@@ -45,7 +45,7 @@ pub(super) fn map_client_error(error: ClientError) -> LibraryServiceError {
                 _ => LibraryServiceErrorKind::Network,
             };
 
-            let mut msg = String::from("Rust SDK library request failed");
+            let mut msg = String::from("Library request failed");
             if let Some(url) = error.url() {
                 msg.push_str(&format!(" [{url}]"));
             }
@@ -76,7 +76,7 @@ pub(super) fn map_sdk_error(error: SdkError) -> LibraryServiceError {
         SdkError::Unauthenticated | SdkError::AuthSession(_) => LibraryServiceErrorKind::Session,
         SdkError::Unconfigured => LibraryServiceErrorKind::Network,
     };
-    LibraryServiceError::new(kind, format!("Rust SDK is not ready: {error}"))
+    LibraryServiceError::new(kind, format!("Not ready: {error}"))
 }
 
 pub(super) fn map_connection_error(error: ConnectionError) -> LibraryServiceError {

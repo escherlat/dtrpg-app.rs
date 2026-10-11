@@ -331,8 +331,9 @@ mod tests {
     #[test]
     fn malformed_color_falls_back_without_panicking() {
         // Other-details swatch rendering (`render_other_details` in
-        // `detail_panel_view.rs`) reuses `cover_style(item).background`, so this
-        // fallback path must never panic on a malformed or empty `item.color`.
+        // `detail_panel_view.rs`) reuses `cover_style(item).background`, so
+        // this fallback path must never panic on a malformed or empty
+        // `item.color`.
         for color in ["", "not-a-color", "#zzzzzz"] {
             let item = make_item("b_malformed", "Malformed Color Book", color);
             let style = cover_style(&item);

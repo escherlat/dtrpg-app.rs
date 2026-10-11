@@ -59,7 +59,8 @@ mod tests {
     #[test]
     fn missing_key_falls_back_to_key_string() {
         // No locale entry exists for these keys; `t!()` falls back to returning
-        // the key itself when no translation and no literal fallback text apply.
+        // the key itself when no translation and no literal fallback text
+        // apply.
         assert_eq!(pluralize(1, "count.nonexistent", "count.nonexistent_plural"),
                    "1 count.nonexistent");
     }

@@ -252,6 +252,11 @@ activity:
   refreshing_thumbnails: "Miniaturansichten werden aktualisiert…"
   refreshing_thumbnails_remaining: "Miniaturansichten werden aktualisiert… (%{remaining} verbleibend)"
   downloading_retry: "%{title} — Versuch %{attempt} in %{delay_secs}s…"
+  creating_collection: "Sammlung „%{name}“ wird erstellt…"
+  deleting_collection: "Sammlung wird gelöscht…"
+  downloading_file: "%{title} wird heruntergeladen…"
+  downloading_file_entry: "%{title} — %{file_name} wird heruntergeladen…"
+  session_setup_failed: "Sitzungseinrichtung nach der Anmeldung fehlgeschlagen"
 
 alert_history:
   title: "Warnungsverlauf"
@@ -323,9 +328,25 @@ menu:
   window_select_tab_title: "Tab auswählen"
   window_select_tab_empty: "Kein Tab"
   help_title: "Hilfe"
+  help_report: "Feature/Fehler melden…"
 
 title_bar:
   sign_out: "Abmelden"
+  report: "Feature/Fehler melden…"
+
+report:
+  title: "Feature/Fehler melden"
+  kind_bug: "Fehler"
+  kind_feature: "Feature-Wunsch"
+  subject_label: "Betreff"
+  subject_placeholder: "Eine kurze Zusammenfassung"
+  description_label: "Beschreibung"
+  description_placeholder: "Schritte zur Reproduktion und was Sie stattdessen erwartet haben."
+  diagnostics_version: "Version %{version}"
+  diagnostics_build: "Build %{date} (%{commit})"
+  diagnostics_platform: "Plattform %{target}"
+  cancel: "Abbrechen"
+  submit: "Melden"
 
 tabs:
   catalog_tab: "Katalog"

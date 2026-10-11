@@ -114,7 +114,8 @@ impl CredentialStore for KeyringCredentialStore {
     fn load(&self) -> Result<Option<Credential>, CredentialError> {
         match self.entry()?.get_password() {
             Ok(raw) => {
-                // Attempt to parse new JSON payload; fall back to legacy raw key string.
+                // Attempt to parse new JSON payload; fall back to legacy raw
+                // key string.
                 let (secret, email) = match serde_json::from_str::<KeyringPayload>(&raw) {
                     Ok(p) => (p.key, p.email),
                     Err(_) => (raw, None),
@@ -151,7 +152,8 @@ mod tests {
     use super::*;
     use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 
-    // ── Mock store for unit testing call-site behavior ────────────────────────
+    // ── Mock store for unit testing call-site behavior
+    // ────────────────────────
 
     #[derive(Default)]
     struct MockCredentialStore {
@@ -281,7 +283,8 @@ mod tests {
         assert!(debug.contains("[redacted]"));
     }
 
-    // ── KeyringPayload JSON encoding ──────────────────────────────────────────
+    // ── KeyringPayload JSON encoding
+    // ──────────────────────────────────────────
 
     #[test]
     fn payload_round_trips_key_and_email() {

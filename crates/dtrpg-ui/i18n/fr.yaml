@@ -252,6 +252,11 @@ activity:
   refreshing_thumbnails: "Actualisation des miniatures…"
   refreshing_thumbnails_remaining: "Actualisation des miniatures… (%{remaining} restantes)"
   downloading_retry: "%{title} — nouvelle tentative %{attempt} dans %{delay_secs}s…"
+  creating_collection: "Création de la collection « %{name} »…"
+  deleting_collection: "Suppression de la collection…"
+  downloading_file: "Téléchargement de %{title}…"
+  downloading_file_entry: "Téléchargement de %{title} — %{file_name}…"
+  session_setup_failed: "Échec de la configuration de la session après la connexion"
 
 alert_history:
   title: "Historique des alertes"
@@ -323,9 +328,25 @@ menu:
   window_select_tab_title: "Sélectionner l'onglet"
   window_select_tab_empty: "Aucun onglet"
   help_title: "Aide"
+  help_report: "Signaler un bug/une fonctionnalité…"
 
 title_bar:
   sign_out: "Se déconnecter"
+  report: "Signaler un bug/une fonctionnalité…"
+
+report:
+  title: "Signaler un bug/une fonctionnalité"
+  kind_bug: "Bug"
+  kind_feature: "Demande de fonctionnalité"
+  subject_label: "Sujet"
+  subject_placeholder: "Un bref résumé"
+  description_label: "Description"
+  description_placeholder: "Étapes pour reproduire, et ce que vous attendiez à la place."
+  diagnostics_version: "Version %{version}"
+  diagnostics_build: "Build %{date} (%{commit})"
+  diagnostics_platform: "Plateforme %{target}"
+  cancel: "Annuler"
+  submit: "Signaler"
 
 tabs:
   catalog_tab: "Catalogue"

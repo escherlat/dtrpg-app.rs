@@ -1,0 +1,110 @@
+name: Release
+
+permissions:
+  contents: write
+  # rust-release.yaml declares id-token: write unconditionally (for crates.io
+  # OIDC trusted publishing), even though publish-to-crates-io is false here -
+  # the caller must still grant it, or GitHub refuses to start the run.
+  id-token: write
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re-)run the release for, e.g. v0.1.0"
+        required: true
+        type: string
+
+jobs:
+  release:
+    uses: pilgrimagesoftware/github-actions/.github/workflows/rust-release.yaml@master
+    with:
+      tag: ${{ inputs.tag }}
+      # ci.yml already runs the whole workspace on both Linux and macOS for
+      # every push and PR; this re-runs that same suite against the tagged
+      # ref. The bare release runner lacks the GUI dev libraries ci.yml
+      # installs; without them the pre-publish cargo test can't link (gpui,
+      # gpui-component).
+      test-args: "--workspace"
+      publish-to-crates-io: false
+      linux-packages: >-
+        libsecret-1-dev libasound2-dev libfontconfig-dev libgit2-dev
+        libglib2.0-dev libssl-dev libva-dev libvulkan1 libwayland-dev
+        libx11-xcb-dev libxkbcommon-x11-dev libzstd-dev
+      release-branch: master
+      merge-back-branch: develop
+    secrets:
+      PSW_CI_APP_ID: ${{ secrets.PSW_CI_APP_ID }}
+      PSW_CI_PRIVATE_KEY: ${{ secrets.PSW_CI_PRIVATE_KEY }}
+
+  # Packages Libri for the released tag and attaches the installers to the
+  # release the job above created.
+  package:
+    needs: release
+    uses: ./.github/workflows/package.yml
+    with:
+      tag: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+      ref: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+    secrets: inherit
+
+  # Registers the release with Sentry for commit-to-release mapping, mirroring
+  # the registration the old package.yaml performed. Requires the
+  # SENTRY_AUTH_TOKEN repo secret (release-management scope); skipped, not
+  # failed, until that secret is added - registration is metadata on top of
+  # crash reporting, which already works via SENTRY_DSN alone (see package.yml).
+  sentry-release:
+    name: Register release with Sentry
+    needs: package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve tag
+        id: resolve_tag
+        run: |
+          echo "tag=${{ inputs.tag != '' && inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.resolve_tag.outputs.tag }}
+          fetch-depth: 0
+
+      # `if:` conditions cannot reference the `secrets` context directly
+      # (GitHub Actions rejects the workflow at parse time), so the token's
+      # presence is checked here in a `run:` step - where secrets ARE
+      # accessible - and the result exposed as a step output for later
+      # steps to branch on.
+      - name: Check for Sentry auth token
+        id: sentry_auth
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Sentry release
+        if: steps.sentry_auth.outputs.present == 'true'
+        uses: getsentry/action-release@v3
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: pilgrimage-software
+          SENTRY_PROJECT: dtrpg
+        with:
+          # `SENTRY_PROJECT` alone does not scope the release to a project -
+          # the action only passes `-p <project>` to sentry-cli when
+          # `projects` is set, and without it the release is created
+          # org-wide but unlinked from any project.
+          projects: dtrpg
+          environment: production
+          release: ${{ steps.resolve_tag.outputs.tag }}
+          set_commits: auto
+
+      - name: Note skipped registration
+        if: steps.sentry_auth.outputs.present != 'true'
+        run: echo "::warning::SENTRY_AUTH_TOKEN not set - skipping Sentry release registration"

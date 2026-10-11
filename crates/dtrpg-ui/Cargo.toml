@@ -28,7 +28,7 @@ chrono = { workspace = true }
 sys-locale = { workspace = true }
 open = { workspace = true }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
-lopdf = { version = "0.44.0", default-features = false }
+lopdf = { version = "0.45.0", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 fs4 = { version = "1.1.0", default-features = false, features = ["sync"] }
 

@@ -64,7 +64,8 @@ fn item_click_handler(id: Arc<str>, title: String, entity: Entity<LibraryControl
             entity.update(cx, |ctrl, cx| {
                       ctrl.clear_selection(cx);
                       // Reopening a detail tab must show no pre-selected item
-                      // (selection is ephemeral, see `catalog-entry-detail-view`).
+                      // (selection is ephemeral, see
+                      // `catalog-entry-detail-view`).
                       ctrl.clear_item_selection(&id, cx);
                       ctrl.ensure_detail_cover(&id, cx);
                   });
@@ -630,9 +631,10 @@ impl TableDelegate for CatalogListDelegate {
     fn render_th(&mut self, col_ix: usize, _window: &mut Window,
                  cx: &mut Context<TableState<Self>>)
                  -> impl IntoElement {
-        // `gpui-component`'s default `render_th` renders the column name in a plain
-        // non-flex `div`, so the text sits at the top of the header cell instead of
-        // vertically centered like every `render_td` cell. Match the cell style here.
+        // `gpui-component`'s default `render_th` renders the column name in a
+        // plain non-flex `div`, so the text sits at the top of the
+        // header cell instead of vertically centered like every
+        // `render_td` cell. Match the cell style here.
         let name = self.column(col_ix, cx).name;
         let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
         div().h_full()
@@ -1148,8 +1150,9 @@ impl Render for CatalogView {
             None
         };
 
-        // Update items_per_row estimate for grid layout using the viewport width.
-        // Subtract a rough sidebar width (220px) and both side pads.
+        // Update items_per_row estimate for grid layout using the viewport
+        // width. Subtract a rough sidebar width (220px) and both side
+        // pads.
         let viewport_w = window.viewport_size().width.as_f32();
         let usable_w = (viewport_w - 220.0 - pad_side.as_f32() * 2.0).max(0.0);
         let card_pitch = density.card_min_width + density.card_gap_x.as_f32();
@@ -1162,13 +1165,15 @@ impl Render for CatalogView {
 
         let outer = div().flex_1().min_h_0().flex().flex_col();
 
-        // Non-virtualized branches (grouped Thumbs/Grid, empty/loading states) size
-        // their content to its natural height and need `root` itself to scroll.
-        // Virtualized branches (uniform_list-backed Thumbs/Grid, and DataTable-backed
-        // List) manage their own scrolling and scrollbar via `scroll_handle` /
-        // internally, so wrapping them in a second, unrelated scroll container here
-        // would leave the outer scrollbar tracking a handle that never reflects the
-        // true (virtualized) content size — the bug behind a missing grid scrollbar.
+        // Non-virtualized branches (grouped Thumbs/Grid, empty/loading states)
+        // size their content to its natural height and need `root`
+        // itself to scroll. Virtualized branches (uniform_list-backed
+        // Thumbs/Grid, and DataTable-backed List) manage their own
+        // scrolling and scrollbar via `scroll_handle` / internally, so
+        // wrapping them in a second, unrelated scroll container here
+        // would leave the outer scrollbar tracking a handle that never reflects
+        // the true (virtualized) content size — the bug behind a
+        // missing grid scrollbar.
         let root = div().flex_1()
                         .min_h_0()
                         .flex()
@@ -1662,12 +1667,13 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let drag_payload = DraggedLibraryItem { title:      title.clone().into(),
                                             member_id:  collection_member_id(item),
                                             product_id: item.product_id, };
-    // Approximation: the title column fills the remaining row width after the cover
-    // and gap, which depends on the actual panel layout (sidebar/detail panel
-    // state) that isn't known synchronously here. `window.viewport_size()`
-    // minus the catalog's own side padding, cover width, and gap is used as a
-    // best-effort proxy; this may under-detect truncation when side panels are
-    // open and the row is narrower than this estimate assumes.
+    // Approximation: the title column fills the remaining row width after the
+    // cover and gap, which depends on the actual panel layout
+    // (sidebar/detail panel state) that isn't known synchronously here.
+    // `window.viewport_size()` minus the catalog's own side padding, cover
+    // width, and gap is used as a best-effort proxy; this may under-detect
+    // truncation when side panels are open and the row is narrower than
+    // this estimate assumes.
     let title_available_w =
         window.viewport_size().width - (density.catalog_pad_side * 2.0) - px(thumb_w) - px(12.0);
     let title_truncated = is_title_truncated(window,

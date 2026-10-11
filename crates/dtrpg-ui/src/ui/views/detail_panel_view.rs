@@ -400,10 +400,11 @@ impl TableDelegate for ItemListDelegate {
         else if col_ix == 0
                   && let Some(table_width) = self.table_width
         {
-            // Name has no user override yet: fill whatever width Type/Size/Status
-            // don't use, so those three stay narrow and pushed to the right
-            // instead of leaving blank trailing space when the panel is wider
-            // than the four columns' fixed defaults.
+            // Name has no user override yet: fill whatever width
+            // Type/Size/Status don't use, so those three stay
+            // narrow and pushed to the right instead of leaving
+            // blank trailing space when the panel is wider than the
+            // four columns' fixed defaults.
             let others: f32 = self.columns[1..].iter().map(|c| c.width.as_f32()).sum();
             let name_width = (table_width.as_f32() - others).max(col.min_width.as_f32());
             col = col.width(name_width);
@@ -690,10 +691,10 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
 
     let selected_file = selected_ix.and_then(|ix| item.files.get(ix).map(|file| (ix, file)));
 
-    // Only ever `Some` while this entry's detail tab is active — inactive detail
-    // tabs never call `render_item_tier` at all (see `root_view`'s match on the
-    // active `TabTarget`), so the popover can't leak into another tab without
-    // extra gating here.
+    // Only ever `Some` while this entry's detail tab is active — inactive
+    // detail tabs never call `render_item_tier` at all (see `root_view`'s
+    // match on the active `TabTarget`), so the popover can't leak into
+    // another tab without extra gating here.
     let zip_popover: AnyElement = match entity.read(cx).zip_preview_for(&entry_id) {
         Some((row_ix, anchor_pos, _pinned)) => match item.files.get(row_ix) {
             Some(file) => {
@@ -1278,8 +1279,8 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
                 .span(2),
         );
 
-    // The DriveThruRPG order-product API does not always report a page count; omit
-    // the row entirely rather than showing a misleading "0".
+    // The DriveThruRPG order-product API does not always report a page count;
+    // omit the row entirely rather than showing a misleading "0".
     if item.pages > 0 {
         list = list.child(
             DescriptionItem::new(styled_label(t!("detail.field_pages").to_string(), label_font_family))

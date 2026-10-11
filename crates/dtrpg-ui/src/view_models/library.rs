@@ -102,8 +102,9 @@ impl LibraryViewModel {
             }
             Err(error) => {
                 if is_needs_reauth(&error) {
-                    // TODO: trigger full re-auth (token refresh → login window) once
-                    // connect-sdk-to-rust-app lands. For now, log and show error state.
+                    // TODO: trigger full re-auth (token refresh → login window)
+                    // once connect-sdk-to-rust-app lands.
+                    // For now, log and show error state.
                     tracing::warn!("session expired, returning to login");
                 }
                 self.items = Vec::new();

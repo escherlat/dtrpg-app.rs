@@ -178,7 +178,8 @@ mod tests {
 
     #[test]
     fn backoff_delay_jitter_stays_within_configured_range() {
-        // attempt=3, base=2, max=30 → pre-jitter capped delay is 8s, +/-25% is [6, 10].
+        // attempt=3, base=2, max=30 → pre-jitter capped delay is 8s, +/-25% is
+        // [6, 10].
         for jitter_source in [0, 1, 100, 999_999] {
             let delay = backoff_delay(3, jitter_source, 2, 30).as_secs();
             assert!((6..=10).contains(&delay),

@@ -117,10 +117,36 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
             .map(|item| (Arc::clone(&item.id), item))
             .collect();
 
+    // The API mints a new `orderProductId` (and thus a new `id`) when a
+    // title's files are republished, so `id` alone isn't stable across a
+    // republish. `product_id` is the catalog SKU and stays constant across
+    // republishes, so it's used as a fallback match for an existing item
+    // whose `id` no longer appears live — without this, a republished title
+    // reconciles as "old id gone" (flagged unavailable) plus "new id new"
+    // (appended), duplicating the entry instead of recognizing it as the
+    // same book.
+    let mut live_id_by_product_id: HashMap<u64, Arc<str>> = HashMap::new();
+    for item in live_by_id.values() {
+        if item.product_id != 0 {
+            live_id_by_product_id.entry(item.product_id)
+                                 .or_insert_with(|| Arc::clone(&item.id));
+        }
+    }
+
     let mut reconciled: Vec<LibraryItem> =
         existing.into_iter()
                 .map(|mut item| {
-                    if let Some(mut live_item) = live_by_id.remove(&item.id) {
+                    let matched_id = if live_by_id.contains_key(&item.id) {
+                        Some(Arc::clone(&item.id))
+                    }
+                    else if item.product_id != 0 {
+                        live_id_by_product_id.get(&item.product_id).cloned()
+                    }
+                    else {
+                        None
+                    };
+
+                    if let Some(mut live_item) = matched_id.and_then(|id| live_by_id.remove(&id)) {
                         let downloaded_by_id: HashMap<Arc<str>, bool> =
                             item.files
                                 .iter()
@@ -144,6 +170,41 @@ fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>) -> Vec<
 
     reconciled.extend(live_by_id.into_values());
     reconciled
+}
+
+/// Collapses catalog entries that share a `product_id` (the catalog SKU)
+/// down to one, keeping the available entry if exactly one of the pair is
+/// available, otherwise the entry with the greater `numeric_id`.
+///
+/// Needed for on-disk caches saved before `reconcile_catalog` learned the
+/// `product_id` fallback match (see its comment): those caches can already
+/// contain a stale-unavailable/new-duplicate pair for a republished title,
+/// which this collapses on load rather than requiring a manual cache clear.
+/// Items with `product_id == 0` (no known SKU) are never deduped against one
+/// another — `0` is used elsewhere in this file as a "SKU unknown" sentinel,
+/// not a real shared identity.
+fn dedupe_by_product_id(items: Vec<LibraryItem>) -> Vec<LibraryItem> {
+    let mut index_by_product_id: HashMap<u64, usize> = HashMap::new();
+    let mut deduped: Vec<LibraryItem> = Vec::with_capacity(items.len());
+    for item in items {
+        if item.product_id == 0 {
+            deduped.push(item);
+            continue;
+        }
+        match index_by_product_id.get(&item.product_id) {
+            Some(&ix) => {
+                let current = (deduped[ix].is_available, deduped[ix].numeric_id);
+                if (item.is_available, item.numeric_id) > current {
+                    deduped[ix] = item;
+                }
+            }
+            None => {
+                index_by_product_id.insert(item.product_id, deduped.len());
+                deduped.push(item);
+            }
+        }
+    }
+    deduped
 }
 
 /// Returns the positions of every not-yet-downloaded file in `files`, in
@@ -291,22 +352,24 @@ fn apply_check_result(item: &mut LibraryItem, result: Result<LibraryItem, Librar
                       checked_at: std::time::SystemTime) {
     match result {
         Ok(fresh) => {
-            // Preserve identity/collection-membership fields from the existing item
-            // rather than trusting the single-item response for them: a per-item
-            // availability re-check should only refresh display data, and blindly
-            // overwriting `order_product_id`/`product_id` here has been observed to
-            // silently corrupt `collection_member_id` lookups for the checked item
-            // (its collection membership stops resolving) when the single-item
-            // endpoint's response doesn't carry the exact same id values the list
-            // fetch populated.
+            // Preserve identity/collection-membership fields from the existing
+            // item rather than trusting the single-item response
+            // for them: a per-item availability re-check should
+            // only refresh display data, and blindly overwriting
+            // `order_product_id`/`product_id` here has been observed to
+            // silently corrupt `collection_member_id` lookups for the checked
+            // item (its collection membership stops resolving) when
+            // the single-item endpoint's response doesn't carry the
+            // exact same id values the list fetch populated.
             let id = Arc::clone(&item.id);
             let numeric_id = item.numeric_id;
             let order_product_id = item.order_product_id;
             let product_id = item.product_id;
-            // `downloaded` is a local-only fact the server response knows nothing
-            // about - the single-item endpoint always reports it `false`.
-            // Preserve each file's existing flag by id so a re-check (or the
-            // disk-presence verification racing it, see
+            // `downloaded` is a local-only fact the server response knows
+            // nothing about - the single-item endpoint always
+            // reports it `false`. Preserve each file's existing
+            // flag by id so a re-check (or the disk-presence
+            // verification racing it, see
             // `verify-downloaded-status-against-disk`) doesn't get its
             // correction wiped the moment this slower network check resolves.
             let downloaded_by_id: HashMap<Arc<str>, bool> =
@@ -394,7 +457,15 @@ fn merge_partial_fetch(mut existing: Vec<LibraryItem>, partial: Vec<LibraryItem>
                        -> Vec<LibraryItem> {
     for mut item in partial {
         item.is_available = true;
-        if let Some(existing_item) = existing.iter_mut().find(|e| e.id == item.id) {
+        // Same `product_id` fallback as `reconcile_catalog`: a republished
+        // title's `id` can change between fetches, so matching on `id` alone
+        // would append a duplicate instead of refreshing the existing entry.
+        let existing_match =
+            existing.iter_mut()
+                    .find(|e| {
+                        e.id == item.id || (item.product_id != 0 && e.product_id == item.product_id)
+                    });
+        if let Some(existing_item) = existing_match {
             *existing_item = item;
         }
         else {
@@ -1053,7 +1124,7 @@ impl LibraryController {
 
             let cached = async_cx
                 .background_executor()
-                .spawn(async move { load_catalog_cache(&cache_root) })
+                .spawn(async move { load_catalog_cache(&cache_root).map(dedupe_by_product_id) })
                 .await;
             if let Some(items) = cached.as_ref() {
                 this.update(async_cx, |ctrl, cx| {
@@ -1063,7 +1134,15 @@ impl LibraryController {
                     if force_reload {
                         ctrl.catalog.clear();
                     }
-                    ctrl.append_catalog_page(items.clone(), cx);
+                    // Only pre-populate when there's nothing in memory yet (fresh
+                    // controller, or just cleared above) — `append_catalog_page`
+                    // does a plain `extend` with no dedup, so calling it again on an
+                    // already-populated catalog (e.g. a periodic refresh tick after
+                    // the initial load completed, or any later call to
+                    // `start_load`/`start_load_inner`) would duplicate every item.
+                    if ctrl.catalog.is_empty() {
+                        ctrl.append_catalog_page(items.clone(), cx);
+                    }
                 })
                 .ok();
             }
@@ -1816,9 +1895,11 @@ impl LibraryController {
                                    .ok();
                   }
                   Err(e) => {
-                      // Session errors are expected when starting before auth completes
-                      // (see `start_load_inner`'s matching treatment for the catalog
-                      // fetch); quietly complete rather than surfacing a user-facing error.
+                      // Session errors are expected when starting before auth
+                      // completes
+                      // (see `start_load_inner`'s matching treatment for the
+                      // catalog fetch); quietly complete
+                      // rather than surfacing a user-facing error.
                       if e.kind == CollectionsServiceErrorKind::Session {
                           tracing::warn!(error = %e,
                                       "collections load skipped: no authenticated session");
@@ -1847,8 +1928,9 @@ impl LibraryController {
                          &catalog_ids);
         self.collections = collections;
         self.collections_loaded = true;
-        // Refresh collection_members if the current filter is a Collection filter,
-        // in case the filter was set before the collections loaded.
+        // Refresh collection_members if the current filter is a Collection
+        // filter, in case the filter was set before the collections
+        // loaded.
         if let SidebarFilter::Collection(id, _) = &self.filter {
             let id = *id;
             self.collection_members = self.collections
@@ -1906,7 +1988,7 @@ impl LibraryController {
     /// [`CollectionCreateFailed`] is emitted so the window can push an
     /// error notification.
     pub fn create_collection(&mut self, name: String, cx: &mut Context<Self>) {
-        let label = format!("Creating collection '{name}'...");
+        let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
@@ -1953,7 +2035,7 @@ impl LibraryController {
     /// [`CollectionCreateFailed`] is emitted — no add is attempted.
     pub fn create_collection_and_add_member(&mut self, name: String, item_id: u64,
                                             product_id: u64, cx: &mut Context<Self>) {
-        let label = format!("Creating collection '{name}'...");
+        let label = t!("activity.creating_collection", name = name);
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
 
         let collections_service = Arc::clone(&self.collections_service);
@@ -2030,16 +2112,17 @@ impl LibraryController {
         self.section_counts = SectionCounts::default();
         self.publishers.clear();
         self.invalidate_cache();
-        // Queued availability checks reference items that no longer exist in the
-        // now-cleared catalog; an in-flight check (if any) still completes normally
-        // and harmlessly finds nothing to update.
+        // Queued availability checks reference items that no longer exist in
+        // the now-cleared catalog; an in-flight check (if any) still
+        // completes normally and harmlessly finds nothing to update.
         self.check_queue.clear();
         for (id, _url, _force) in self.thumbnail_queue.drain(..) {
             cx.global_mut::<CoverCache>().in_flight.remove(&id);
         }
-        // If nothing is currently in flight, no pending fetch completion will ever run
-        // `drain_thumbnail_queue`'s empty-queue completion branch — without this, the
-        // aggregated activity item would be left showing "in progress" indefinitely.
+        // If nothing is currently in flight, no pending fetch completion will
+        // ever run `drain_thumbnail_queue`'s empty-queue completion
+        // branch — without this, the aggregated activity item would be
+        // left showing "in progress" indefinitely.
         if self.active_thumbnail_fetches == 0
            && let Some(id) = self.thumbnail_activity_id.take()
         {
@@ -2064,7 +2147,7 @@ impl LibraryController {
     /// Logs failures to the activity panel and leaves the collection in place
     /// on error.
     pub fn delete_collection(&mut self, id: u64, cx: &mut Context<Self>) {
-        let label = "Deleting collection\u{2026}".to_string();
+        let label = t!("activity.deleting_collection").to_string();
         let activity_id = self.activity.update(cx, |a, cx| a.start(&label, None, cx));
         let collections_service = Arc::clone(&self.collections_service);
         cx.spawn(async move |this, async_cx| {
@@ -2316,7 +2399,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Thumbnail loading ──────────────────────────────────────────────────────
+    // ── Thumbnail loading
+    // ──────────────────────────────────────────────────────
 
     /// Enqueues thumbnail fetches for items that have a `cover_url` not yet
     /// cached or in flight.  Must be called before items are added to `catalog`
@@ -2662,9 +2746,10 @@ impl LibraryController {
         }
 
         self.thumbnail_queue.clear();
-        // This forces a fresh full re-fetch batch — reset the processed counter so the
-        // progress bar denominator isn't skewed by whatever fraction of a prior batch
-        // had already completed before this action was invoked.
+        // This forces a fresh full re-fetch batch — reset the processed counter
+        // so the progress bar denominator isn't skewed by whatever
+        // fraction of a prior batch had already completed before this
+        // action was invoked.
         self.thumbnail_processed = 0;
         self.thumbnail_refresh_active = true;
         self.thumbnail_refresh_pending =
@@ -2710,7 +2795,8 @@ impl LibraryController {
         }
     }
 
-    // ── Snapshot ──────────────────────────────────────────────────────────────
+    // ── Snapshot
+    // ──────────────────────────────────────────────────────────────
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
@@ -2785,7 +2871,8 @@ impl LibraryController {
             .collect()
     }
 
-    // ── Filtered result set ───────────────────────────────────────────────────
+    // ── Filtered result set
+    // ───────────────────────────────────────────────────
 
     /// Recomputes the filtered, sorted item cache from the current catalog,
     /// filter, search query, and sort settings.
@@ -2837,7 +2924,8 @@ impl LibraryController {
              .unwrap_or_default()
     }
 
-    // ── Sidebar filter mutations ──────────────────────────────────────────────
+    // ── Sidebar filter mutations
+    // ──────────────────────────────────────────────
 
     /// Sets the active sidebar filter.
     ///
@@ -2862,7 +2950,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Search mutations ──────────────────────────────────────────────────────
+    // ── Search mutations
+    // ──────────────────────────────────────────────────────
 
     /// Updates the text search query.
     pub fn set_search_query(&mut self, query: String, cx: &mut Context<Self>) {
@@ -2878,11 +2967,13 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Sidebar section search mutations ──────────────────────────────────────
+    // ── Sidebar section search mutations
+    // ──────────────────────────────────────
     //
     // These filter the publishers/collections sidebar lists only. They never
     // touch the catalog cache and are intentionally session-only: closing a
-    // section's search bar clears its query so reopening it always starts fresh.
+    // section's search bar clears its query so reopening it always starts
+    // fresh.
 
     /// Toggles the publishers section's inline search bar, clearing its query
     /// on close.
@@ -2916,7 +3007,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Sort mutations ────────────────────────────────────────────────────────
+    // ── Sort mutations
+    // ────────────────────────────────────────────────────────
 
     /// Sets the sort method.
     pub fn set_sort(&mut self, sort: SortMethod, cx: &mut Context<Self>) {
@@ -2988,7 +3080,8 @@ impl LibraryController {
                                                                 self.presentation).save();
     }
 
-    // ── Selection mutations ───────────────────────────────────────────────────
+    // ── Selection mutations
+    // ───────────────────────────────────────────────────
 
     /// Opens the single-click item popover for `id` (see `main-window-tabs`).
     ///
@@ -3062,7 +3155,8 @@ impl LibraryController {
         self.verifying_downloads.clone()
     }
 
-    // ── Item-level availability checks ────────────────────────────────────────
+    // ── Item-level availability checks
+    // ────────────────────────────────────────
 
     /// Returns `true` if an availability check is currently in flight for
     /// catalog item `id` (on-demand or from the periodic queue).
@@ -3124,8 +3218,8 @@ impl LibraryController {
             if let Err(e) = &result
                && e.kind != LibraryServiceErrorKind::NotFound
             {
-                // Transient failure: not evidence of removal, leave the item and
-                // its flag entirely unchanged.
+                // Transient failure: not evidence of removal, leave the item
+                // and its flag entirely unchanged.
                 tracing::warn!(id = %id, error = %e, "item availability check failed transiently");
             }
             this.update(async_cx, |ctrl, cx| {
@@ -3456,7 +3550,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Detail panel width ────────────────────────────────────────────────────
+    // ── Detail panel width
+    // ────────────────────────────────────────────────────
 
     /// Returns the current detail panel width, in pixels.
     #[must_use]
@@ -3474,7 +3569,8 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    // ── Download queue ────────────────────────────────────────────────────────
+    // ── Download queue
+    // ────────────────────────────────────────────────────────
 
     /// Reverts a `Downloaded` entry to `Cloud` status.
     ///
@@ -3801,8 +3897,10 @@ impl LibraryController {
                         });
 
         let label = match &found {
-            Some((_, file_name, _)) => format!("Downloading {title} — {file_name}..."),
-            None => format!("Downloading {title}..."),
+            Some((_, file_name, _)) => t!("activity.downloading_file_entry",
+                                          title = title,
+                                          file_name = file_name).to_string(),
+            None => t!("activity.downloading_file", title = title).to_string(),
         };
         let activity_id = self.activity
                               .update(cx, |a, cx| a.start(&label, Some(cancel_fn), cx));
@@ -3962,7 +4060,8 @@ impl LibraryController {
           .detach();
     }
 
-    // ── Theme / density mutations (dispatched via callbacks) ──────────────────
+    // ── Theme / density mutations (dispatched via callbacks)
+    // ──────────────────
 
     /// Applies a new theme key (updates the GPUI global) and persists it via
     /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart
@@ -4079,7 +4178,8 @@ impl LibraryController {
         cx.notify();
     }
 
-    // ── Helper accessors ──────────────────────────────────────────────────────
+    // ── Helper accessors
+    // ──────────────────────────────────────────────────────
 
     /// Returns the selected `LibraryItem`, if any.
     #[must_use]
@@ -5765,7 +5865,8 @@ mod check_batch_tests {
         let batch = select_check_batch(&catalog, 10);
 
         // The recently-checked item is within its cooldown and not due, so it's
-        // excluded; the never-checked item sorts before the long-ago-checked one.
+        // excluded; the never-checked item sorts before the long-ago-checked
+        // one.
         assert_eq!(batch,
                    vec![Arc::clone(&never_checked.id),
                         Arc::clone(&checked_long_ago.id)]);
@@ -5851,7 +5952,8 @@ mod partial_fetch_tests {
 
         let merged = merge_partial_fetch(vec![existing], vec![]);
 
-        // Absence from a partial response proves nothing — the flag must not change.
+        // Absence from a partial response proves nothing — the flag must not
+        // change.
         assert!(!merged[0].is_available);
     }
 

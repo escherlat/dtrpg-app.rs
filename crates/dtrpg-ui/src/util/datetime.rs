@@ -307,9 +307,10 @@ mod tests {
 
     #[test]
     fn absolute_epoch_zero() {
-        // Tests the deterministic fixed-format path directly — `format_absolute`
-        // itself is OS-locale-dependent on macOS and can't be pinned to a
-        // literal expected string (see `format_absolute_os_locale`).
+        // Tests the deterministic fixed-format path directly —
+        // `format_absolute` itself is OS-locale-dependent on macOS and
+        // can't be pinned to a literal expected string (see
+        // `format_absolute_os_locale`).
         assert_eq!(format_absolute_fixed(0), "January 1, 1970 at 12:00 AM");
     }
 

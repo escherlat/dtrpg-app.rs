@@ -165,9 +165,8 @@ fn runtime_or_builtin(env_var: &str, builtin: Option<&str>) -> Option<String> {
 fn init_sentry_with(dsn: String, environment: String, release: String)
                     -> (Option<sentry::ClientInitGuard>, SentryStatus) {
     let guard = sentry::init((dsn,
-                              sentry::ClientOptions { environment: Some(environment.into()),
-                                                      release: Some(release.into()),
-                                                      ..Default::default() }));
+                              sentry::ClientOptions::new().environment(environment)
+                                                          .release(release)));
 
     if guard.is_enabled() {
         (Some(guard), SentryStatus::Active)

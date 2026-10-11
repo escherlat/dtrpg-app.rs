@@ -1,0 +1,216 @@
+name: Package
+
+# Builds installable Libri packages with cargo-packager for every platform
+# ci.yml already tests (macOS, Linux), plus a best-effort Windows leg (see
+# windows-spike.yaml for the standalone build-only trial that gates removing
+# `continue-on-error` below).
+#
+# Runs on every merge into develop, keeping the result as a workflow artifact,
+# and is called by release.yml with a tag, which also attaches the installers
+# to the GitHub Release.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to attach the packages to. Empty to only keep them as an artifact."
+        type: string
+        default: ""
+      ref:
+        description: "Git ref to build. Defaults to the ref that triggered the caller."
+        type: string
+        default: ""
+
+env:
+  CARGO_TERM_COLOR: always
+  SENTRY_ORG: pilgrimage-software
+  SENTRY_PROJECT: dtrpg
+
+permissions:
+  contents: write
+
+# A merge into develop supersedes the build in flight for the one before it; a
+# release build has its own group and is never cancelled.
+concurrency:
+  group: package-${{ inputs.tag || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  package:
+    name: Package (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    # The Windows leg is unverified against the pinned `gpui` revision (see
+    # windows-spike.yaml); it must not block macOS/Linux packaging while
+    # that's resolved.
+    continue-on-error: ${{ matrix.name == 'Windows' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `macos-latest` runners are Apple Silicon (arm64); build natively.
+          # Intel Mac is not a supported target — see the README's Platform
+          # Requirements section.
+          - name: macOS
+            os: macos-latest
+            target: aarch64-apple-darwin
+            formats: dmg
+          # Uses the `gnu` target rather than ci.yml's `musl`: AppImage/.deb
+          # packaging expects dynamic linking against the system's GUI
+          # libraries (X11/Wayland, fontconfig, D-Bus/libsecret), impractical
+          # to statically link via musl for a GUI app.
+          - name: Linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            formats: appimage,deb
+          - name: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            formats: nsis,wix
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          target: ${{ matrix.target }}
+          cache-key: package-${{ matrix.target }}
+
+      - name: Install Linux packaging dependencies
+        if: matrix.name == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsecret-1-dev \
+            libasound2-dev \
+            libfontconfig-dev \
+            libgit2-dev \
+            libglib2.0-dev \
+            libssl-dev \
+            libva-dev \
+            libvulkan1 \
+            libwayland-dev \
+            libx11-xcb-dev \
+            libxkbcommon-x11-dev \
+            libzstd-dev
+
+      - name: Install cargo-packager
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-packager
+
+      # cargo-packager resolves `[package.metadata.packager]` from the manifest
+      # in the current directory, not from a workspace root with `--packages`.
+      - name: Package
+        working-directory: crates/dtrpg-core
+        shell: bash
+        env:
+          # macOS Developer ID signing/notarization credentials. While unset the
+          # .app and dmg get the ad-hoc signature `crates/dtrpg-core/Cargo.toml`
+          # configures. cargo-packager reads the certificate and notarization
+          # values from the environment, but the identity only from its
+          # config, so the script below writes APPLE_SIGNING_IDENTITY into
+          # the manifest.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # `crates/dtrpg-core/build.rs` embeds these at compile time when the
+          # `sentry` feature is enabled (see before-packaging-command in
+          # `crates/dtrpg-core/Cargo.toml`). An unset/empty DSN disables
+          # Sentry without failing the build.
+          DTRPG_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          DTRPG_SENTRY_ENVIRONMENT: production
+          DTRPG_SENTRY_RELEASE: ${{ inputs.tag }}
+          # `before-packaging-command` in `crates/dtrpg-core/Cargo.toml` runs a
+          # plain `cargo build` with no `--target`. Without this, cargo writes
+          # the binary to `target/release/` while `cargo packager --target
+          # ${{ matrix.target }}` looks for it under
+          # `target/${{ matrix.target }}/release/`, so packaging fails with a
+          # "file not found" error even though the build itself succeeded.
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          # A secret that isn't set still arrives as an empty variable, and
+          # cargo-packager treats a present-but-empty APPLE_CERTIFICATE as a
+          # certificate to import, which fails. Unset the empty ones.
+          for var in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+            APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!var}" ] || unset "$var"
+          done
+          if [ "$RUNNER_OS" = macOS ] && [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+            perl -pi -e 's/^signing-identity = "-"$/signing-identity = "$ENV{APPLE_SIGNING_IDENTITY}"/' Cargo.toml
+            grep -qxF "signing-identity = \"$APPLE_SIGNING_IDENTITY\"" Cargo.toml || {
+              echo "::error::could not set the Developer ID identity in crates/dtrpg-core/Cargo.toml"
+              exit 1
+            }
+          fi
+          cargo packager \
+            --release \
+            --target ${{ matrix.target }} \
+            --formats ${{ matrix.formats }} \
+            --verbose
+
+      # Fails the job on a missing or broken signature, on the dmg itself and
+      # on the copy a user actually installs from it. `--deep` here only
+      # verifies nested code; signing never uses it. No separate check against
+      # the unpacked target/<triple>/release/Libri.app: cargo-packager cleans
+      # that intermediate bundle up once it's been copied into the dmg (see
+      # its "Cleaning ... Libri.app" log line), so by this point the dmg's
+      # own copy is the only one that still exists, and is also the one that
+      # actually matters (it's what ships).
+      - name: Verify macOS signatures
+        if: matrix.name == 'macOS'
+        run: |
+          set -euo pipefail
+          out=target/${{ matrix.target }}/release
+          dmg=$(ls "$out"/*.dmg)
+          codesign --verify --strict --verbose=2 "$dmg"
+          mnt=$(mktemp -d)
+          # The dmg carries LICENSE.md as a license agreement, which hdiutil
+          # pages and asks to accept; without the `yes` it cancels the attach.
+          # Fed by process substitution, not a pipe: `yes` dies of SIGPIPE once
+          # hdiutil stops reading, which `pipefail` would report as a failure.
+          PAGER=cat hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg" < <(yes) >/dev/null
+          trap 'hdiutil detach "$mnt" -quiet || true' EXIT
+          codesign --verify --deep --strict --verbose=2 "$mnt/Libri.app"
+          codesign -dv "$mnt/Libri.app"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Libri-${{ matrix.name }}-${{ github.run_number }}
+          path: |
+            target/${{ matrix.target }}/release/*.dmg
+            target/${{ matrix.target }}/release/*.AppImage
+            target/${{ matrix.target }}/release/*.deb
+            target/${{ matrix.target }}/release/*.msi
+            target/${{ matrix.target }}/release/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach to release
+        if: inputs.tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          gh release upload "${{ inputs.tag }}" \
+            target/${{ matrix.target }}/release/*.dmg \
+            target/${{ matrix.target }}/release/*.AppImage \
+            target/${{ matrix.target }}/release/*.deb \
+            target/${{ matrix.target }}/release/*.msi \
+            target/${{ matrix.target }}/release/*.exe \
+            --clobber

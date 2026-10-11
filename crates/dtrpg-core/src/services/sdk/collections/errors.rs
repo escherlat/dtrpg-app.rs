@@ -47,7 +47,7 @@ pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
                 Some(401) | Some(403) => CollectionsServiceErrorKind::Session,
                 _ => CollectionsServiceErrorKind::Network,
             };
-            let mut msg = String::from("Rust SDK collections request failed");
+            let mut msg = String::from("Collections request failed");
             if let Some(url) = error.url() {
                 msg.push_str(&format!(" [{url}]"));
             }
@@ -73,7 +73,7 @@ pub(super) fn map_sdk_error(error: SdkError) -> CollectionsServiceError {
         }
         SdkError::Unconfigured => CollectionsServiceErrorKind::Network,
     };
-    CollectionsServiceError::new(kind, format!("Rust SDK is not ready: {error}"))
+    CollectionsServiceError::new(kind, format!("Not ready: {error}"))
 }
 
 pub(super) fn map_connection_error(error: ConnectionError) -> CollectionsServiceError {

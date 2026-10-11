@@ -18,7 +18,7 @@ use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
-use crate::ui::actions::ShowSettings;
+use crate::ui::actions::{ReportFeatureBug, ShowSettings};
 
 /// Renders the title bar: app title on the left, a drag region, and the
 /// account button on the right, separated from the content below by a
@@ -178,6 +178,16 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
                         window.dispatch_action(Box::new(ShowSettings), cx);
                     },
                 ))
+                .item(
+                    PopupMenuItem::new(t!("title_bar.report")).on_click(move |_, window, cx| {
+                        // Same action the Help menu item dispatches, so both
+                        // entry points open the identical dialog (and share
+                        // its no-stacking guard) — see
+                        // `shared-report-feature-bug`.
+                        window.dispatch_action(Box::new(ReportFeatureBug), cx);
+                    }),
+                )
+                .item(PopupMenuItem::separator())
                 .item(
                     PopupMenuItem::new(t!("title_bar.sign_out")).on_click(move |_, _, cx| {
                         s_logout.update(cx, |ctrl, cx| ctrl.logout(cx));

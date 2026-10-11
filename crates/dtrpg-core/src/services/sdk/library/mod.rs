@@ -90,7 +90,8 @@ impl LibraryService for RustSdkLibraryService {
 
             let response = self.gateway.list_order_products(params)?;
 
-            // Derive estimated total from `links.last` on the first page response.
+            // Derive estimated total from `links.last` on the first page
+            // response.
             if !total_reported {
                 if let (Some(cb), Some(last_page)) =
                     (on_total.as_deref_mut(), last_page_from_links(&response.links))
@@ -101,9 +102,10 @@ impl LibraryService for RustSdkLibraryService {
                 total_reported = true;
             }
 
-            // `Product` resources are only needed to resolve this page's items — rebuilt
-            // fresh per page rather than accumulated, since each ordered product's
-            // relationship points at its own distinct `Product` resource.
+            // `Product` resources are only needed to resolve this page's items
+            // — rebuilt fresh per page rather than accumulated,
+            // since each ordered product's relationship points at
+            // its own distinct `Product` resource.
             let products = response.included
                                    .as_deref()
                                    .map(product_lookup)
@@ -144,9 +146,9 @@ impl LibraryService for RustSdkLibraryService {
 
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {
         let response = self.gateway.get_order_product(id)?;
-        // The detail endpoint sideloads the same Publisher/Product `included` array as
-        // the list endpoint; resolve it the same way rather than falling back to
-        // `attributes.product` embedding alone.
+        // The detail endpoint sideloads the same Publisher/Product `included`
+        // array as the list endpoint; resolve it the same way rather
+        // than falling back to `attributes.product` embedding alone.
         let products = response.included
                                .as_deref()
                                .map(product_lookup)
@@ -160,12 +162,12 @@ impl LibraryService for RustSdkLibraryService {
     }
 
     fn count_items(&self) -> Option<Result<usize, LibraryServiceError>> {
-        // Request a single item per page: with `pageSize=1`, the last page number
-        // reported in `links.last` is numerically equal to the total item count,
-        // so this is a cheap way to detect remote changes without fetching all
-        // pages. Falls back to the single returned page's length when there is no
-        // `last` link (i.e. the whole library fits on one page of size 1: 0 or 1
-        // items).
+        // Request a single item per page: with `pageSize=1`, the last page
+        // number reported in `links.last` is numerically equal to the
+        // total item count, so this is a cheap way to detect remote
+        // changes without fetching all pages. Falls back to the single
+        // returned page's length when there is no `last` link (i.e. the
+        // whole library fits on one page of size 1: 0 or 1 items).
         let params = LibraryItemsParams { page:               Some(1),
                                           page_size:          Some(1),
                                           get_checksum:       Some(false),

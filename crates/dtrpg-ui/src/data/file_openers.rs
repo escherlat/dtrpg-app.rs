@@ -207,7 +207,8 @@ pub(crate) fn save_app_config(cfg: &AppConfigFile) {
 // ─────────────────────────────────────────────────────
 
 impl FileOpenerConfig {
-    // ── Persistence ───────────────────────────────────────────────────────────
+    // ── Persistence
+    // ───────────────────────────────────────────────────────────
 
     /// Loads the config from disk, returning a default if the file is absent or
     /// unparseable.
@@ -276,7 +277,8 @@ impl FileOpenerConfig {
         }
     }
 
-    // ── Validation ────────────────────────────────────────────────────────────
+    // ── Validation
+    // ────────────────────────────────────────────────────────────
 
     /// Returns entries whose `app_path` does not exist on disk.
     pub fn validate_all(&self) -> Vec<&FileOpenerEntry> {
@@ -322,7 +324,8 @@ mod tests {
         FileOpenerConfig { entries }
     }
 
-    // ── find_override ─────────────────────────────────────────────────────────
+    // ── find_override
+    // ─────────────────────────────────────────────────────────
 
     #[test]
     fn find_override_exact_match() {
@@ -392,7 +395,8 @@ mod tests {
                    PathBuf::from("/Applications/Acrobat.app"));
     }
 
-    // ── validate_all ──────────────────────────────────────────────────────────
+    // ── validate_all
+    // ──────────────────────────────────────────────────────────
 
     #[test]
     fn validate_all_flags_missing_paths() {

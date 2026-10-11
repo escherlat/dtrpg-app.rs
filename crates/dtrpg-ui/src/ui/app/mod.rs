@@ -286,9 +286,13 @@ pub fn setup(cx: &mut App) {
     cx.on_action::<Quit>(|_, cx| cx.quit());
     cx.on_action::<HideApplication>(|_, cx| cx.hide());
     cx.on_action::<HideOthers>(|_, cx| cx.hide_other_apps());
-    // The real handler lives on `LibraryRootView` (opens the About dialog). This is
-    // a harmless fallback in case the action fires before any window has focus.
+    // The real handler lives on `LibraryRootView` (opens the About dialog).
+    // This is a harmless fallback in case the action fires before any
+    // window has focus.
     cx.on_action::<About>(|_, _cx| {});
+    // Same fallback shape, for the "Report a Feature/Bug" dialog — see
+    // `LibraryRootView`'s `ReportFeatureBug` handler.
+    cx.on_action::<ReportFeatureBug>(|_, _cx| {});
     cx.on_action::<Minimize>(|_, cx| {
           if let Some(win) = cx.active_window() {
               win.update(cx, |_, window, _| window.minimize_window()).ok();
@@ -377,9 +381,9 @@ pub fn setup(cx: &mut App) {
 /// set changes, so the OS menu's checkmarks and tab-selection items track the
 /// toolbar/tab-strip's current state.
 pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
-    // Column-header clicks produce `SortMethod::Custom { col_key }` rather than the
-    // named variants the menu offers; map each back to the menu item it corresponds
-    // to so the checkmark still tracks column-driven sorts.
+    // Column-header clicks produce `SortMethod::Custom { col_key }` rather than
+    // the named variants the menu offers; map each back to the menu item it
+    // corresponds to so the checkmark still tracks column-driven sorts.
     let normalized_sort = match state.sort {
         SortMethod::Custom { col_key: "publisher", } => Some(SortMethod::Publisher),
         SortMethod::Custom { col_key: "added" } => Some(SortMethod::DateAdded),
@@ -568,7 +572,10 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
                 ShowAlertHistory,
             ),
         ]),
-        Menu::new(t!("menu.help_title").to_string())
-            .items([MenuItem::action(t!("menu.app_about").to_string(), About)]),
+        Menu::new(t!("menu.help_title").to_string()).items([
+            MenuItem::action(t!("menu.app_about").to_string(), About),
+            MenuItem::separator(),
+            MenuItem::action(t!("menu.help_report").to_string(), ReportFeatureBug),
+        ]),
     ]
 }

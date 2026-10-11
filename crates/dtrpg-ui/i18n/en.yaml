@@ -253,6 +253,11 @@ activity:
   refreshing_thumbnails: "Refreshing thumbnails…"
   refreshing_thumbnails_remaining: "Refreshing thumbnails… (%{remaining} remaining)"
   downloading_retry: "%{title} — retrying (attempt %{attempt}) in %{delay_secs}s…"
+  creating_collection: "Creating collection '%{name}'…"
+  deleting_collection: "Deleting collection…"
+  downloading_file: "Downloading %{title}…"
+  downloading_file_entry: "Downloading %{title} — %{file_name}…"
+  session_setup_failed: "Session setup failed after sign-in"
 
 alert_history:
   title: "Alert History"
@@ -324,9 +329,25 @@ menu:
   window_select_tab_title: "Select Tab"
   window_select_tab_empty: "No Tab"
   help_title: "Help"
+  help_report: "Report a Feature/Bug…"
 
 title_bar:
   sign_out: "Sign Out"
+  report: "Report a Feature/Bug…"
+
+report:
+  title: "Report a Feature/Bug"
+  kind_bug: "Bug"
+  kind_feature: "Feature Request"
+  subject_label: "Subject"
+  subject_placeholder: "A short summary"
+  description_label: "Description"
+  description_placeholder: "Steps to reproduce, and what you expected instead."
+  diagnostics_version: "Version %{version}"
+  diagnostics_build: "Build %{date} (%{commit})"
+  diagnostics_platform: "Platform %{target}"
+  cancel: "Cancel"
+  submit: "Report"
 
 tabs:
   catalog_tab: "Catalog"

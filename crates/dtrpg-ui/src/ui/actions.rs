@@ -11,7 +11,8 @@ actions!(libri,
           HideOthers,
           ShowAll,
           ShowSettings,
-          About,]);
+          About,
+          ReportFeatureBug,]);
 
 // Window-level actions
 actions!(libri, [Minimize, Zoom, ToggleFullscreen]);

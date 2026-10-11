@@ -138,8 +138,9 @@ struct CollectionsSection {
 }
 
 impl Collapsible for CollectionsSection {
-    // The app's `Sidebar` is built with `.collapsible(SidebarCollapsible::None)`,
-    // so the icon-only rail state this trait exists for is never reached.
+    // The app's `Sidebar` is built with
+    // `.collapsible(SidebarCollapsible::None)`, so the icon-only rail state
+    // this trait exists for is never reached.
     fn collapsed(self, _collapsed: bool) -> Self {
         self
     }
@@ -357,7 +358,8 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     let publishers_open = prefs.publishers_open();
     let collections_open = prefs.collections_open();
 
-    // ── Library smart-filter menu ─────────────────────────────────────────────
+    // ── Library smart-filter menu
+    // ─────────────────────────────────────────────
     let lib_menu = SidebarMenu::new().child(nav_item(&t!("sidebar.all_titles"),
                                                      counts.all,
                                                      active == SidebarFilter::AllTitles,
@@ -385,7 +387,8 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
 
     let publishers_count = publishers.len();
 
-    // ── Publishers menu ───────────────────────────────────────────────────────
+    // ── Publishers menu
+    // ───────────────────────────────────────────────────────
     let mut pub_children: Vec<SidebarMenuItem> =
         publishers.into_iter()
                   .filter(|p| name_matches_query(p.name.as_ref(), &publisher_search.query))
@@ -438,13 +441,13 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
             .children(pub_children),
     );
 
-    // ── Sidebar assembly (collections before publishers) ──────────────────────
-    // `w_full()` rather than a fixed pixel width: the parent `resizable_panel`
-    // in `root_view.rs` already owns width management (its divider IS the drag
-    // handle — no separate resize control). A fixed width here would leave the
-    // visible sidebar content pinned regardless of the panel's actual dragged
-    // width, decoupling what you drag from where the sidebar and catalog
-    // actually meet.
+    // ── Sidebar assembly (collections before publishers)
+    // ────────────────────── `w_full()` rather than a fixed pixel width:
+    // the parent `resizable_panel` in `root_view.rs` already owns width
+    // management (its divider IS the drag handle — no separate resize
+    // control). A fixed width here would leave the visible sidebar content
+    // pinned regardless of the panel's actual dragged width, decoupling
+    // what you drag from where the sidebar and catalog actually meet.
     let sidebar_builder = Sidebar::new("sidebar").collapsible(SidebarCollapsible::None)
                                                  .side(Side::Left)
                                                  .w_full()
@@ -453,7 +456,8 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
 
     // ── Collections menu (always present) ────────────────────────────────────
     // Show "?" instead of "0" while the initial collections fetch is still in
-    // flight, so an empty list doesn't read as a confirmed zero-collections state.
+    // flight, so an empty list doesn't read as a confirmed zero-collections
+    // state.
     let collections_count: SharedString = if collections_loaded {
         collections.len().to_string().into()
     }

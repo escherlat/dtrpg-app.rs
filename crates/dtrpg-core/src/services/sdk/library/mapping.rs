@@ -231,11 +231,12 @@ pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<St
     let files = map_files(&attributes.files);
     let year = resolve_year(attributes);
 
-    // The API reports `datePurchased`/`fileLastModified` as raw RFC 3339 strings
-    // (e.g. "2024-07-16T10:45:52-05:00"). Parse them into `date_added` /
-    // `date_updated` rather than embedding the machine format as text — the
-    // detail panel renders these as relative labels with a human-readable
-    // absolute-date tooltip (see `render_relative_date_value`).
+    // The API reports `datePurchased`/`fileLastModified` as raw RFC 3339
+    // strings (e.g. "2024-07-16T10:45:52-05:00"). Parse them into
+    // `date_added` / `date_updated` rather than embedding the machine
+    // format as text — the detail panel renders these as relative labels
+    // with a human-readable absolute-date tooltip (see
+    // `render_relative_date_value`).
     //
     // `datePurchased` is documented as present "if available" — it's absent
     // for some ordered products (observed for bundle members), which would
@@ -439,7 +440,8 @@ mod tests {
         let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
         // "2026-01-01T10:45:52-05:00" == 2026-01-01T15:45:52Z, unchanged from
-        // `date_purchased` despite an older `order.date_created` also being set.
+        // `date_purchased` despite an older `order.date_created` also being
+        // set.
         assert_eq!(mapped.date_added, Some(1_767_282_352));
     }
 
@@ -482,8 +484,9 @@ mod tests {
     #[test]
     fn map_order_product_derives_format_from_file_extension_not_title() {
         let mut item = order_product_item(515_276, "The Wellspring");
-        // File `title` is the document's display name, distinct from its extension —
-        // the mapped format must come from the extension, not this field.
+        // File `title` is the document's display name, distinct from its
+        // extension — the mapped format must come from the extension,
+        // not this field.
         item.attributes.files =
             vec![OrderProductFile { index:                     0,
                                     order_product_download_id: 1234,
@@ -634,9 +637,10 @@ mod tests {
 
     #[test]
     fn map_order_product_builds_cover_url_from_sideloaded_product_relationship() {
-        // Matches the live API's actual shape: `product` metadata is *not* embedded on
-        // `attributes` — it's referenced via `relationships.product.data.id` and
-        // resolved against the response's `included` array.
+        // Matches the live API's actual shape: `product` metadata is *not*
+        // embedded on `attributes` — it's referenced via
+        // `relationships.product.data.id` and resolved against the
+        // response's `included` array.
         let mut item = order_product_item(515_276, "The Wellspring");
         item.attributes.royalty_publisher_id = 4952;
         item.relationships = Some(OrderProductRelationships {

@@ -38,12 +38,14 @@ pub fn render_notification_banner(notices: Vec<Notice>,
              let auth_entity_dismiss = auth_entity.clone();
              let root_entity = root_entity.clone();
 
-             // Border and background live on this outer container, not the inner
-             // `Alert`, so the emphasis encloses both the message and the action
-             // button as one banner rather than boxing the message alone.
-             // `Alert`'s own banner-mode border/background use a warning color
+             // Border and background live on this outer container, not the
+             // inner `Alert`, so the emphasis encloses both the
+             // message and the action button as one banner rather
+             // than boxing the message alone. `Alert`'s own
+             // banner-mode border/background use a warning color
              // mixed with white, which reads as barely-there; its own border is
-             // muted to `warning_bg` here so it doesn't compete with the outer one.
+             // muted to `warning_bg` here so it doesn't compete with the outer
+             // one.
              div()
                 .flex()
                 .items_center()

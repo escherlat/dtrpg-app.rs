@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -236,7 +237,29 @@ pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
     for item in &mut items {
         item.dedupe_files();
     }
+    items = dedupe_items(items);
     Some(items)
+}
+
+/// Collapses whole-item duplicates from `items`, keyed first by `id` (an
+/// identical entry repeated verbatim — the symptom of a stale catalog-sync
+/// bug that re-appended the same cached page into an already-populated
+/// catalog on every load) and secondarily by `product_id` (the catalog SKU,
+/// which stays constant across a republish even though `id` doesn't — see
+/// the comment on `reconcile_catalog` in `controllers::library`). Items with
+/// `product_id == 0` (SKU unknown) are only deduped by `id`. The first
+/// occurrence of each key wins.
+fn dedupe_items(items: Vec<LibraryItem>) -> Vec<LibraryItem> {
+    let mut seen_ids = std::collections::HashSet::new();
+    let mut seen_product_ids = std::collections::HashSet::new();
+    items.into_iter()
+         .filter(|item| {
+             if !seen_ids.insert(Arc::clone(&item.id)) {
+                 return false;
+             }
+             item.product_id == 0 || seen_product_ids.insert(item.product_id)
+         })
+         .collect()
 }
 
 // ── save_catalog_cache
@@ -460,5 +483,71 @@ mod tests {
         let loaded = loaded.unwrap();
         assert_eq!(loaded[0].files.len(), 1);
         assert!(!loaded[0].is_multi_item());
+    }
+
+    #[test]
+    fn load_dedupes_whole_items_repeated_verbatim() {
+        // Regression: a catalog-sync bug re-appended the same cached page
+        // into an already-populated in-memory catalog on every load, which
+        // then got written straight back to disk — ballooning a 2,000-item
+        // library into tens of thousands of duplicate entries across
+        // repeated launches. Loading an already-bloated cache must collapse
+        // it back down rather than requiring a manual cache wipe.
+        let dir = test_dir("dedupe_whole_items_on_load");
+        fs::create_dir_all(&dir).unwrap();
+        let item = make_item("c1");
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![item.clone(), item.clone(), item]).unwrap()).unwrap();
+
+        let loaded = load_catalog_cache(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].id.as_ref(), "c1");
+    }
+
+    #[test]
+    fn load_dedupes_republished_items_by_product_id() {
+        // A republish mints a new `id` but keeps the same `product_id` (the
+        // catalog SKU) — see the matching comment on `reconcile_catalog` in
+        // `controllers::library`. An already-corrupted cache holding both
+        // the stale and the new id for the same product must collapse to
+        // one entry, keeping the first occurrence.
+        let dir = test_dir("dedupe_by_product_id_on_load");
+        fs::create_dir_all(&dir).unwrap();
+        let mut old_item = make_item("old-id");
+        old_item.product_id = 42;
+        let mut new_item = make_item("new-id");
+        new_item.product_id = 42;
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![old_item, new_item]).unwrap()).unwrap();
+
+        let loaded = load_catalog_cache(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].id.as_ref(), "old-id");
+    }
+
+    #[test]
+    fn load_does_not_dedupe_distinct_items_with_unknown_product_id() {
+        // `product_id == 0` is a "SKU unknown" sentinel, not a real shared
+        // identity — two distinct items that both happen to have it must
+        // not collapse into one just because their product ids match.
+        let dir = test_dir("no_dedupe_unknown_product_id");
+        fs::create_dir_all(&dir).unwrap();
+        let item_a = make_item("a1");
+        let item_b = make_item("a2");
+        assert_eq!(item_a.product_id, 0);
+        assert_eq!(item_b.product_id, 0);
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![item_a, item_b]).unwrap()).unwrap();
+
+        let loaded = load_catalog_cache(&dir);
+        let _ = fs::remove_dir_all(&dir);
+
+        assert_eq!(loaded.unwrap().len(), 2);
     }
 }

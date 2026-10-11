@@ -224,9 +224,9 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
     ));
 
     let alert_for_open_change = activity.clone();
-    // `Popover::trigger` requires `Selectable`, which `Badge` doesn't implement, so
-    // the unread-alert dot is layered on as a sibling of the popover rather
-    // than wrapping the trigger in a `Badge`.
+    // `Popover::trigger` requires `Selectable`, which `Badge` doesn't
+    // implement, so the unread-alert dot is layered on as a sibling of the
+    // popover rather than wrapping the trigger in a `Badge`.
     let notification_panel = div()
         .relative()
         .child(

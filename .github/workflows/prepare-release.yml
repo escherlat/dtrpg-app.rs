@@ -1,0 +1,24 @@
+name: Prepare Release
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    uses: pilgrimagesoftware/github-actions/.github/workflows/rust-prepare-release.yaml@master
+    with:
+      project-number: 8
+      base-branch: master
+      reviewer: paulyhedral
+      release-label: release
+      # `cargo set-version` bumps every workspace member, and the lockfile
+      # follows; the default (Cargo.toml CHANGELOG.md) would leave those out
+      # of the release commit.
+      commit-files: "Cargo.toml Cargo.lock crates/*/Cargo.toml CHANGELOG.md"
+    secrets:
+      PSW_CI_APP_ID: ${{ secrets.PSW_CI_APP_ID }}
+      PSW_CI_PRIVATE_KEY: ${{ secrets.PSW_CI_PRIVATE_KEY }}

@@ -141,8 +141,8 @@ mod tests {
         let mut ctrl = AuthStateController::new(AuthState::Unauthenticated);
         ctrl.is_auth_pending = true;
         ctrl.notices = notices_for(ctrl.state, ctrl.is_auth_pending);
-        // Banner is suppressed while auth is in-flight; toast notification handles
-        // feedback.
+        // Banner is suppressed while auth is in-flight; toast notification
+        // handles feedback.
         assert!(ctrl.active_notices().is_empty());
     }
 
