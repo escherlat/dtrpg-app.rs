@@ -163,6 +163,10 @@ impl LibraryController {
                         },
                         |_| true,
                         |e: &ThumbnailFetchError| e.retry_after,
+                        || ThumbnailFetchError {
+                            message: "cover thumbnail fetch cancelled".to_string(),
+                            retry_after: None,
+                        },
                         Some(&mut on_retry),
                     )?;
                     save_cached_cover(&covers_root, &disk_key, &bytes);

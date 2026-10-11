@@ -360,6 +360,12 @@ impl LibraryController {
                                         || e.kind == LibraryServiceErrorKind::RateLimited
                                 },
                                 |e: &LibraryServiceError| e.retry_after,
+                                || {
+                                    LibraryServiceError::new(
+                                        LibraryServiceErrorKind::Network,
+                                        "totals request cancelled",
+                                    )
+                                },
                                 Some(&mut on_retry),
                             )
                         })
