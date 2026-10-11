@@ -811,9 +811,10 @@ impl LibraryRootView {
         let controller_for_cache_cleared = controller.clone();
         cx.subscribe(&settings,
                      move |_this, _settings, _event: &CacheCleared, cx| {
-                         controller_for_cache_cleared.update(cx, |ctrl, cx| {
-                                                         ctrl.clear_and_reload(cx)
-                                                     });
+                         let controller = controller_for_cache_cleared.clone();
+                         cx.defer(move |cx| {
+                               controller.update(cx, |ctrl, cx| ctrl.clear_and_reload(cx));
+                           });
                      })
           .detach();
 
