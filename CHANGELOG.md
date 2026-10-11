@@ -1,4 +1,12 @@
 
+## 0.2.3 - 2026-10-11
+
+### Fixed
+- Make Zip content preview popover list scroll for large archives
+- Defer cache reload after settings change
+
+
+
 ## 0.2.2 - 2026-10-09
 
 ### Fixed
