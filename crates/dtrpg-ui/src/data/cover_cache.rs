@@ -52,6 +52,12 @@ pub fn load_cached_cover(root: &Path, item_id: &str) -> Option<Vec<u8>> {
 /// Writes `bytes` to `{root}/{hash}.{ext}`, creating `root` if needed, where
 /// `{ext}` is derived by sniffing the actual image format from `bytes`.
 ///
+/// Any previously cached file for the same `item_id` under a *different* known
+/// extension is removed first. Without this, a cover whose format changes
+/// between fetches (e.g. a `jpg` that is later served as a `png`) would leave
+/// the stale `jpg` in place, and [`load_cached_cover`]'s fixed-order scan would
+/// keep returning it instead of the freshly written file.
+///
 /// Failures are not surfaced as an error type — a failed cache write only costs
 /// a repeat network fetch next launch, not correctness, so callers log a
 /// warning and continue rather than threading a `Result` through the
@@ -62,6 +68,20 @@ pub fn save_cached_cover(root: &Path, item_id: &str, bytes: &[u8]) {
         return;
     }
     let ext = sniff(bytes).extension();
+
+    for known in KNOWN_EXTENSIONS {
+        if known == ext {
+            continue;
+        }
+        let stale = root.join(cover_filename(item_id, known));
+        if let Err(e) = fs::remove_file(&stale)
+           && e.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(path = %stale.display(), error = %e,
+                           "cover cache: failed to remove stale extension");
+        }
+    }
+
     let path = root.join(cover_filename(item_id, ext));
     if let Err(e) = fs::write(&path, bytes) {
         tracing::warn!(path = %path.display(), error = %e, "cover cache: failed to write");
@@ -149,6 +169,30 @@ mod tests {
             assert!(exists,
                     "expected {name} bytes to be written with .{ext} extension");
         }
+    }
+
+    #[test]
+    fn save_removes_stale_alternate_extension_on_format_change() {
+        let dir = test_dir("format_change");
+        let id = "/api/vBeta/order_products/88";
+
+        // First fetch is a JPEG.
+        let jpeg = vec![0xFFu8, 0xD8, 0xFF, 1, 2, 3];
+        save_cached_cover(&dir, id, &jpeg);
+        let jpg_path = dir.join(cover_filename(id, "jpg"));
+        assert!(jpg_path.is_file(), "jpeg should be cached as .jpg");
+
+        // The same item is later served as a PNG.
+        let png = vec![0x89u8, b'P', b'N', b'G', 1, 2];
+        save_cached_cover(&dir, id, &png);
+
+        let jpg_still_there = jpg_path.is_file();
+        let loaded = load_cached_cover(&dir, id);
+        let _ = fs::remove_dir_all(&dir);
+
+        assert!(!jpg_still_there,
+                "stale .jpg should be removed when the format changes");
+        assert_eq!(loaded, Some(png), "lookup must return the fresh PNG bytes");
     }
 
     #[test]
