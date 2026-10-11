@@ -33,8 +33,6 @@ keyring = { version = "3", features = ["apple-native"] }
 thiserror = "2"
 tracing = "0.1"
 dtrpg-ui = { path = "crates/dtrpg-ui" }
-dtrpg-core = { path = "crates/dtrpg-core" }
-anyhow = "1"
 # gpui = "0.2.2"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 gpui = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe" }
@@ -42,8 +40,6 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1d217ee3
 gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "be4c5d30e0a51d5bfb2df93477a05050a50bf889" }
 cocoa = "=0.27.0"
 cocoa-foundation = "=0.2.0"
-const_format = "0.2"
-convert_case = "0.8.0"
 core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.6.1", features = ["metal"] }
@@ -60,4 +56,3 @@ open = "5"
 rust-embed = "8.11"
 sentry = { version = "0.49", default-features = false, features = ["backtrace", "contexts", "panic", "reqwest", "rustls"] }
 sentry-tracing = "0.49"
-async-tar = "0.6.1"

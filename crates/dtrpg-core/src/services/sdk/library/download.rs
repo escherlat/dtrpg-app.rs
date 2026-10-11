@@ -62,6 +62,10 @@ fn download_item_with_config(gateway: &dyn SdkLibraryGateway, order_product_id: 
                            || e.kind == LibraryServiceErrorKind::RateLimited
                        },
                        |e: &LibraryServiceError| e.retry_after,
+                       || {
+                           LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                                    "download cancelled")
+                       },
                        Some(&mut adapted_on_retry))
 }
 
@@ -70,6 +74,15 @@ fn download_item_with_config(gateway: &dyn SdkLibraryGateway, order_product_id: 
 fn attempt_download(gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32,
                     dest: &Path, cancel: &AtomicBool)
                     -> Result<(), LibraryServiceError> {
+    // Check cancellation before `prepare_download`: a queued download that was
+    // cancelled before it started must not issue the authenticated prepare
+    // request. (`retry_with_backoff` also checks before the first attempt; this
+    // guards the operation itself so the invariant holds regardless of caller.)
+    if cancel.load(Ordering::SeqCst) {
+        return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                            "download cancelled"));
+    }
+
     let response = gateway.prepare_download(order_product_id, index)?;
     let url = response
         .pointer("/data/attributes/url")
@@ -362,6 +375,25 @@ mod tests {
 
         assert!(matches!(result, Err(e) if e.kind == LibraryServiceErrorKind::Session));
         assert_eq!(gateway.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn download_item_makes_no_request_when_cancelled_before_start() {
+        // Pre-cancelled: neither the retry loop nor `attempt_download` may call
+        // `prepare_download`, so the gateway invocation count stays at zero and
+        // no authenticated request is made.
+        let gateway = CountingGateway { url:   "http://127.0.0.1:1/unused".to_string(),
+                                        calls: AtomicU32::new(0), };
+        let dest = temp_dest("pre-cancelled");
+        let cancel = AtomicBool::new(true);
+
+        let result =
+            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+
+        assert!(result.is_err());
+        assert_eq!(gateway.calls.load(Ordering::SeqCst), 0);
+        assert!(!dest.exists());
+        assert!(!part_path_for(&dest).exists());
     }
 
     #[test]
