@@ -6,7 +6,8 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use gpui::{Entity, IntoElement, ParentElement, Styled, div, px};
+use gpui::{App, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
+use gpui_component::WindowExt as _;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
@@ -14,10 +15,36 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::data::collection::CollectionEntry;
+use crate::data::constants::BULK_ACTION_CONFIRM_THRESHOLD;
 use crate::data::enums::SelectionField;
 use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
 use crate::util::matching::member_ids_contain;
+
+/// Runs `dispatch` immediately for a selection at or below
+/// [`BULK_ACTION_CONFIRM_THRESHOLD`]; for a larger selection, asks for
+/// confirmation first. `Open` in particular can launch one external-app
+/// process per item, which has been observed to lock up the default viewer
+/// app for a selection in the thousands.
+fn confirm_and_dispatch(window: &mut Window, cx: &mut App, count: usize,
+                        action_label: SharedString,
+                        dispatch: impl Fn(&mut App) + Clone + 'static) {
+    if count <= BULK_ACTION_CONFIRM_THRESHOLD {
+        dispatch(cx);
+        return;
+    }
+    window.open_alert_dialog(cx, move |alert, _, _| {
+              let dispatch = dispatch.clone();
+              alert.confirm()
+                   .title(t!("toolbar.bulk_confirm_title", n = count).to_string())
+                   .description(t!("toolbar.bulk_confirm_description",
+                                   action = action_label.clone()).to_string())
+                   .on_ok(move |_, _window, cx| {
+                       dispatch(cx);
+                       true
+                   })
+          });
+}
 
 /// Renders the bulk-action bar row. Caller is responsible for only
 /// including this when selection mode is active and `bulk_selection_count >
@@ -49,7 +76,11 @@ pub fn render_bulk_action_bar(bulk_selection_count: usize,
          .child(render_select_all_controls(entity.clone()))
          .child(render_pattern_select(entity.clone(), pattern_input, pattern_field))
          .child(div().flex_1())
-         .child(render_bulk_actions(bulk_selected_ids, items, collections, entity))
+         .child(render_bulk_actions(bulk_selection_count,
+                                    bulk_selected_ids,
+                                    items,
+                                    collections,
+                                    entity))
 }
 
 fn render_select_all_controls(entity: Entity<LibraryController>) -> impl IntoElement + 'static {
@@ -128,8 +159,10 @@ fn render_pattern_select(entity: Entity<LibraryController>, pattern_input: Entit
                                                   }))
 }
 
-fn render_bulk_actions(bulk_selected_ids: &HashSet<Arc<str>>, items: &[LibraryItem],
-                       collections: &[CollectionEntry], entity: Entity<LibraryController>)
+#[allow(clippy::too_many_arguments)]
+fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<Arc<str>>,
+                       items: &[LibraryItem], collections: &[CollectionEntry],
+                       entity: Entity<LibraryController>)
                        -> impl IntoElement + 'static {
     let add_collections = collections.to_vec();
     let remove_collections: Vec<_> =
@@ -161,28 +194,39 @@ fn render_bulk_actions(bulk_selected_ids: &HashSet<Arc<str>>, items: &[LibraryIt
             Button::new("bulk-download")
                 .ghost()
                 .label(t!("toolbar.bulk_download"))
-                .on_click(move |_, _, cx| {
-                    e_download.update(cx, |ctrl, cx| ctrl.bulk_download(cx));
+                .on_click(move |_, window, cx| {
+                    let e = e_download.clone();
+                    confirm_and_dispatch(window, cx, bulk_selection_count,
+                                        t!("toolbar.bulk_download").to_string().into(),
+                                        move |cx| {
+                                            e.update(cx, |ctrl, cx| ctrl.bulk_download(cx));
+                                        });
                 }),
         )
         .child(
             Button::new("bulk-remove-download")
                 .ghost()
                 .label(t!("toolbar.bulk_remove_download"))
-                .on_click(move |_, _, cx| {
-                    e_remove_download.update(cx, |ctrl, cx| {
-                        ctrl.bulk_remove_download(cx);
-                    });
+                .on_click(move |_, window, cx| {
+                    let e = e_remove_download.clone();
+                    confirm_and_dispatch(window, cx, bulk_selection_count,
+                                        t!("toolbar.bulk_remove_download").to_string().into(),
+                                        move |cx| {
+                                            e.update(cx, |ctrl, cx| ctrl.bulk_remove_download(cx));
+                                        });
                 }),
         )
         .child(
             Button::new("bulk-fetch-thumbnail")
                 .ghost()
                 .label(t!("toolbar.bulk_fetch_thumbnail"))
-                .on_click(move |_, _, cx| {
-                    e_thumbnail.update(cx, |ctrl, cx| {
-                        ctrl.bulk_fetch_thumbnail(cx);
-                    });
+                .on_click(move |_, window, cx| {
+                    let e = e_thumbnail.clone();
+                    confirm_and_dispatch(window, cx, bulk_selection_count,
+                                        t!("toolbar.bulk_fetch_thumbnail").to_string().into(),
+                                        move |cx| {
+                                            e.update(cx, |ctrl, cx| ctrl.bulk_fetch_thumbnail(cx));
+                                        });
                 }),
         )
         .child(
@@ -195,8 +239,17 @@ fn render_bulk_actions(bulk_selected_ids: &HashSet<Arc<str>>, items: &[LibraryIt
                         let id = collection.id;
                         let e = e_add.clone();
                         menu = menu.item(PopupMenuItem::new(collection.name.to_string()).on_click(
-                            move |_, _, cx| {
-                                e.update(cx, |ctrl, cx| ctrl.bulk_add_to_collection(id, cx));
+                            move |_, window, cx| {
+                                let e = e.clone();
+                                confirm_and_dispatch(window, cx, bulk_selection_count,
+                                                    t!("toolbar.bulk_add_to_collection")
+                                                        .to_string()
+                                                        .into(),
+                                                    move |cx| {
+                                                        e.update(cx, |ctrl, cx| {
+                                                            ctrl.bulk_add_to_collection(id, cx)
+                                                        });
+                                                    });
                             },
                         ));
                     }
@@ -213,8 +266,17 @@ fn render_bulk_actions(bulk_selected_ids: &HashSet<Arc<str>>, items: &[LibraryIt
                         let id = collection.id;
                         let e = e_remove.clone();
                         menu = menu.item(PopupMenuItem::new(collection.name.to_string()).on_click(
-                            move |_, _, cx| {
-                                e.update(cx, |ctrl, cx| ctrl.bulk_remove_from_collection(id, cx));
+                            move |_, window, cx| {
+                                let e = e.clone();
+                                confirm_and_dispatch(window, cx, bulk_selection_count,
+                                                    t!("toolbar.bulk_remove_from_collection")
+                                                        .to_string()
+                                                        .into(),
+                                                    move |cx| {
+                                                        e.update(cx, |ctrl, cx| {
+                                                            ctrl.bulk_remove_from_collection(id, cx)
+                                                        });
+                                                    });
                             },
                         ));
                     }
@@ -225,8 +287,13 @@ fn render_bulk_actions(bulk_selected_ids: &HashSet<Arc<str>>, items: &[LibraryIt
             Button::new("bulk-open")
                 .ghost()
                 .label(t!("toolbar.bulk_open"))
-                .on_click(move |_, _, cx| {
-                    e_open.update(cx, |ctrl, cx| ctrl.bulk_open(cx));
+                .on_click(move |_, window, cx| {
+                    let e = e_open.clone();
+                    confirm_and_dispatch(window, cx, bulk_selection_count,
+                                        t!("toolbar.bulk_open").to_string().into(),
+                                        move |cx| {
+                                            e.update(cx, |ctrl, cx| ctrl.bulk_open(cx));
+                                        });
                 }),
         )
 }

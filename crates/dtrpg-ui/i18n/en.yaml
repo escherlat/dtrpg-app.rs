@@ -51,6 +51,8 @@ toolbar:
   bulk_add_to_collection: "Add to Collection"
   bulk_remove_from_collection: "Remove from Collection"
   bulk_open: "Open"
+  bulk_confirm_title: "Apply to %{n} items?"
+  bulk_confirm_description: "You're about to run \"%{action}\" on a large selection. This may take a while or strain system resources."
 
 count:
   title: "title"

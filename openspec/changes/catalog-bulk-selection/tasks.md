@@ -39,7 +39,7 @@
 - [x] 5.2 Pattern input is a plain `Entity<InputState>` field on `LibraryRootView`, read directly on the "Select Matches" click — no `Change` subscription/draft needed since nothing else observes the draft value
 - [x] 5.3 Bar renders: selection-count label, Select All / Deselect All, pattern `Input` + field dropdown (Title/Publisher/System) + "Select Matches"
 - [x] 5.4 Bar renders the six bulk-action buttons
-- [x] 5.5 Each wired to its `LibraryController` method
+- [x] 5.5 Each wired to its `LibraryController` method, gated through a shared `confirm_and_dispatch` helper that asks for confirmation first when the selection exceeds `BULK_ACTION_CONFIRM_THRESHOLD` (20) — added after manual testing surfaced that `Open` on ~2000 items launched that many Preview processes and locked up the app
 - [x] 5.6 "Add to Collection" dropdown lists `collections` (cloned from the snapshot)
 - [x] 5.7 "Remove from Collection" dropdown filtered to collections intersecting the selection (via `snap.items`, the currently-visible page — a selected item scrolled out of the active filter won't be picked up by this filter; noted as a known best-effort limitation, not a correctness issue for the common case)
 - [x] 5.8 Bar included in `LibraryRootView::render` as a conditional child, directly below the toolbar, when `bulk_selection_mode` — shown as soon as selection mode is entered (not gated on a non-empty selection; confirmed via manual review that users expect the bar immediately, not only after the first pick)
