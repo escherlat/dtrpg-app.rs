@@ -1,5 +1,6 @@
 pub mod activity_panel_view;
 pub mod alert_history_view;
+pub mod bulk_action_bar_view;
 pub mod catalog_view;
 pub mod detail_panel_view;
 pub mod item_popover_view;

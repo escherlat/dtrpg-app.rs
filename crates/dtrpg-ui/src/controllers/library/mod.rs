@@ -51,6 +51,7 @@ mod downloads;
 mod filtering;
 mod helpers;
 mod lifecycle;
+mod bulk_selection;
 mod preferences;
 mod selection;
 mod thumbnails;
@@ -115,6 +116,13 @@ pub struct LibrarySnapshot {
     pub collection_search_query:   String,
     /// Current width of the detail panel, in pixels.
     pub detail_panel_width:        f32,
+    /// Whether bulk-selection mode is active (see `catalog-selection`).
+    pub bulk_selection_mode:       bool,
+    /// Ids of catalog items currently selected for bulk actions.
+    pub bulk_selected_ids:         HashSet<Arc<str>>,
+    /// `bulk_selected_ids.len()`, exposed directly so views don't need to
+    /// clone the set just to show a count.
+    pub bulk_selection_count:      usize,
 }
 
 /// A Zip content preview popover open for one file row within a detail
@@ -374,6 +382,13 @@ pub struct LibraryController {
     /// [`Self::confirm_pending_download`] or cleared by
     /// [`Self::cancel_pending_download`].
     pending_download:              Option<PendingDownloadRequest>,
+    /// Whether bulk-selection mode is active, toggled from the toolbar (see
+    /// `catalog-selection`). When off, `bulk_selected_ids` is always empty.
+    bulk_selection_mode:           bool,
+    /// Ids of catalog items currently selected for a bulk action. Cleared
+    /// whenever selection mode is turned off or a bulk action dispatches
+    /// (see [`Self::clear_bulk_selection_and_exit_mode`]).
+    bulk_selected_ids:             HashSet<Arc<str>>,
 }
 
 /// A user-initiated download-queuing action stashed while a

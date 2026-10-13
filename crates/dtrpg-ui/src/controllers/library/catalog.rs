@@ -218,7 +218,10 @@ impl LibraryController {
                           publisher_search_query: self.publisher_search_query.clone(),
                           collection_search_open: self.collection_search_open,
                           collection_search_query: self.collection_search_query.clone(),
-                          detail_panel_width: self.detail_panel_width }
+                          detail_panel_width: self.detail_panel_width,
+                          bulk_selection_mode: self.bulk_selection_mode,
+                          bulk_selected_ids: self.bulk_selected_ids.clone(),
+                          bulk_selection_count: self.bulk_selected_ids.len() }
     }
 
     /// Returns true while the initial catalog fetch is still in flight and no
