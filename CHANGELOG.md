@@ -1,4 +1,21 @@
 
+## 0.2.4 - 2026-10-13
+
+### Changed
+- Split the library controller into concern modules
+
+
+### Fixed
+- Remove stale cover files when the cached format changes
+- Do not start a retry or download after cancellation
+- Present native file pickers asynchronously
+
+
+### Performance
+- Compute settings cache counts off the render path
+
+
+
 ## 0.2.3 - 2026-10-11
 
 ### Fixed

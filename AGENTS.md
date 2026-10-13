@@ -10,19 +10,7 @@ This is the repository for the DriveThruRPG frontend application implemented in 
 
 The UI is implemented using the `gpui` framework from the [Zed](https://zed.dev) project, along with the `gpui-component` crate from [Longbridge](https://github.com/longbridge/gpui-component).
 
-A short term goal is to move from `gpui` to `gpui-ce` (https://github.com/gpui-ce/gpui-ce).
-
-## Architecture and Code Organization
-
-Use a modular architecture. Do not place substantial UI, state, and data logic in a single file.
-
-- `src/main.rs` should stay minimal and only bootstrap application startup.
-- `src/ui/` owns GPUI view composition and rendering concerns.
-- `src/ui/<feature>/state.rs` owns feature interaction/state controller logic.
-- `src/ui/<feature>/data.rs` owns sorting/filtering/grouping helpers and presentation transforms.
-- `src/view_models/` owns domain-facing view models that mediate service data into UI state.
-
-When adding features, prefer new focused modules over expanding existing files into monoliths.
+A short term goal is to move from `gpui` to `gpui-kit` (https://github.com/longbridge/gpui-kit).
 
 ## UI Policy
 
@@ -47,3 +35,68 @@ exclusively in the platform-native secure store via `dtrpg_ui::credentials::Keyr
 - On Linux, the app requires `libsecret` (GNOME Keyring or KWallet). Add `libsecret-1-dev`
   to the Linux CI build environment.
 - The SDK (`dtrpg-sdk`) does NOT persist credentials — that is the app's responsibility.
+
+## Documentation 
+
+- Docs MUST be kept up to date; if a new feature is added, documentation MUST be 
+  written for it, with clear, concise examples. Avoid contrived tutorials.
+- Docs will be added to `docs/site/`.
+- Docs will be kept logically organized.
+- When documentation is published, it MUST be versioned, with the latest version
+  showing by default.
+- Documentation MUST include installation instructions, including gotchas, caveats,
+  and workarounds for platform issues, such as macOS quarantine.
+
+## Releases
+
+`prepare-release.yml` / `tag-release.yml` / `release.yml` automate the
+git-flow release cycle (version bump + changelog via `cargo-edit`/`git-cliff`,
+tag `main`, cut a GitHub Release, merge `main` back into `develop`), calling
+the reusable `pilgrimagesoftware/github-actions` `rust-*-release` workflows, and
+`package.yml` builds `Knot.app` with `cargo-packager`. Details and
+required secrets: `CONTRIBUTING.md` - Releases. Rationale: `docs/adr/0001-git-flow.md`.
+
+## Architecture Decisions
+
+Non-trivial design choices are recorded as ADRs under `docs/adr/`. Index and
+process: `docs/adr/README.md`. `/adr "<title>"` scaffolds a new record from
+`docs/adr/0000-template.md`.
+
+## Conventions
+
+- **No `.rs` file over 500 lines.** Enforced by `make size-check` in CI. Split
+  by concern, not by line count; move colocated tests to a sibling `tests.rs`
+  first. Do not raise the limit to make a change fit.
+- **`mod.rs` declares; it does not implement.** Module declarations,
+  re-exports and the module doc comment only - implementation goes in sibling
+  files named for what they do. Being under the line limit is not evidence the
+  code is in the right place. The six that predated the rule were split under
+  issue #300; the ones still holding code elsewhere in the workspace are a
+  backlog, not exceptions.
+- **No crate-wide `allow`.** Allow on the item, with a comment saying why.
+  `UNWIRED` marks ported-but-unconnected code, `SUPERSEDED` marks code a newer
+  path replaced - both greppable.
+- Constants live in a single `consts.rs` per crate.
+- Errors: `thiserror` enums per crate (`GitError`, `DiscoveryError`, core
+  `Error`), re-exported with a crate `Result` alias.
+- User-facing text goes through `knot_core::l10n::t`; tests assert the key
+  resolves, never the English copy.
+- Keep functions to <= 5-6 args; group related args in a struct.
+- Closed vocabularies are enums with `Display`/`FromStr`, not `String` matched
+  with a `_ => default` arm. An open one (`agent_type`) keeps its `String` and
+  gets one roster - `knot_core::agent_type` - that every crate reads.
+- Locks are `parking_lot::Mutex`: no poisoning, so no `.unwrap()` or
+  `if let Ok(..)` around a guard. `tokio::sync::Mutex` only where a guard is
+  held across an `.await` (`knot-acp`'s transport).
+- No I/O on the render path - GPUI re-renders per keystroke. Diff stats go
+  through `knot/src/diff_stats.rs`, which has caught this three times.
+- Off-thread results have to reach a frame. A new cache, dirty flag or
+  `spawn_blocking` result belongs in `repaint_poll_tick`'s `if` chain, and a
+  clearing read (`take_changed`, `take_dirty`) must not be reachable on a path
+  that discards it. Four separate breaks of that chain are named in
+  `.claude/rules/rust-structure.md`; none of them failed a test.
+- No statement-hugging brace style; format with nightly `rustfmt`.
+
+`.claude/rules/rust-structure.md` has the reasoning behind each of these, with
+the defect that produced it. Read it before a refactor; every rule names the
+cost of breaking it, so you can tell when it genuinely does not apply.

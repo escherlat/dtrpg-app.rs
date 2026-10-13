@@ -71,23 +71,47 @@ pub type OnRetry<'a, E> = &'a mut dyn FnMut(u32, Duration, &E);
 /// signal pass `|_| None` to preserve the default exponential-backoff
 /// behavior.
 ///
+/// `cancelled()` synthesizes the error returned when `cancel` is observed set
+/// *before* `operation` has run even once — there is no prior failure to
+/// surface in that case. Callers should return an error describing the
+/// cancellation (e.g. a `Network`-kind "cancelled" error) so it reads
+/// identically to a cancellation observed mid-run.
+///
 /// `on_retry(attempt, delay, &error)` is invoked once per retry, right before
 /// the backoff wait begins, mirroring `list_items_paged`'s `on_page`/`on_total`
 /// callback idiom used elsewhere in this codebase.
+///
+/// # Cancellation
+///
+/// `cancel` is checked before every `operation` call, so an already-cancelled
+/// caller never starts a request. A queued download that is cancelled before it
+/// begins therefore does not issue a `prepare_download` (or any other
+/// authenticated request); it returns `cancelled()` instead.
 ///
 /// # Errors
 ///
 /// Returns the last attempt's error if every attempt fails, if `is_retryable`
 /// returns `false` for an error, or if `cancel` is observed set (whether
-/// before an attempt starts or mid-backoff).
+/// before the first attempt — `cancelled()` — or mid-backoff).
 pub fn retry_with_backoff<T, E>(config: RetryConfig, cancel: &AtomicBool,
                                 mut operation: impl FnMut() -> Result<T, E>,
                                 is_retryable: impl Fn(&E) -> bool,
                                 extract_retry_after: impl Fn(&E) -> Option<Duration>,
-                                mut on_retry: Option<OnRetry<'_, E>>)
+                                cancelled: impl Fn() -> E, mut on_retry: Option<OnRetry<'_, E>>)
                                 -> Result<T, E> {
     let mut attempt = 1;
+    // The most recent failure, once a prior attempt has run. Used to return a
+    // meaningful error when cancellation is observed before the *next*
+    // attempt; `None` before the first attempt, where `cancelled()` supplies
+    // the error instead.
+    let mut last_error: Option<E> = None;
     loop {
+        // Check cancellation before invoking the operation so an already
+        // cancelled caller never starts a request.
+        if cancel.load(Ordering::SeqCst) {
+            return Err(last_error.unwrap_or_else(cancelled));
+        }
+
         match operation() {
             Ok(value) => return Ok(value),
             Err(error) => {
@@ -109,6 +133,7 @@ pub fn retry_with_backoff<T, E>(config: RetryConfig, cancel: &AtomicBool,
                 if !wait_cancelable(delay, cancel) {
                     return Err(error);
                 }
+                last_error = Some(error);
                 attempt += 1;
             }
         }
@@ -193,8 +218,13 @@ mod tests {
         let config = RetryConfig { max_attempts: 3,
                                    base_secs:    0,
                                    max_secs:     0, };
-        let result: Result<u32, &str> =
-            retry_with_backoff(config, &cancel, || Ok(42), |_| true, |_| None, None);
+        let result: Result<u32, &str> = retry_with_backoff(config,
+                                                           &cancel,
+                                                           || Ok(42),
+                                                           |_| true,
+                                                           |_| None,
+                                                           || "cancelled",
+                                                           None);
         assert_eq!(result, Ok(42));
     }
 
@@ -214,6 +244,7 @@ mod tests {
                                                           },
                                                           |_| true,
                                                           |_| None,
+                                                          || "cancelled",
                                                           None);
         assert_eq!(result, Err("transient"));
         assert_eq!(attempts.load(Ordering::SeqCst), 3);
@@ -235,6 +266,7 @@ mod tests {
                                                           },
                                                           |_| false,
                                                           |_| None,
+                                                          || "cancelled",
                                                           None);
         assert_eq!(result, Err("fatal"));
         assert_eq!(attempts.load(Ordering::SeqCst), 1);
@@ -257,9 +289,35 @@ mod tests {
                                                           },
                                                           |_| true,
                                                           |_| None,
+                                                          || "cancelled",
                                                           None);
         assert_eq!(result, Err("transient"));
         assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn retry_with_backoff_does_not_invoke_operation_when_pre_cancelled() {
+        // A cancel observed before the first attempt must not start the
+        // operation at all (e.g. a queued download cancelled before it began
+        // must not issue an authenticated request).
+        let cancel = AtomicBool::new(true);
+        let attempts = AtomicU32::new(0);
+        let config = RetryConfig { max_attempts: 3,
+                                   base_secs:    0,
+                                   max_secs:     0, };
+        let result: Result<(), &str> = retry_with_backoff(config,
+                                                          &cancel,
+                                                          || {
+                                                              attempts.fetch_add(1,
+                                                                                 Ordering::SeqCst);
+                                                              Ok(())
+                                                          },
+                                                          |_| true,
+                                                          |_| None,
+                                                          || "cancelled",
+                                                          None);
+        assert_eq!(result, Err("cancelled"));
+        assert_eq!(attempts.load(Ordering::SeqCst), 0);
     }
 
     #[test]
@@ -278,6 +336,7 @@ mod tests {
                                                           || Err("transient"),
                                                           |_| true,
                                                           |_| None,
+                                                          || "cancelled",
                                                           Some(&mut on_retry));
         assert_eq!(result, Err("transient"));
         assert_eq!(retry_calls.load(Ordering::SeqCst), 2);
@@ -298,6 +357,7 @@ mod tests {
                                                           || Err("rate_limited"),
                                                           |_| true,
                                                           |_| Some(Duration::from_millis(5)),
+                                                          || "cancelled",
                                                           Some(&mut on_retry));
         assert_eq!(result, Err("rate_limited"));
         assert_eq!(recorded_delay, Some(Duration::from_millis(5)));
@@ -318,6 +378,7 @@ mod tests {
                                                           || Err("transient"),
                                                           |_| true,
                                                           |_| None,
+                                                          || "cancelled",
                                                           Some(&mut on_retry));
         assert_eq!(result, Err("transient"));
         assert_eq!(recorded_delay, Some(Duration::ZERO));

@@ -107,11 +107,29 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                             .icon(IconName::Folder)
                             .tooltip(t!("settings.storage_change_tooltip").to_string())
                             .on_click(move |_event, _window, cx| {
-                                let picked = rfd::FileDialog::new().pick_folder();
-                                if let Some(path) = picked {
+                                let entity = entity_change.clone();
+                                cx.spawn(async move |cx| {
+                                    // Present the picker asynchronously rather than blocking
+                                    // here. `rfd::FileDialog::pick_folder` runs AppKit's
+                                    // nested modal loop on the main thread while this handler
+                                    // still holds gpui's `App` borrow (the handler runs
+                                    // inside `dispatch_event`). That modal loop drains the
+                                    // main dispatch queue, so a foreground task resuming
+                                    // mid-picker — a catalog page continuation, or the
+                                    // periodic catalog-refresh timer — re-enters
+                                    // `AppCell::borrow_mut` on the still-borrowed `App` and
+                                    // aborts with "already borrowed". `AsyncFileDialog`
+                                    // presents the panel as a sheet, so no gpui thread is
+                                    // ever blocked. See issue #257.
+                                    let Some(handle) =
+                                        rfd::AsyncFileDialog::new().pick_folder().await
+                                    else {
+                                        return;
+                                    };
+                                    let path = handle.path().to_path_buf();
                                     match validate_writable(&path) {
                                         Ok(()) => {
-                                            entity_change.update(cx, |ctrl, cx| {
+                                            entity.update(cx, |ctrl, cx| {
                                                 if let Err(e) = ctrl.apply_storage_path(path, cx) {
                                                     tracing::warn!("storage path rejected: {e}");
                                                 }
@@ -119,7 +137,8 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                                         }
                                         Err(e) => tracing::warn!("storage path not writable: {e}"),
                                     }
-                                }
+                                })
+                                .detach();
                             }),
                     )
                     // "Show in Finder/Explorer/Files" icon button

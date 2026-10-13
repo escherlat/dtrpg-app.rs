@@ -27,8 +27,8 @@ use crate::services::LoginService;
 /// `cx.text_system().all_font_names()`), not a curated list.
 pub type FontSelectState = Entity<SelectState<Vec<String>>>;
 
-/// Per-type counts of regenerable app cache data, computed on demand from
-/// disk — see [`SettingsController::cache_counts`].
+/// Per-type counts of regenerable app cache data, computed from disk and
+/// cached on the controller — see [`SettingsController::refresh_cache_counts`].
 #[derive(Clone, Copy, Default)]
 pub struct CacheCounts {
     /// Number of items in the cached catalog/collections metadata.
@@ -190,6 +190,11 @@ pub struct SettingsController {
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
     active_page_ix:                 usize,
+    /// Cached per-type cache counts for the Advanced page. Refreshed on the
+    /// panel-open, page-change, and cache-clear paths — see
+    /// [`Self::refresh_cache_counts`] — rather than recomputed on every
+    /// render pass, so rendering performs no disk I/O.
+    cache_counts:                   CacheCounts,
     /// `true` when the email input should be focused on the settings
     /// window's next render pass. Set by
     /// [`Self::request_email_focus_on_account_tab`] and consumed (cleared)
@@ -288,6 +293,7 @@ impl SettingsController {
                               active_page_ix:
                                   crate::data::ui_state::UiState::load().settings_page_ix()
                                                                         .unwrap_or(0),
+                              cache_counts: CacheCounts::default(),
                               focus_email_pending: false,
                               recently_updated_window_input: None,
                               max_concurrent_downloads_input: None,
@@ -296,6 +302,7 @@ impl SettingsController {
                               label_font_select: None,
                               mono_font_select: None };
         ctrl.check_storage_path_exists(initial_path, cx);
+        ctrl.refresh_cache_counts();
         ctrl
     }
 
@@ -327,6 +334,7 @@ impl SettingsController {
                api_key_hint: None,
                pending_file_opener: None,
                active_page_ix: 0,
+               cache_counts: CacheCounts::default(),
                focus_email_pending: false,
                recently_updated_window_input: None,
                max_concurrent_downloads_input: None,
@@ -394,6 +402,7 @@ impl SettingsController {
     /// settings window reopens on the same page next time.
     pub fn set_active_page_ix(&mut self, ix: usize, cx: &mut Context<Self>) {
         self.active_page_ix = ix;
+        self.refresh_cache_counts();
         crate::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
     }
@@ -564,40 +573,27 @@ impl SettingsController {
     /// re-fetches live.
     ///
     /// Does not touch downloaded content, credentials, or preferences.
-    pub fn clear_cache(&self, cx: &mut Context<Self>) {
+    pub fn clear_cache(&mut self, cx: &mut Context<Self>) {
         let dir = app_cache_dir();
         if let Err(e) = std::fs::remove_dir_all(&dir)
            && e.kind() != std::io::ErrorKind::NotFound
         {
             tracing::warn!("clear cache: failed to remove {}: {e}", dir.display());
         }
+        self.refresh_cache_counts();
         cx.emit(CacheCleared);
     }
 
-    /// Computes current per-type cache counts by reading the cache metadata
-    /// sidecar, listing the covers directory, and checking for a cached
-    /// avatar file.
+    /// Recomputes the per-type [`CacheCounts`] shown on the Advanced page and
+    /// stores them for subsequent [`snapshot`](Self::snapshot) calls.
     ///
-    /// Cheap enough to call on every render pass: a JSON sidecar read (no
-    /// full catalog parse), one `read_dir`, and one `exists()` check, all
-    /// against local app-managed paths.
-    pub fn cache_counts(&self) -> CacheCounts {
-        let metadata = load_cache_metadata(&cache_dir());
-        let metadata_items = metadata.as_ref().map_or(0, |m| m.item_count);
-        let metadata_saved_at_secs =
-            metadata.as_ref()
-                    .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
-        let last_item_check_batch_secs =
-            metadata.as_ref()
-                    .and_then(|m| m.last_item_check_batch_secs)
-                    .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
-        let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
-                                                              .unwrap_or(0);
-        CacheCounts { metadata_items,
-                      cover_thumbnails,
-                      avatar_cached: avatar_cached(),
-                      metadata_saved_at_secs,
-                      last_item_check_batch_secs }
+    /// The computation touches disk: a cache-metadata sidecar read (no full
+    /// catalog parse), one `read_dir` of the covers directory, and one avatar
+    /// `exists()` check. It runs on the panel-open, page-change, and
+    /// cache-clear paths rather than once per render pass, so the render path
+    /// itself performs no disk I/O.
+    pub fn refresh_cache_counts(&mut self) {
+        self.cache_counts = compute_cache_counts();
     }
 
     /// Opens the OS file manager at the app cache directory, creating it
@@ -774,6 +770,7 @@ impl SettingsController {
     pub fn open(&mut self, cx: &mut Context<Self>) {
         if !self.is_open {
             self.is_open = true;
+            self.refresh_cache_counts();
             cx.emit(SettingsChanged);
         }
     }
@@ -895,7 +892,7 @@ impl SettingsController {
                            storage_path_input: self.storage_path_input.clone(),
                            pending_file_opener: self.pending_file_opener.clone(),
                            active_page_ix: self.active_page_ix,
-                           cache_counts: self.cache_counts(),
+                           cache_counts: self.cache_counts,
                            max_concurrent_downloads: self.storage.max_concurrent_downloads(),
                            max_concurrent_downloads_input: self.max_concurrent_downloads_input
                                                                .clone(),
@@ -916,6 +913,29 @@ impl EventEmitter<LogoutRequested> for SettingsController {}
 
 // ── Helpers
 // ───────────────────────────────────────────────────────────────────
+
+/// Reads the current per-type cache counts from disk.
+///
+/// Kept free of `SettingsController` so its disk-I/O cost is obvious at the
+/// call site and it stays trivially unit-testable — see
+/// [`SettingsController::refresh_cache_counts`], its only production caller.
+fn compute_cache_counts() -> CacheCounts {
+    let metadata = load_cache_metadata(&cache_dir());
+    let metadata_items = metadata.as_ref().map_or(0, |m| m.item_count);
+    let metadata_saved_at_secs =
+        metadata.as_ref()
+                .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
+    let last_item_check_batch_secs = metadata.as_ref()
+                                             .and_then(|m| m.last_item_check_batch_secs)
+                                             .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
+    let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
+                                                          .unwrap_or(0);
+    CacheCounts { metadata_items,
+                  cover_thumbnails,
+                  avatar_cached: avatar_cached(),
+                  metadata_saved_at_secs,
+                  last_item_check_batch_secs }
+}
 
 /// Returns a masked representation of an API key: first 4 chars + bullets +
 /// last 1 char. For keys 5 characters or shorter, returns only bullets.
