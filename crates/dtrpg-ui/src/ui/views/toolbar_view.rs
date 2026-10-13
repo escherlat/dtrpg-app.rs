@@ -4,6 +4,7 @@
 use gpui::prelude::*;
 use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
 use gpui_component::Icon;
+use gpui_component::Selectable;
 use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::input::{Input, InputState};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
@@ -80,8 +81,8 @@ fn count_label_for(filter: &SidebarFilter, filter_count: usize, matched_count: u
 pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count: usize,
                       total_count: usize, search_query: &str, search_input: Entity<InputState>,
                       sort: SortMethod, sort_direction: SortDirection, grouped: bool,
-                      presentation: CatalogPresentation, entity: Entity<LibraryController>,
-                      colors: &ColorTokens)
+                      presentation: CatalogPresentation, selection_mode: bool,
+                      entity: Entity<LibraryController>, colors: &ColorTokens)
                       -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
@@ -129,7 +130,8 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
                      .gap(px(10.0))
                      .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
                      .child(render_sort_selector(sort, sort_direction, grouped, entity.clone()))
-                     .child(render_layout_switcher(presentation, entity)))
+                     .child(render_layout_switcher(presentation, entity.clone()))
+                     .child(render_selection_mode_toggle(selection_mode, entity)))
 }
 
 // ── Sort selector
@@ -225,6 +227,22 @@ fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: 
                         }),
                 )
                                 })
+}
+
+// ── Selection mode toggle
+// ──────────────────────────────────────────────
+
+fn render_selection_mode_toggle(active: bool, entity: Entity<LibraryController>)
+                                -> impl IntoElement + 'static {
+    Button::new("selection-mode-toggle").icon(Icon::empty().path("icons/square-check.svg"))
+                                        .ghost()
+                                        .selected(active)
+                                        .tooltip(t!("toolbar.select_items"))
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |ctrl, cx| {
+                                                      ctrl.toggle_bulk_selection_mode(cx)
+                                                  });
+                                        })
 }
 
 // ── Layout switcher

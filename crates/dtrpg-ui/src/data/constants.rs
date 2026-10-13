@@ -251,3 +251,12 @@ pub const NETWORK_MONITOR_CACHE_TTL_SECS: u64 = 5;
 
 /// Interval for the recurring long-running-session catalog-staleness timer.
 pub const CATALOG_REFRESH_TIMER_INTERVAL_SECS: u64 = 3600;
+
+/// Selection size above which a bulk-action button (Download, Remove
+/// Download, Fetch Thumbnail, Add/Remove Collection, Open) asks for
+/// confirmation before dispatching, per `catalog-bulk-actions`.
+///
+/// `Open` in particular can launch one external-app process per selected
+/// item; a selection in the thousands has been observed to lock up the
+/// default viewer app under that many simultaneous launches.
+pub const BULK_ACTION_CONFIRM_THRESHOLD: usize = 20;

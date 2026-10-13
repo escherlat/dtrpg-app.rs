@@ -1,5 +1,8 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
@@ -31,6 +34,7 @@ use crate::ui::app::{
 };
 use crate::ui::views::report_feature_bug_dialog::open_report_feature_bug_dialog;
 use crate::ui::views::{
+    bulk_action_bar_view::render_bulk_action_bar,
     catalog_view::CatalogView,
     detail_panel_view::render_detail_tab_content,
     notification_banner_view::render_notification_banner,
@@ -52,7 +56,7 @@ use crate::{
     data::{
         auth_state::AuthState,
         constants::{KEYRING_API_KEY, KEYRING_SERVICE},
-        enums::CatalogPresentation,
+        enums::{CatalogPresentation, SelectionField},
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
@@ -143,6 +147,12 @@ pub struct LibraryRootView {
     /// File Openers settings list (inline, not a modal — see the subscription
     /// wired up in `new()` for the Enter/Blur commit behavior).
     file_opener_extension_input: Entity<InputState>,
+    /// Pattern text input for the bulk-selection bar's "Select Matches"
+    /// control.
+    bulk_pattern_input:          Entity<InputState>,
+    /// Field the bulk-selection pattern match is applied against, selected
+    /// via the bulk-action bar's field dropdown.
+    bulk_pattern_field:          Rc<Cell<SelectionField>>,
     /// Last `ViewMenuState` passed to `cx.set_menus`.
     ///
     /// `cx.set_menus` replaces the whole native menu bar and, on macOS, tears
@@ -463,6 +473,12 @@ impl LibraryRootView {
                          }
                      })
           .detach();
+
+        let bulk_pattern_input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(t!("toolbar.select_matches_placeholder")
+                                                                                              .to_string())
+        });
+        let bulk_pattern_field = Rc::new(Cell::new(SelectionField::Title));
 
         let collection_name_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder(t!("collections.name_placeholder").to_string())
@@ -859,6 +875,8 @@ impl LibraryRootView {
                file_opener_extension_input,
                publisher_search_input,
                collection_search_input,
+               bulk_pattern_input,
+               bulk_pattern_field,
                last_menu_state: None }
     }
 
@@ -1014,22 +1032,30 @@ impl Render for LibraryRootView {
              collection_sort,
              collection_sort_direction,
              grouped,
-             presentation) = (snap.filter,
-                              snap.counts,
-                              snap.publishers,
-                              snap.collections,
-                              snap.collections_loaded,
-                              snap.catalog_loading,
-                              snap.catalog_ids,
-                              snap.total_count,
-                              snap.total_mb,
-                              snap.matched_count,
-                              snap.sort,
-                              snap.sort_direction,
-                              snap.collection_sort,
-                              snap.collection_sort_direction,
-                              snap.grouped,
-                              snap.presentation);
+             presentation,
+             bulk_selection_mode,
+             bulk_selected_ids,
+             bulk_selection_count,
+             bulk_items) = (snap.filter,
+                            snap.counts,
+                            snap.publishers,
+                            snap.collections,
+                            snap.collections_loaded,
+                            snap.catalog_loading,
+                            snap.catalog_ids,
+                            snap.total_count,
+                            snap.total_mb,
+                            snap.matched_count,
+                            snap.sort,
+                            snap.sort_direction,
+                            snap.collection_sort,
+                            snap.collection_sort_direction,
+                            snap.grouped,
+                            snap.presentation,
+                            snap.bulk_selection_mode,
+                            snap.bulk_selected_ids,
+                            snap.bulk_selection_count,
+                            snap.items);
 
         let settings_snap = self.settings.read(cx).snapshot();
         let activity_snap = self.activity.read(cx).snapshot();
@@ -1042,6 +1068,18 @@ impl Render for LibraryRootView {
 
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
+
+        let bulk_action_bar =
+            bulk_selection_mode.then(|| {
+                                   render_bulk_action_bar(bulk_selection_count,
+                                                          &bulk_selected_ids,
+                                                          &bulk_items,
+                                                          &collections,
+                                                          lib_entity.clone(),
+                                                          self.bulk_pattern_input.clone(),
+                                                          self.bulk_pattern_field.clone(),
+                                                          colors)
+                               });
 
         let publisher_search =
             crate::ui::views::sidebar_view::SidebarSectionSearch { open:
@@ -1083,6 +1121,7 @@ impl Render for LibraryRootView {
                                      sort_direction,
                                      grouped,
                                      presentation,
+                                     bulk_selection_mode,
                                      lib_entity.clone(),
                                      colors);
         let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
@@ -1123,6 +1162,7 @@ impl Render for LibraryRootView {
                                        .flex()
                                        .flex_col()
                                        .child(toolbar)
+                                       .children(bulk_action_bar)
                                        .child(banner)
                                        .child(self.catalog_view.clone())
                                        .into_any_element(),
