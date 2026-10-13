@@ -42,7 +42,7 @@
 - [x] 5.5 Each wired to its `LibraryController` method
 - [x] 5.6 "Add to Collection" dropdown lists `collections` (cloned from the snapshot)
 - [x] 5.7 "Remove from Collection" dropdown filtered to collections intersecting the selection (via `snap.items`, the currently-visible page — a selected item scrolled out of the active filter won't be picked up by this filter; noted as a known best-effort limitation, not a correctness issue for the common case)
-- [x] 5.8 Bar included in `LibraryRootView::render` as a conditional child, directly below the toolbar, when `bulk_selection_mode && bulk_selection_count > 0`
+- [x] 5.8 Bar included in `LibraryRootView::render` as a conditional child, directly below the toolbar, when `bulk_selection_mode` — shown as soon as selection mode is entered (not gated on a non-empty selection; confirmed via manual review that users expect the bar immediately, not only after the first pick)
 
 ## 6. Catalog Views: Per-Item Checkboxes
 

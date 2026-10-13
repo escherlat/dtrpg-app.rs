@@ -29,7 +29,7 @@ The catalog currently has no notion of a selection set. Each item is acted on in
 
 ### Bulk-action bar is part of the toolbar area, not a floating overlay
 
-**Decision**: Render the bulk-action bar as a second row beneath the normal toolbar, visible only when `selection_mode && selection_count > 0`. Use `FluentBuilder::when(...)` to conditionally include the row.
+**Decision**: Render the bulk-action bar as a second row beneath the normal toolbar, visible whenever `selection_mode` is on (not gated on a non-empty selection — manual review found users expect the bar as soon as they enter selection mode, not only after picking an item). Included conditionally via `Option::then(...)`.
 
 **Rationale**: A floating overlay competes with the catalog content and complicates hit-testing. A toolbar row keeps the catalog area clean, uses available horizontal space efficiently, and is trivially dismissed by deselecting all or toggling off selection mode.
 
