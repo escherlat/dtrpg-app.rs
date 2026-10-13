@@ -15,16 +15,16 @@ The Rust UI toolbar SHALL include a button that toggles catalog selection mode. 
 - **WHEN** selection mode is inactive
 - **THEN** the toggle button is rendered in its default/ghost visual state
 
-### Requirement: Toolbar shows a bulk-action bar when selection is non-empty
-When selection mode is active and at least one item is selected, the Rust UI toolbar area SHALL display a bulk-action bar in place of (or below) the normal toolbar row. The bar SHALL contain: a selection count label, Select All, Deselect All, a pattern-match selection control, and the six bulk-action buttons (Download, Remove Download, Fetch Thumbnail, Add to Collection, Remove from Collection, Open).
+### Requirement: Toolbar shows a bulk-action bar whenever selection mode is active
+Whenever selection mode is active, the Rust UI toolbar area SHALL display a bulk-action bar below the normal toolbar row, regardless of selection count. The bar SHALL contain: a selection count label, Select All, Deselect All, a pattern-match selection control, and the six bulk-action buttons (Download, Remove Download, Fetch Thumbnail, Add to Collection, Remove from Collection, Open).
 
-#### Scenario: Bulk-action bar replaces or supplements toolbar in selection mode
-- **WHEN** selection mode is active and the selection count is greater than zero
-- **THEN** the bulk-action bar is visible and all six action buttons are present
+#### Scenario: Bulk-action bar appears as soon as selection mode is entered
+- **WHEN** selection mode is toggled on
+- **THEN** the bulk-action bar is visible immediately, with all six action buttons present, even before any item is selected
 
-#### Scenario: Bulk-action bar hidden when no items selected
-- **WHEN** selection mode is active but the selection set is empty
-- **THEN** the bulk-action bar is not visible (or renders as hidden)
+#### Scenario: Bulk-action bar hidden outside selection mode
+- **WHEN** selection mode is off
+- **THEN** the bulk-action bar is not rendered
 
 ### Requirement: Pattern-match selection control is accessible from the bulk-action bar
 The bar SHALL include a pattern-match control (text input + field selector) that allows users to add items to the selection by matching on title, publisher, or system.

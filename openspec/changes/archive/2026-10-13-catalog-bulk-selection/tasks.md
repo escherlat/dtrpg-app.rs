@@ -59,16 +59,10 @@
 
 ## 8. Manual Verification
 
-Left for manual verification — not run from this session (no UI launch/screenshot in this workflow):
+Reviewed in the running app by the user (not run from this session — no UI launch/screenshot in this workflow). Two issues were found and fixed during review before merge:
 
-- [ ] 8.1 Selection mode toggle activates/deactivates; checkboxes appear/disappear in all three views
-- [ ] 8.2 Individual checkboxes toggle selection; count updates
-- [ ] 8.3 Select All / Deselect All
-- [ ] 8.4 Pattern-match control for each of the three fields
-- [ ] 8.5 Bulk Download queues and clears selection
-- [ ] 8.6 Bulk Remove Download clears local status and clears selection
-- [ ] 8.7 Bulk Fetch Thumbnail enqueues and clears selection
-- [ ] 8.8 Add to Collection dropdown assigns items
-- [ ] 8.9 Remove from Collection dropdown shows only relevant collections
-- [ ] 8.10 Bulk Open opens downloaded files; cloud-only items skipped
-- [ ] 8.11 Bulk-action bar visibility toggles correctly with selection count
+- [x] 8.1–8.9, 8.11 — confirmed working; no further issues reported
+- [x] 8.10 Bulk Open opens downloaded files — found that a selection in the thousands launched one Preview process per item and locked up the app; fixed by adding a confirmation prompt (`confirm_and_dispatch`, `BULK_ACTION_CONFIRM_THRESHOLD = 20`) gating all six bulk actions, not just Open
+- [x] Bulk-action bar visibility — found it stayed hidden until the first item was picked; fixed to show as soon as selection mode is toggled on, regardless of count
+
+PR #266 merged into `develop`.

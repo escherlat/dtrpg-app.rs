@@ -1,15 +1,35 @@
-## ADDED Requirements
+# catalog-bulk-actions Specification
 
-### Requirement: Bulk-action bar appears when selection is non-empty in selection mode
-The system SHALL render a bulk-action bar only when selection mode is active and at least one item is selected. When the selection becomes empty, the bar SHALL be hidden.
+## Purpose
+Bulk actions (Download, Remove Download, Fetch Thumbnail, Add/Remove Collection, Open) dispatched over the current catalog selection set, with a confirmation gate for large selections.
 
-#### Scenario: Bar appears on first selection
-- **WHEN** selection mode is active and the user selects the first item
-- **THEN** the bulk-action bar becomes visible
+## Requirements
 
-#### Scenario: Bar disappears when selection is cleared
-- **WHEN** all items are deselected (or Deselect All is invoked)
+### Requirement: Bulk-action bar appears as soon as selection mode is active
+The system SHALL render a bulk-action bar whenever selection mode is active, regardless of selection count. Gating the bar on a non-empty selection was tried and rejected during review — users expect it immediately on entering selection mode, not only after picking an item.
+
+#### Scenario: Bar appears immediately on entering selection mode
+- **WHEN** the user toggles selection mode on
+- **THEN** the bulk-action bar becomes visible, showing a count of zero
+
+#### Scenario: Bar disappears when selection mode is turned off
+- **WHEN** selection mode is deactivated
 - **THEN** the bulk-action bar is hidden
+
+### Requirement: Bulk actions on a large selection require confirmation
+The system SHALL ask for confirmation before dispatching a bulk action whose selection count exceeds a threshold (20 items), naming the action and the count. A selection at or below the threshold dispatches immediately.
+
+#### Scenario: Small selection dispatches without confirmation
+- **WHEN** the user invokes a bulk action with a selection of 20 items or fewer
+- **THEN** the action runs immediately with no confirmation prompt
+
+#### Scenario: Large selection requires confirmation
+- **WHEN** the user invokes a bulk action with a selection larger than 20 items
+- **THEN** a confirmation dialog appears naming the action and the selection count before the action runs
+
+#### Scenario: Declining confirmation cancels the action
+- **WHEN** the user dismisses or cancels the confirmation dialog
+- **THEN** the bulk action does not run and the selection is preserved
 
 ### Requirement: Bulk Download queues selected items for download
 The system SHALL provide a Bulk Download action that enqueues each selected item that is not already downloaded.
@@ -26,12 +46,12 @@ The system SHALL provide a Bulk Download action that enqueues each selected item
 - **WHEN** the Bulk Download action is dispatched
 - **THEN** the selection set is cleared and selection mode is deactivated
 
-### Requirement: Bulk Remove Download deletes local files for selected items
-The system SHALL provide a Bulk Remove Download action that deletes the local download directory for each selected item that is currently downloaded.
+### Requirement: Bulk Remove Download reverts selected items to cloud-only status
+The system SHALL provide a Bulk Remove Download action that reverts each selected downloaded item to `Cloud` status, reusing the same per-item removal path as the single-item "Remove Download" action.
 
-#### Scenario: Bulk Remove Download removes local files
+#### Scenario: Bulk Remove Download reverts downloaded items
 - **WHEN** the user invokes Bulk Remove Download with downloaded items selected
-- **THEN** each selected item's local directory is removed from disk
+- **THEN** each selected item's files are marked not-downloaded and its status becomes `Cloud`
 
 #### Scenario: Bulk Remove Download skips cloud-only items
 - **WHEN** a selected item has no local download
@@ -86,12 +106,12 @@ The system SHALL provide a Bulk Remove from Collection action. When invoked, a c
 - **WHEN** a collection is chosen and the action is dispatched
 - **THEN** the selection set is cleared and selection mode is deactivated
 
-### Requirement: Bulk Open opens each selected item in the system PDF viewer
-The system SHALL provide a Bulk Open action that opens each selected item's downloaded PDF in the platform file manager / viewer. Items without a local download are skipped.
+### Requirement: Bulk Open opens each selected item with its default application
+The system SHALL provide a Bulk Open action that opens each selected downloaded item's file with the platform default application. Items without a local download, and multi-file entries requiring explicit file selection, are skipped.
 
 #### Scenario: Bulk Open opens downloaded items
 - **WHEN** the user invokes Bulk Open with downloaded items selected
-- **THEN** each downloaded item's file is opened via the platform reveal/open utility
+- **THEN** each downloaded item's file is opened with its default application
 
 #### Scenario: Bulk Open skips cloud-only items
 - **WHEN** a selected item has no local file
