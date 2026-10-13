@@ -313,32 +313,50 @@ fn render_add_button(entity: Entity<SettingsController>, extension_input: Entity
 /// inline "add file opener" flow: resets and focuses `extension_input`,
 /// reclaims OS key-window status (the native panel can steal it), and tells
 /// the controller to render a pending row for the picked app.
+///
+/// The picker is presented asynchronously (`AsyncFileDialog`) instead of
+/// blocking this handler: a blocking `rfd::FileDialog` runs AppKit's modal loop
+/// while the handler still holds gpui's `App` borrow, and a foreground task
+/// resuming mid-modal aborts in `AppCell::borrow_mut` (see issue #257). The
+/// post-pick UI work therefore goes through the window context's `update`
+/// rather than the borrowed `window`/`cx` handed to this function.
 fn pick_app_and_begin_add(entity: &Entity<SettingsController>,
                           extension_input: &Entity<InputState>, window: &mut Window,
                           cx: &mut App) {
-    // Native app picker; blocks the calling thread while the modal is open,
-    // matching the existing "Change…" storage-folder picker's convention.
-    let picked =
-        rfd::FileDialog::new().add_filter(t!("settings.file_opener_app_filter_name").to_string(),
-                                          &["app"])
-                              .set_directory("/Applications")
-                              .pick_file();
-    let Some(app_path) = picked
-    else {
-        return;
-    };
+    let entity = entity.clone();
+    let extension_input = extension_input.clone();
+    window.to_async(cx)
+          .spawn(async move |cx| {
+              let picked = rfd::AsyncFileDialog::new()
+                  .add_filter(t!("settings.file_opener_app_filter_name").to_string(), &["app"])
+                  .set_directory("/Applications")
+                  .pick_file()
+                  .await;
+              let Some(handle) = picked
+              else {
+                  return;
+              };
+              let app_path = handle.path().to_path_buf();
 
-    extension_input.update(cx, |state, cx| state.set_value("", window, cx));
+              cx.update(|window, cx| {
+                    extension_input.update(cx, |state, cx| state.set_value("", window, cx));
+                    // The native panel can leave the GPUI window without OS
+                    // key-window status. Without reclaiming it here, gpui's
+                    // focus tracking still thinks the handle is focused but no
+                    // keyboard events arrive, so the extension input below
+                    // silently refuses focus.
+                    window.activate_window();
+                })
+                .ok();
 
-    // The blocking native file panel above can leave the GPUI window without OS
-    // key-window status; without reclaiming it here, GPUI's own focus tracking
-    // still thinks a handle is focused but no keyboard events actually arrive,
-    // so the extension input below silently refuses focus.
-    window.activate_window();
+              entity.update(cx, |ctrl, cx| ctrl.begin_add_file_opener(app_path, cx));
 
-    entity.update(cx, |ctrl, cx| ctrl.begin_add_file_opener(app_path, cx));
-
-    extension_input.update(cx, |state, cx| state.focus(window, cx));
+              cx.update(|window, cx| {
+                    extension_input.update(cx, |state, cx| state.focus(window, cx));
+                })
+                .ok();
+          })
+          .detach();
 }
 
 // ── Helpers
