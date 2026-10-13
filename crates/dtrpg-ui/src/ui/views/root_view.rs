@@ -1070,15 +1070,15 @@ impl Render for LibraryRootView {
         let colors = &theme.colors;
 
         let bulk_action_bar = (bulk_selection_mode && bulk_selection_count > 0).then(|| {
-            render_bulk_action_bar(bulk_selection_count,
-                                   &bulk_selected_ids,
-                                   &bulk_items,
-                                   &collections,
-                                   lib_entity.clone(),
-                                   self.bulk_pattern_input.clone(),
-                                   self.bulk_pattern_field.clone(),
-                                   colors)
-        });
+                                  render_bulk_action_bar(bulk_selection_count,
+                                                         &bulk_selected_ids,
+                                                         &bulk_items,
+                                                         &collections,
+                                                         lib_entity.clone(),
+                                                         self.bulk_pattern_input.clone(),
+                                                         self.bulk_pattern_field.clone(),
+                                                         colors)
+                              });
 
         let publisher_search =
             crate::ui::views::sidebar_view::SidebarSectionSearch { open:

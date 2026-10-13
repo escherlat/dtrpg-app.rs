@@ -39,6 +39,7 @@ use crate::util::publisher::*;
 use crate::util::sort::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
+mod bulk_selection;
 mod catalog;
 mod catalog_sync;
 mod checks;
@@ -51,7 +52,6 @@ mod downloads;
 mod filtering;
 mod helpers;
 mod lifecycle;
-mod bulk_selection;
 mod preferences;
 mod selection;
 mod thumbnails;

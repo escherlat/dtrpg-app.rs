@@ -329,7 +329,8 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                                                                     Arc::clone(&checkbox_id),
                                                                     cx,
                                                                 );
-                                                            } else {
+                                                            }
+                                                            else {
                                                                 ctrl.bulk_deselect_item(
                                                                     &checkbox_id,
                                                                     cx,
@@ -1236,11 +1237,12 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let content: AnyElement = match (snap.presentation, snap.grouped) {
-            // ── List, ungrouped — DataTable (handles header/row alignment) ──
-            (CatalogPresentation::List, false) => {
-                use gpui_component::Size;
-                root.px(pad_side)
+        let content: AnyElement =
+            match (snap.presentation, snap.grouped) {
+                // ── List, ungrouped — DataTable (handles header/row alignment) ──
+                (CatalogPresentation::List, false) => {
+                    use gpui_component::Size;
+                    root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1248,15 +1250,15 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-            }
+                }
 
-            // ── List, grouped — DataTable over a flattened header/item row
-            // list, so it gets the same virtualization as the ungrouped
-            // branch instead of hand-rolled, fully-materialized rows ──
-            (CatalogPresentation::List, true) => {
-                use gpui_component::Size;
-                self.grouped_items(cx);
-                root.px(pad_side)
+                // ── List, grouped — DataTable over a flattened header/item row
+                // list, so it gets the same virtualization as the ungrouped
+                // branch instead of hand-rolled, fully-materialized rows ──
+                (CatalogPresentation::List, true) => {
+                    use gpui_component::Size;
+                    self.grouped_items(cx);
+                    root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_grouped_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1264,76 +1266,77 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-            }
+                }
 
-            // ── Thumbs, ungrouped — virtualized ───────────────────────────
-            (CatalogPresentation::Thumbs, false) => {
-                let c = colors.clone();
-                let d = density.clone();
-                let s = storage_root.clone();
-                let t = tabs_entity.clone();
-                let selection_mode = snap.bulk_selection_mode;
-                let selected_ids = snap.bulk_selected_ids.clone();
-                root.px(pad_side)
-                    .child(
-                           div().relative()
-                                .flex_1()
-                                .min_h_0()
-                                .child(
-                    uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
-                        let items = ctrl.read(cx).visible_items_slice(range);
-                        let covers: Vec<Option<Arc<Image>>> = {
-                            let cache = cx.global::<CoverCache>();
-                            items.iter().map(|item| cache.get(&item.id)).collect()
-                        };
-                        let checking: Vec<(bool, bool)> = {
-                            let ctrl_ref = ctrl.read(cx);
+                // ── Thumbs, ungrouped — virtualized ───────────────────────────
+                (CatalogPresentation::Thumbs, false) => {
+                    let c = colors.clone();
+                    let d = density.clone();
+                    let s = storage_root.clone();
+                    let t = tabs_entity.clone();
+                    let selection_mode = snap.bulk_selection_mode;
+                    let selected_ids = snap.bulk_selected_ids.clone();
+                    root.px(pad_side)
+                        .child(
+                               div().relative()
+                                    .flex_1()
+                                    .min_h_0()
+                                    .child(
+                        uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
+                            let items = ctrl.read(cx).visible_items_slice(range);
+                            let covers: Vec<Option<Arc<Image>>> = {
+                                let cache = cx.global::<CoverCache>();
+                                items.iter().map(|item| cache.get(&item.id)).collect()
+                            };
+                            let checking: Vec<(bool, bool)> = {
+                                let ctrl_ref = ctrl.read(cx);
+                                items.iter()
+                                     .map(|item| {
+                                         (ctrl_ref.is_checking(&item.id),
+                                          ctrl_ref.is_verifying_downloads(&item.id))
+                                     })
+                                     .collect()
+                            };
                             items.iter()
-                                 .map(|item| {
-                                     (ctrl_ref.is_checking(&item.id),
-                                      ctrl_ref.is_verifying_downloads(&item.id))
+                                 .zip(covers)
+                                 .zip(checking)
+                                 .map(|((item, cover), (is_checking, is_verifying))| {
+                                     let is_selected = selected_ids.contains(&item.id);
+                                     render_thumb_row(item,
+                                                      cover,
+                                                      &c,
+                                                      &d,
+                                                      ctrl.clone(),
+                                                      t.clone(),
+                                                      s.clone(),
+                                                      window,
+                                                      is_checking,
+                                                      is_verifying,
+                                                      selection_mode,
+                                                      is_selected).into_any_element()
                                  })
                                  .collect()
-                        };
-                        items.iter()
-                             .zip(covers)
-                             .zip(checking)
-                             .map(|((item, cover), (is_checking, is_verifying))| {
-                                 let is_selected = selected_ids.contains(&item.id);
-                                 render_thumb_row(item,
-                                                  cover,
-                                                  &c,
-                                                  &d,
-                                                  ctrl.clone(),
-                                                  t.clone(),
-                                                  s.clone(),
-                                                  window,
-                                                  is_checking,
-                                                  is_verifying,
-                                                  selection_mode,
-                                                  is_selected).into_any_element()
-                             })
-                             .collect()
-                    }).track_scroll(&scroll_handle)
-                      .size_full(),
-                )
-                                .vertical_scrollbar(&scroll_handle),
-                )
-                    .into_any_element()
-            }
+                        }).track_scroll(&scroll_handle)
+                          .size_full(),
+                    )
+                                    .vertical_scrollbar(&scroll_handle),
+                    )
+                        .into_any_element()
+                }
 
-            // ── Thumbs, grouped — non-virtualized ─────────────────────────
-            (CatalogPresentation::Thumbs, true) => {
-                let groups = self.grouped_items(cx);
-                let cover_cache = {
-                    let cache = cx.global::<CoverCache>();
-                    cache.images.clone()
-                };
-                let checking_items = self.controller.read(cx).checking_items_snapshot();
-                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
-                let selection_mode = snap.bulk_selection_mode;
-                let selected_ids = snap.bulk_selected_ids.clone();
-                root.overflow_y_scrollbar()
+                // ── Thumbs, grouped — non-virtualized ─────────────────────────
+                (CatalogPresentation::Thumbs, true) => {
+                    let groups = self.grouped_items(cx);
+                    let cover_cache = {
+                        let cache = cx.global::<CoverCache>();
+                        cache.images.clone()
+                    };
+                    let checking_items = self.controller.read(cx).checking_items_snapshot();
+                    let verifying_downloads =
+                        self.controller.read(cx).verifying_downloads_snapshot();
+                    let selection_mode = snap.bulk_selection_mode;
+                    let selected_ids = snap.bulk_selected_ids.clone();
+                    root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                         let c = colors.clone();
@@ -1374,18 +1377,18 @@ impl Render for CatalogView {
                                                           }))
                     }))
                     .into_any_element()
-            }
+                }
 
-            // ── Grid, ungrouped — row-virtualized ─────────────────────────
-            (CatalogPresentation::Grid, false) => {
-                let row_count = item_count.div_ceil(items_per_row);
-                let c = colors.clone();
-                let d = density.clone();
-                let s = storage_root.clone();
-                let t = tabs_entity.clone();
-                let selection_mode = snap.bulk_selection_mode;
-                let selected_ids = snap.bulk_selected_ids.clone();
-                root.px(pad_side)
+                // ── Grid, ungrouped — row-virtualized ─────────────────────────
+                (CatalogPresentation::Grid, false) => {
+                    let row_count = item_count.div_ceil(items_per_row);
+                    let c = colors.clone();
+                    let d = density.clone();
+                    let s = storage_root.clone();
+                    let t = tabs_entity.clone();
+                    let selection_mode = snap.bulk_selection_mode;
+                    let selected_ids = snap.bulk_selected_ids.clone();
+                    root.px(pad_side)
                     .child(
                            div().relative()
                                 .flex_1()
@@ -1457,20 +1460,21 @@ impl Render for CatalogView {
                                 .vertical_scrollbar(&scroll_handle),
                 )
                     .into_any_element()
-            }
+                }
 
-            // ── Grid, grouped — non-virtualized ───────────────────────────
-            (CatalogPresentation::Grid, true) => {
-                let groups = self.grouped_items(cx);
-                let cover_cache = {
-                    let cache = cx.global::<CoverCache>();
-                    cache.images.clone()
-                };
-                let checking_items = self.controller.read(cx).checking_items_snapshot();
-                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
-                let selection_mode = snap.bulk_selection_mode;
-                let selected_ids = snap.bulk_selected_ids.clone();
-                root.overflow_y_scrollbar()
+                // ── Grid, grouped — non-virtualized ───────────────────────────
+                (CatalogPresentation::Grid, true) => {
+                    let groups = self.grouped_items(cx);
+                    let cover_cache = {
+                        let cache = cx.global::<CoverCache>();
+                        cache.images.clone()
+                    };
+                    let checking_items = self.controller.read(cx).checking_items_snapshot();
+                    let verifying_downloads =
+                        self.controller.read(cx).verifying_downloads_snapshot();
+                    let selection_mode = snap.bulk_selection_mode;
+                    let selected_ids = snap.bulk_selected_ids.clone();
+                    root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                                                     let c = colors.clone();
@@ -1492,8 +1496,8 @@ impl Render for CatalogView {
                                                                             selection_mode, sel))
                                                 }))
                     .into_any_element()
-            }
-        };
+                }
+            };
 
         let mut result =
             outer.relative()
