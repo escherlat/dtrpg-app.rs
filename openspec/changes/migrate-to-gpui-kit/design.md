@@ -38,15 +38,17 @@ state that compiles — see the ADR amendment for the compiler-proven detail.
   Popover is the one confirmed builder reshape (`.content(...)` →
   `.anchor(...).open(...).on_open_change(...)`). What changed is not *what*
   to port to, but that the porting has to happen everywhere at once.
-- **Value-type conversions are mechanical but real.** `gpui::Hsla` and
-  `gpui_pre::Hsla` (reached via `gpui_kit::Hsla`) are field-identical
-  (`h`/`s`/`l`/`a: f32`) but distinct types — no blanket `.into()` exists
-  across the orphan-rule boundary, so a small local conversion helper is
-  needed wherever a color value crosses from app code into a gpui-kit
-  widget. Same pattern for `SharedString` (`gpui_pre::SharedString::from
-  (our_str.as_ref())`, since `From<&str>` exists on the gpui-pre side).
-  These are per-value-type helpers written once and reused, not something
-  to solve per call site.
+- **Value-type conversions turned out to be unnecessary — superseded by a
+  simpler fix.** This decision originally called for `Hsla`/`SharedString`
+  conversion helpers (field-wise copy across the orphan-rule boundary).
+  Implementation found a cheaper fix that removes the boundary entirely:
+  the workspace's own `gpui`/`gpui_platform` dependencies are repointed
+  from zed-industries/zed's git fork to the exact `gpui-pre`/
+  `gpui-pre-platform` crates.io packages gpui-kit itself depends on (pinned
+  to the same version). After that one `Cargo.toml` change, our
+  `gpui::Hsla`/`gpui::SharedString`/`gpui::Context`/etc. *are* gpui-kit's
+  types — not merely convertible to them. No conversion helpers were
+  written; see `tasks.md` section 2's completion note.
 - **`gpui-component`/`gpui-component-assets` are removed in the same change**
   that introduces `gpui-kit`'s replacements — there's no longer a
   "coexistence window" during which both stay in `Cargo.toml`.
