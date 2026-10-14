@@ -6,11 +6,26 @@ versions:
     pages:
       - index
       - install
+      - catalog
+      - collections
+      - downloads
+      - settings
       - themes
+      - activity
     nav:
       - title: Overview
         path: ""
       - title: Installation
         path: install/
+      - title: Browsing your catalog
+        path: catalog/
+      - title: Collections
+        path: collections/
+      - title: Downloads
+        path: downloads/
+      - title: Settings
+        path: settings/
       - title: Themes and appearance
         path: themes/
+      - title: Activity and alerts
+        path: activity/
