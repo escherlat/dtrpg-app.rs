@@ -158,11 +158,13 @@ fn render_account_button(
         // mask, never corner radii - the image is only ever circularly
         // clipped via its own corner_radii at its own paint call.
         div()
+            .flex_none()
             .w(px(28.0))
             .h(px(28.0))
             .overflow_hidden()
             .child(
                 img(ImageSource::Image(image))
+                    .flex_none()
                     .size(px(28.0))
                     .aspect_square()
                     .rounded_full()
