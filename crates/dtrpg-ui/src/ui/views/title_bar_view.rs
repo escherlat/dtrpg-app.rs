@@ -149,12 +149,22 @@ fn render_account_button(
     let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
         let format = detect_image_format(bytes);
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        img(ImageSource::Image(image))
+        // A bare img() styled directly as this Button's flex child gets
+        // resized by the button's internal h_flex layout despite explicit
+        // w()/h() (see settings_account_view.rs's render_avatar_circle for
+        // the same issue). Wrapping it in its own fixed-size, clipped div
+        // isolates it from that.
+        div()
             .w(px(28.0))
             .h(px(28.0))
-            .aspect_square()
             .rounded_full()
-            .object_fit(ObjectFit::Cover)
+            .overflow_hidden()
+            .child(
+                img(ImageSource::Image(image))
+                    .size(px(28.0))
+                    .aspect_square()
+                    .object_fit(ObjectFit::Cover),
+            )
             .into_any_element()
     } else {
         div()
