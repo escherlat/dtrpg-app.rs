@@ -186,15 +186,19 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
         // with explicit pixels instead. aspect_square() is required: once the
         // image decodes, Img sets its own intrinsic aspect ratio onto the
         // layout style and that silently overrides our explicit height for
-        // any non-square source photo.
+        // any non-square source photo. rounded_full() must go on the img
+        // itself, not just the wrapping div: overflow_hidden() only clips to
+        // a rectangular bounds mask here, corner radii are never consulted
+        // for it - the image is only ever circularly clipped via its own
+        // corner_radii at its own paint call.
         return div()
             .size(AVATAR_SIZE)
-            .rounded_full()
             .overflow_hidden()
             .child(
                 img(ImageSource::Image(image))
                     .size(AVATAR_SIZE)
                     .aspect_square()
+                    .rounded_full()
                     .object_fit(ObjectFit::Cover),
             )
             .into_any_element();

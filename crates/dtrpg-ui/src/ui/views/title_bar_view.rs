@@ -152,17 +152,20 @@ fn render_account_button(
         // A bare img() styled directly as this Button's flex child gets
         // resized by the button's internal h_flex layout despite explicit
         // w()/h() (see settings_account_view.rs's render_avatar_circle for
-        // the same issue). Wrapping it in its own fixed-size, clipped div
-        // isolates it from that.
+        // the same issue). Wrapping it in its own fixed-size div isolates it
+        // from that. rounded_full() must go on the img itself, not the
+        // wrapping div: overflow_hidden() only clips to a rectangular bounds
+        // mask, never corner radii - the image is only ever circularly
+        // clipped via its own corner_radii at its own paint call.
         div()
             .w(px(28.0))
             .h(px(28.0))
-            .rounded_full()
             .overflow_hidden()
             .child(
                 img(ImageSource::Image(image))
                     .size(px(28.0))
                     .aspect_square()
+                    .rounded_full()
                     .object_fit(ObjectFit::Cover),
             )
             .into_any_element()
