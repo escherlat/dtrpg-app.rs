@@ -1,20 +1,26 @@
 ## ADDED Requirements
 
-### Requirement: No dedicated status dot or glyph next to the publisher name
+### Requirement: Downloaded status has no dedicated dot or glyph; cloud status keeps an icon, left of the title
 
 A catalog row (list, thumbs, or grid layout) SHALL NOT render a dedicated
-dot or glyph next to the publisher name to indicate download status. The
-row's hover tooltip SHALL state the item's download status instead.
+dot next to the publisher name to indicate `ItemStatus::Downloaded`. The
+row's hover tooltip SHALL state that the item is downloaded instead. A
+`ItemStatus::Cloud` item SHALL still show a ☁ glyph, since it is an
+intuitive, self-explanatory indicator unlike the removed dots, but
+positioned immediately to the left of the row's title text rather than next
+to the publisher name.
 
-#### Scenario: Downloaded row shows no publisher-line dot
+#### Scenario: Downloaded row shows no dot
 - **WHEN** an item has `ItemStatus::Downloaded`
-- **THEN** the row's publisher line shows no dot next to the publisher name
+- **THEN** the row shows no dot next to the publisher name or anywhere else
+  indicating download status
 - **AND** hovering the row's tooltip states the item is downloaded
 
-#### Scenario: Cloud row shows no publisher-line glyph
+#### Scenario: Cloud row shows a ☁ glyph to the left of the title
 - **WHEN** an item has `ItemStatus::Cloud`
-- **THEN** the row's publisher line shows no ☁ or other glyph next to the
-  publisher name
+- **THEN** a ☁ glyph appears immediately to the left of the row's title text
+  in list, thumbs, and grid layouts
+- **AND** the row's publisher line shows no glyph of its own
 - **AND** hovering the row's tooltip states the item is cloud-only
 
 ### Requirement: No permanent "Show in Finder" row; reveal stays in the context menu
