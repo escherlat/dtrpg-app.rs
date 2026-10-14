@@ -104,5 +104,28 @@ commit on `feature/233-migrate-to-gpui-kit`.
       --check` (via `rustup run nightly cargo fmt`): clean after one
       `cargo fmt` pass (two import lines exceeded width after the rename).
       `cargo test --workspace`: 54 (dtrpg-core) + 338 (dtrpg-ui) + 12
-      (doc-tests) passed, 0 failed. Manual smoke test left to the user (no
-      automated UI verification).
+      (doc-tests) passed, 0 failed.
+
+## 6. Manual smoke test findings (fixed post-merge-readiness)
+
+- [x] 6.1 Avatar photo rendered squished (thin vertical sliver) in both the
+      title bar and settings account view. Root causes, found in order:
+      `Avatar::src()` itself works fine (confirmed against gpui-kit.com's own
+      demo); the title-bar instance was being squashed by `Button::render()`
+      applying its own ~10px padding whenever `.child(..)` is non-empty (its
+      "normal button" sizing branch, since passing the avatar via `.child()`
+      disqualifies the no-padding "icon button" branch) — `.p(px(0.0))` on
+      the `Button` cancels it.
+- [x] 6.2 Avatar photo wasn't circularly clipped — `overflow_hidden()` on a
+      wrapping `div` only clips children to a rectangular bounds mask in
+      this gpui-kit version (`Style::overflow_mask` never reads
+      `corner_radii`); not applicable once 6.1's fix let `Avatar`'s own
+      internal clipping (which already applies `corner_radii` directly to
+      the image at its own paint call) render correctly.
+- [x] 6.3 Most non-button interactive controls (list rows, menu items,
+      switches, sliders) showed a glaring light/white hover background under
+      dark themes like Ink. `apply_theme_colors` only covered the
+      button/table/sidebar/tab/status-bar token families; `accent`,
+      `accent_foreground`, and the list/group-box/switch/slider/link family
+      were left at gpui-kit's light-theme defaults. Extended the mapping to
+      cover them from the existing `ColorTokens` palette.
