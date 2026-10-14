@@ -4,9 +4,10 @@
       the research inventory against its actual source — done; see
       `docs/adr/0001-migrate-to-gpui-kit.md`. Only Popover needs a builder
       rewrite; everything else has a confirmed, near-identical equivalent.
-- [ ] 0.2 Add `gpui-kit = "0.7"` to `crates/dtrpg-ui/Cargo.toml` and
+- [x] 0.2 Add `gpui-kit = "0.7"` to `crates/dtrpg-ui/Cargo.toml` and
       `crates/dtrpg-core/Cargo.toml` alongside the existing `gpui-component`
-      dependency (coexistence, no removal yet)
+      dependency (coexistence, no removal yet) — done, resolved to 0.7.3,
+      commit 236e0d8 on feature/233-migrate-to-gpui-kit
 
 ## 1. `util/`, `data/`
 
