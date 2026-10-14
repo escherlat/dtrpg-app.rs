@@ -183,7 +183,10 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
         // Avatar::src() composes the image with a percentage-sized child that
         // squishes under gpui-kit's Img layout; size and crop it ourselves
-        // with explicit pixels instead.
+        // with explicit pixels instead. aspect_square() is required: once the
+        // image decodes, Img sets its own intrinsic aspect ratio onto the
+        // layout style and that silently overrides our explicit height for
+        // any non-square source photo.
         return div()
             .size(AVATAR_SIZE)
             .rounded_full()
@@ -191,6 +194,7 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
             .child(
                 img(ImageSource::Image(image))
                     .size(AVATAR_SIZE)
+                    .aspect_square()
                     .object_fit(ObjectFit::Cover),
             )
             .into_any_element();

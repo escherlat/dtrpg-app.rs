@@ -152,6 +152,7 @@ fn render_account_button(
         img(ImageSource::Image(image))
             .w(px(28.0))
             .h(px(28.0))
+            .aspect_square()
             .rounded_full()
             .object_fit(ObjectFit::Cover)
             .into_any_element()
