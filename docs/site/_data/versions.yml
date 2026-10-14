@@ -1,0 +1,16 @@
+latest: latest
+versions:
+  - id: latest
+    label: Latest
+    path: /latest/
+    pages:
+      - index
+      - install
+      - themes
+    nav:
+      - title: Overview
+        path: ""
+      - title: Installation
+        path: install/
+      - title: Themes and appearance
+        path: themes/

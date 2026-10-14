@@ -1,0 +1,16 @@
+title: Libri Documentation
+description: Documentation for Libri, the DriveThruRPG desktop library manager.
+url: ""
+baseurl: ""
+markdown: kramdown
+permalink: pretty
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - AGENTS.md
+  - PUBLISHING.md
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
