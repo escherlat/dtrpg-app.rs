@@ -116,6 +116,12 @@ fn render_account_button(
             .rounded_full()
             .w(px(28.0))
             .h(px(28.0))
+            // Button::render() applies ~10px of its own horizontal padding
+            // whenever `.child(..)` is non-empty (its "normal button, not
+            // icon button" sizing branch) - that shrinks this 28px button's
+            // usable content width to a sliver the 28px-wide avatar then
+            // gets clipped against. Cancel it so the avatar gets the full box.
+            .p(px(0.0))
             .border_1()
             .border_color(border_strong)
             .child(inner)
@@ -151,10 +157,9 @@ fn render_account_button(
     let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
         let format = detect_image_format(bytes);
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        // flex_none() keeps this from being resized by this Button's internal
-        // h_flex content row's flex-basis/shrink computation - without it,
-        // Avatar's own explicit pixel sizing can still get squished in a
-        // tight flex context like this 28x28 button.
+        // See the .p(px(0.0)) on the enclosing Button below for the actual
+        // fix to this avatar looking squished - this flex_none() wrapper
+        // alone wasn't it.
         div()
             .flex_none()
             .child(
@@ -188,6 +193,7 @@ fn render_account_button(
         .rounded_full()
         .w(px(28.0))
         .h(px(28.0))
+        .p(px(0.0))
         .child(inner)
         .dropdown_menu(move |menu, _, _| {
             let s_logout = settings.clone();
