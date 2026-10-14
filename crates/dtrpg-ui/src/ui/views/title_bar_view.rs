@@ -9,9 +9,11 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Entity, Image, ImageFormat, ImageSource, MouseButton, ObjectFit,
-    ParentElement, Styled, div, img, px,
+    AnyElement, App, Entity, Image, ImageFormat, ImageSource, MouseButton, ParentElement, Styled,
+    div, px,
 };
+use gpui_kit::component::Sizable;
+use gpui_kit::component::avatar::Avatar;
 use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use rust_i18n::t;
@@ -149,26 +151,17 @@ fn render_account_button(
     let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
         let format = detect_image_format(bytes);
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        // A bare img() styled directly as this Button's flex child gets
-        // resized by the button's internal h_flex layout despite explicit
-        // w()/h() (see settings_account_view.rs's render_avatar_circle for
-        // the same issue). Wrapping it in its own fixed-size div isolates it
-        // from that. rounded_full() must go on the img itself, not the
-        // wrapping div: overflow_hidden() only clips to a rectangular bounds
-        // mask, never corner radii - the image is only ever circularly
-        // clipped via its own corner_radii at its own paint call.
+        // flex_none() keeps this from being resized by this Button's internal
+        // h_flex content row's flex-basis/shrink computation - without it,
+        // Avatar's own explicit pixel sizing can still get squished in a
+        // tight flex context like this 28x28 button.
         div()
             .flex_none()
-            .w(px(28.0))
-            .h(px(28.0))
-            .overflow_hidden()
             .child(
-                img(ImageSource::Image(image))
-                    .flex_none()
-                    .size(px(28.0))
-                    .aspect_square()
+                Avatar::new()
+                    .with_size(gpui_kit::component::Size::Size(px(28.0)))
                     .rounded_full()
-                    .object_fit(ObjectFit::Cover),
+                    .src(ImageSource::Image(image)),
             )
             .into_any_element()
     } else {

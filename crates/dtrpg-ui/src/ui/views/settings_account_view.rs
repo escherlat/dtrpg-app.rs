@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use gpui::{
     AnyElement, Entity, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
-    ObjectFit, ParentElement, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
+    ParentElement, StatefulInteractiveElement, Styled, div, px,
 };
 use gpui_kit::component::Sizable;
 use gpui_kit::component::avatar::Avatar;
@@ -181,25 +181,17 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
             ImageFormat::Jpeg
         };
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        // Avatar::src() composes the image with a percentage-sized child that
-        // squishes under gpui-kit's Img layout; size and crop it ourselves
-        // with explicit pixels instead. aspect_square() is required: once the
-        // image decodes, Img sets its own intrinsic aspect ratio onto the
-        // layout style and that silently overrides our explicit height for
-        // any non-square source photo. rounded_full() must go on the img
-        // itself, not just the wrapping div: overflow_hidden() only clips to
-        // a rectangular bounds mask here, corner radii are never consulted
-        // for it - the image is only ever circularly clipped via its own
-        // corner_radii at its own paint call.
+        // flex_none() keeps this from being resized by an ancestor flex
+        // layout's basis/shrink computation - without it, Avatar's own
+        // explicit pixel sizing can still get squished in a tight flex
+        // context (observed in the title-bar account button).
         return div()
-            .size(AVATAR_SIZE)
-            .overflow_hidden()
+            .flex_none()
             .child(
-                img(ImageSource::Image(image))
-                    .size(AVATAR_SIZE)
-                    .aspect_square()
+                Avatar::new()
+                    .with_size(gpui_kit::component::Size::Size(AVATAR_SIZE))
                     .rounded_full()
-                    .object_fit(ObjectFit::Cover),
+                    .src(ImageSource::Image(image)),
             )
             .into_any_element();
     }
@@ -210,10 +202,14 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
         .or_else(|| auth.display_initial.map(|c| c.to_string()))
         .unwrap_or_else(|| "D".to_string());
 
-    Avatar::new()
-        .with_size(gpui_kit::component::Size::Size(AVATAR_SIZE))
-        .rounded_full()
-        .name(name)
+    div()
+        .flex_none()
+        .child(
+            Avatar::new()
+                .with_size(gpui_kit::component::Size::Size(AVATAR_SIZE))
+                .rounded_full()
+                .name(name),
+        )
         .into_any_element()
 }
 
