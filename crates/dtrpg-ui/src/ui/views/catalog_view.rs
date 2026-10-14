@@ -11,17 +11,19 @@ use gpui::{
     Styled, StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems,
     uniform_list,
 };
-use gpui_component::ElementExt;
-use gpui_component::WindowExt as _;
-use gpui_component::badge::Badge;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::checkbox::Checkbox;
-use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
-use gpui_component::scroll::ScrollableElement;
-use gpui_component::spinner::Spinner;
-use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
-use gpui_component::tooltip::Tooltip;
-use gpui_component::{Sizable, Size};
+use gpui_kit::component::ElementExt;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::badge::Badge;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
+use gpui_kit::component::scroll::ScrollableElement;
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::table::{
+    Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState,
+};
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{Sizable, Size};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -51,7 +53,7 @@ enum EmptyReason {
 /// Builds a catalog item's `on_click` handler: a single click opens the item
 /// popover; a double click additionally opens (or activates) an expanded
 /// detail tab and dismisses the popover. Mirrors the click-count escalation
-/// pattern `gpui-component`'s own `TableState::on_row_left_click` uses.
+/// pattern `gpui-kit`'s own `TableState::on_row_left_click` uses.
 fn item_click_handler(
     id: Arc<str>, title: String, entity: Entity<LibraryController>, tabs: Entity<TabsController>,
 ) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
@@ -708,7 +710,7 @@ impl TableDelegate for CatalogListDelegate {
     fn render_th(
         &mut self, col_ix: usize, _window: &mut Window, cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
-        // `gpui-component`'s default `render_th` renders the column name in a
+        // `gpui-kit`'s default `render_th` renders the column name in a
         // plain non-flex `div`, so the text sits at the top of the
         // header cell instead of vertically centered like every
         // `render_td` cell. Match the cell style here.
@@ -1314,7 +1316,7 @@ impl Render for CatalogView {
         let content: AnyElement = match (snap.presentation, snap.grouped) {
             // ── List, ungrouped — DataTable (handles header/row alignment) ──
             (CatalogPresentation::List, false) => {
-                use gpui_component::Size;
+                use gpui_kit::component::Size;
                 root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_list_table)
@@ -1329,7 +1331,7 @@ impl Render for CatalogView {
             // list, so it gets the same virtualization as the ungrouped
             // branch instead of hand-rolled, fully-materialized rows ──
             (CatalogPresentation::List, true) => {
-                use gpui_component::Size;
+                use gpui_kit::component::Size;
                 self.grouped_items(cx);
                 root.px(pad_side)
                     .child(

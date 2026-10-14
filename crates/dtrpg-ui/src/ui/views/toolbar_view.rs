@@ -3,13 +3,13 @@
 
 use gpui::prelude::*;
 use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
-use gpui_component::Icon;
-use gpui_component::Selectable;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::input::{Input, InputState};
-use gpui_component::menu::{DropdownMenu, PopupMenuItem};
-use gpui_component::tab::{Tab, TabBar};
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::Icon;
+use gpui_kit::component::Selectable;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_kit::component::tab::{Tab, TabBar};
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;

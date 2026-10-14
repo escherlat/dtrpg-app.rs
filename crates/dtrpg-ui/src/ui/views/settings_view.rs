@@ -3,7 +3,7 @@
 //! as an in-window overlay.
 //!
 //! Page navigation is a custom `Sidebar`/`SidebarMenu` rather than
-//! gpui-component's `Settings` widget: that widget tracks the active page in
+//! gpui-kit's `Settings` widget: that widget tracks the active page in
 //! its own per-window state with no way to read it back, which would reset
 //! the active page to the first one every time the settings window is closed
 //! and reopened (a new window has its own state). Driving the active page
@@ -16,9 +16,9 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, FocusHandle, IntoElement, MouseButton, ParentElement, Styled, div, px,
 };
-use gpui_component::input::InputState;
-use gpui_component::scroll::ScrollableElement as _;
-use gpui_component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
+use gpui_kit::component::input::InputState;
+use gpui_kit::component::scroll::ScrollableElement as _;
+use gpui_kit::component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;

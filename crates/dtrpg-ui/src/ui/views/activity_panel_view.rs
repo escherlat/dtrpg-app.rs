@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px, relative};
-use gpui_component::scroll::ScrollableElement;
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::scroll::ScrollableElement;
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -30,7 +30,7 @@ pub fn render_activity_panel(
 
     // No bg/border/shadow/rounding here — the enclosing `Popover` content
     // wrapper already supplies that framing (see `popover_style` in
-    // `gpui-component`); adding our own on top produced a nested double frame.
+    // `gpui-kit`); adding our own on top produced a nested double frame.
     div()
         .w(px(340.0))
         .flex()

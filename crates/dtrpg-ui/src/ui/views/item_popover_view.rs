@@ -14,12 +14,12 @@ use gpui::{
     AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, SharedString, Styled, anchored,
     deferred, div, px,
 };
-use gpui_component::Disableable;
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::description_list::{DescriptionItem, DescriptionList};
-use gpui_component::tooltip::Tooltip;
-use gpui_component::{IconName, Sizable};
+use gpui_kit::component::Disableable;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{IconName, Sizable};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;

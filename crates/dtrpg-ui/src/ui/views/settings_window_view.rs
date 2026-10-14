@@ -6,8 +6,7 @@ use gpui::{
     Context, Entity, FocusHandle, Focusable, IntoElement, ParentElement, Render, Styled, Window,
     div,
 };
-use gpui_component::Root;
-use gpui_component::input::InputState;
+use gpui_kit::component::input::InputState;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
@@ -59,13 +58,6 @@ impl Focusable for SettingsWindowView {
 
 impl Render for SettingsWindowView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // See `LibraryRootView::render` for why these layers must be composed
-        // explicitly: `Root` tracks dialogs/sheets/notifications as state but
-        // does not render them itself.
-        let sheet_layer = Root::render_sheet_layer(window, cx);
-        let dialog_layer = Root::render_dialog_layer(window, cx);
-        let notification_layer = Root::render_notification_layer(window, cx);
-
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
         // Adjusting the shared rem size scales every `rems(...)`-based size
@@ -126,11 +118,6 @@ impl Render for SettingsWindowView {
             font_selects,
         );
 
-        div()
-            .size_full()
-            .child(panel)
-            .children(sheet_layer)
-            .children(dialog_layer)
-            .children(notification_layer)
+        div().size_full().child(panel)
     }
 }

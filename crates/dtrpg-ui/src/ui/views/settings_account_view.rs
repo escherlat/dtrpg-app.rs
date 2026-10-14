@@ -7,11 +7,11 @@ use gpui::{
     AnyElement, Entity, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
     ParentElement, StatefulInteractiveElement, Styled, div, px,
 };
-use gpui_component::Sizable;
-use gpui_component::avatar::Avatar;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::description_list::{DescriptionItem, DescriptionList};
-use gpui_component::input::{Input, InputState};
+use gpui_kit::component::Sizable;
+use gpui_kit::component::avatar::Avatar;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
+use gpui_kit::component::input::{Input, InputState};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -173,7 +173,7 @@ fn account_info_item(
 /// otherwise.
 fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyElement {
     let avatar = Avatar::new()
-        .with_size(gpui_component::Size::Size(px(56.)))
+        .with_size(gpui_kit::component::Size::Size(px(56.)))
         .rounded_full();
 
     if let Some(bytes) = &auth.avatar_bytes {

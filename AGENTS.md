@@ -8,21 +8,30 @@ This is the repository for the DriveThruRPG frontend application implemented in 
 
 ## Frameworks
 
-The UI is implemented using the `gpui` framework from the [Zed](https://zed.dev) project, along with the `gpui-component` crate from [Longbridge](https://github.com/longbridge/gpui-component).
-
-A short term goal is to move from `gpui` to `gpui-kit` (https://github.com/longbridge/gpui-kit).
+The UI is implemented using `gpui-kit` (https://github.com/longbridge/gpui-kit),
+Longbridge's actively maintained successor to `gpui-component`. `gpui-kit`
+forks zed-industries/zed's `gpui` under its own package family, published to
+crates.io as `gpui-pre`/`gpui-pre-platform`/etc. — this app's own
+`gpui`/`gpui_platform` workspace dependencies are pinned to that same fork
+(not zed's original), so this codebase's `Context`/`Window`/`App`/`Global`
+types are gpui-kit's own types, not a separate compatible set. See
+`docs/adr/0001-migrate-to-gpui-kit.md` for why: an incremental,
+coexistence-based migration was attempted first and found to be impossible
+— gpui-kit's widget layer is foreign to zed's original `gpui` at the type
+level (the orphan rule blocks any bridge), so the whole app moved to
+gpui-kit's fork in one change, not file-by-file.
 
 ## UI Policy
 
 - Preserve the separation between UI rendering, interaction state, and service adapters.
 - Keep code structured so stubs can be replaced by SDK adapters without rewriting views.
 
-## gpui-component Usage
+## gpui-kit Usage
 
-Always prefer components from the `gpui-component` crate over rolling custom implementations:
+Always prefer components from `gpui_kit::component`/`gpui_kit::base` over rolling custom implementations:
 
 - **Tabular data**: Use `DataTable` (virtualized, delegate-based, handles header/row alignment) or `Table`/`TableHeader`/`TableRow`/`TableHead`/`TableCell` (simple, stateless). Never build custom flex-row column layouts for table-like views — they cannot reliably align headers with rows when virtualization is involved.
-- Check the `gpui-component` crate for any other UI primitive before implementing from scratch.
+- Check `gpui_kit::component`/`gpui_kit::base` for any other UI primitive before implementing from scratch.
 
 ## Credential Storage
 

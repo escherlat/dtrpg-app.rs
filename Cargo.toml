@@ -33,11 +33,14 @@ keyring = { version = "3", features = ["apple-native"] }
 thiserror = "2"
 tracing = "0.1"
 dtrpg-ui = { path = "crates/dtrpg-ui" }
-# gpui = "0.2.2"
 tokio = { version = "1", features = ["rt-multi-thread"] }
-gpui = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "1d217ee39d381ac101b7cf49d3d22451ac1093fe", features = ["font-kit", "wayland", "x11"] }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "be4c5d30e0a51d5bfb2df93477a05050a50bf889" }
+# gpui-kit forks zed-industries/zed's gpui under its own package family
+# (gpui-pre, gpui-pre-platform, gpui-pre-macros) — pinned to the exact
+# version gpui-kit 0.7.3 itself depends on, so our Context/Window/App/Global
+# types are the *same* types gpui-kit's widgets use, not merely
+# structurally similar ones. See docs/adr/0001-migrate-to-gpui-kit.md.
+gpui = { package = "gpui-pre", version = "=0.3.9" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["font-kit", "wayland", "x11"] }
 gpui-kit = "0.7"
 cocoa = "=0.27.0"
 cocoa-foundation = "=0.2.0"
@@ -45,7 +48,6 @@ core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.6.1", features = ["metal"] }
 metal = "0.33"
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "be4c5d30e0a51d5bfb2df93477a05050a50bf889" }
 md5 = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

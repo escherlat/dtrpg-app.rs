@@ -172,7 +172,7 @@ impl ThemeKey {
 /// control changes it.
 #[derive(Debug, Clone)]
 pub struct FontSelections {
-    /// Active body-font family; also applied to `gpui_component::Theme`'s
+    /// Active body-font family; also applied to `gpui_kit::component::Theme`'s
     /// `font_family` by whichever call site changes it (see
     /// `LibraryController::set_body_font`).
     pub body_font: SharedString,
@@ -248,29 +248,29 @@ impl LibriTheme {
     }
 }
 
-// ── gpui-component theme color sync
+// ── gpui-kit theme color sync
 // ─────────────────────────────────────────────
 
-/// Overrides `gpui_component::Theme`'s semantic colors to match `colors`.
+/// Overrides `gpui_kit::component::Theme`'s semantic colors to match `colors`.
 ///
-/// `gpui-component` widgets (`Button`, `Input`, `Popover`/`PopupMenu`,
+/// `gpui-kit` widgets (`Button`, `Input`, `Popover`/`PopupMenu`,
 /// tooltips, scrollbars, `Sidebar`, `DataTable`/`Table`, `TabBar`/`Tab`
 /// (including the catalog view-mode selector and tab strip), `StatusBar`,
 /// `TitleBar`, etc.) read their colors from `cx.theme()`
-/// (`gpui_component::Theme`), which is a separate
+/// (`gpui_kit::component::Theme`), which is a separate
 /// global from [`LibriTheme`] and is never otherwise synced with the active
-/// Libri palette — so those widgets rendered with `gpui-component`'s default
+/// Libri palette — so those widgets rendered with `gpui-kit`'s default
 /// light/dark colors (whatever `Theme::apply_config` computed for the
 /// ambient system mode) regardless of which Libri theme was active.
 ///
 /// Call this whenever [`LibriTheme`] changes, updating both `colors` (read
 /// directly by most components) and `tokens` (read by `DataTable` and other
 /// newer widgets) so the two stay in sync. `ColorTokens` has a smaller set of
-/// semantic roles than `gpui_component::Theme` — where there's no dedicated
+/// semantic roles than `gpui_kit::component::Theme` — where there's no dedicated
 /// Libri token for a field (e.g. a distinct "info" or "success" hue), the
 /// semantically closest token is reused rather than leaving the field on its
 /// light/dark default.
-pub fn apply_theme_colors(theme: &mut gpui_component::Theme, colors: &ColorTokens) {
+pub fn apply_theme_colors(theme: &mut gpui_kit::component::Theme, colors: &ColorTokens) {
     // Base semantic fields.
     theme.colors.background = colors.surface;
     theme.colors.foreground = colors.text_primary;

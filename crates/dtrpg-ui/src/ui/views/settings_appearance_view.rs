@@ -13,10 +13,10 @@ use gpui::{
     Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
 };
-use gpui_component::button::Button;
-use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_component::select::Select;
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::button::Button;
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::select::Select;
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;

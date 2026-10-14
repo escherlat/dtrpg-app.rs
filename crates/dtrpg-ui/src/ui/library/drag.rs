@@ -4,7 +4,7 @@ use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString, Styled, Window,
     div, px,
 };
-use gpui_component::ActiveTheme;
+use gpui_kit::component::ActiveTheme;
 
 /// Carried by a catalog item (grid card or thumb row) while it is being
 /// dragged onto a sidebar collection.

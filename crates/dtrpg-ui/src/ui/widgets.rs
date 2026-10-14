@@ -1,11 +1,11 @@
 //! Small reusable rendering helpers shared across views.
 
 use gpui::{ElementId, SharedString};
-use gpui_component::text::TextView;
+use gpui_kit::component::text::TextView;
 
 use crate::util::text::escape_markdown;
 
-/// Renders `text` as selectable, copyable plain text via `gpui-component`'s
+/// Renders `text` as selectable, copyable plain text via `gpui-kit`'s
 /// `TextView`.
 ///
 /// The text is Markdown-escaped first — `TextView` parses its input as

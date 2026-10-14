@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, div, px};
-use gpui_component::WindowExt as _;
-use gpui_component::input::{Input, InputState};
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;

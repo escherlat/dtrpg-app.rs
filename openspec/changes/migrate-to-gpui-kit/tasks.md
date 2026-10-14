@@ -1,111 +1,108 @@
+This was a single unit of work (see ADR 0001's round-3 amendment): the tree
+did not compile until every section below landed together. Done — see
+commit on `feature/233-migrate-to-gpui-kit`.
+
 ## 0. Pre-flight
 
 - [x] 0.1 Clone `longbridge/gpui-kit` directly and verify every item from
       the research inventory against its actual source — done; see
-      `docs/adr/0001-migrate-to-gpui-kit.md`. Only Popover needs a builder
-      rewrite; everything else has a confirmed, near-identical equivalent.
+      `docs/adr/0001-migrate-to-gpui-kit.md`.
 - [x] 0.2 Add `gpui-kit = "0.7"` to `crates/dtrpg-ui/Cargo.toml` and
       `crates/dtrpg-core/Cargo.toml` alongside the existing `gpui-component`
-      dependency (coexistence, no removal yet) — done, resolved to 0.7.3,
-      commit 236e0d8 on feature/233-migrate-to-gpui-kit
+      dependency — superseded by section 4/5, which removed the coexistence
+      scaffolding once the rewrite landed.
 
-## 1. `util/`, `data/`
+## 1. App bootstrap
 
-- [ ] 1.1 Migrate `Theme`/`ActiveTheme` global usage to gpui-kit's
-      equivalent (`crates/component/src/theme/`)
-- [ ] 1.2 Migrate `Column`/`ColumnSort` table config types (direct
-      equivalent: `crates/component/src/table/column.rs`)
-- [ ] 1.3 `cargo check -p dtrpg-ui -p dtrpg-core --all-targets`, `cargo
-      clippy -p dtrpg-ui -p dtrpg-core --all-targets -- -D warnings`
+- [x] 1.1 Workspace `Cargo.toml`: renamed `gpui`/`gpui_platform` from the
+      zed-industries/zed git dependency to the `gpui-pre`/`gpui-pre-platform`
+      crates.io packages gpui-kit itself depends on (pinned `=0.3.9`,
+      matching gpui-kit 0.7.3's own pin) — this is the key move: it makes
+      our `Context`/`Window`/`App`/`Global`/`Hsla`/`SharedString` the exact
+      same types gpui-kit's widgets use, eliminating the orphan-rule
+      conversion problem entirely rather than needing per-value-type
+      helpers (section 2 below turned out to be unnecessary — see note
+      there). `crates/dtrpg-core/src/app/mod.rs`'s `open_library_window`/
+      `open_settings_window` switched from `cx.open_window` + manual
+      `Root::new(view, window, cx).bordered(false)` to
+      `gpui_kit::open_window(options, cx, |window, cx| cx.new(|cx| View::new(...)))`,
+      which wraps the view in `Root` internally. `WindowHandle<Root>` is
+      recovered via `AnyWindowHandle::downcast::<Root>()` where callers need
+      it (window activation, `AddCollection`'s dialog path).
+- [x] 1.2 `ui/app/mod.rs`: `init`/`Root` resolve via
+      `gpui_kit::component::{init, Root}` (component re-exports
+      `gpui_base::Root`) — same names as guessed in ADR 0001, confirmed
+      working.
+- [x] 1.2b `ui/views/root_view.rs` and `ui/views/settings_window_view.rs`:
+      removed the manual `Root::render_sheet_layer`/`render_dialog_layer`/
+      `render_notification_layer` calls (and their `.children(...)`
+      composition) — gpui-kit's `Root` renders these layers itself via its
+      own `Render` impl now; the wrapped view doesn't call anything. This
+      wasn't anticipated by ADR 0001; found by reading gpui-kit's own
+      `StoryRoot` example (`crates/story/src/lib.rs`) after hitting
+      `no associated function render_sheet_layer`.
 
-## 2. `controllers/`, `controllers/library/`
+## 2. Value-type conversion helpers
 
-- [ ] 2.1 Migrate `TableState`/`TableEvent`/`TableDelegate` entity usage in
-      `controllers/tabs.rs` to gpui-kit's `component::table` equivalents
-      (same names: `DataTable`, `Table`, `TableDelegate`, `TableState`)
-- [ ] 2.2 Migrate any `InputState`/`SelectState` entities held by
-      controllers (not yet the views that render them)
-- [ ] 2.3 `cargo check -p dtrpg-ui --all-targets`, `cargo clippy -p
-      dtrpg-ui --all-targets -- -D warnings`
+- [x] 2.1-2.3 **Turned out to be unnecessary.** Once `gpui`/`gpui_platform`
+      were repointed to the same `gpui-pre` fork gpui-kit uses (task 1.1),
+      `gpui::Hsla`/`gpui::SharedString`/etc. in our own code already *are*
+      gpui-kit's types — no conversion needed anywhere. The Hsla-conversion
+      helper written during an earlier (reverted) coexistence attempt was
+      deleted along with that attempt.
 
-## 3. `ui/views/`, `ui/app/`, `ui/library/`
+## 3. Global/state types
 
-All of the below are import swaps plus adjusting whatever method-level
-signature differs (verify per-file as you touch it; do not assume byte-for-
-byte parity beyond what ADR 0001 confirmed at the type level). Group by file
-to keep diffs reviewable; order within the wave doesn't matter since nothing
-here blocks on anything else in the wave.
+- [x] 3.1-3.4 No cross-file sequencing needed in practice: once task 1.1
+      landed, `Theme`, `TableState`/`TableEvent`/`TableDelegate`,
+      `InputState`/`SelectState` all type-checked as ordinary import swaps
+      — the "must move together" constraint ADR 0001 anticipated was a
+      symptom of the two-crate problem task 1.1 eliminated, not an
+      independent sequencing issue.
 
-- [ ] 3.1 Button/ButtonVariants/ButtonCustomVariant — direct swap,
-      `.primary()/.danger()/.ghost()` shortcuts confirmed present (all 19+
-      files using Button)
-- [ ] 3.2 Checkbox, Radio/RadioGroup — direct swap (`catalog_view.rs`,
-      `manage_collections_dialog.rs`, `report_feature_bug_dialog.rs`)
-- [ ] 3.3 Table/DataTable/TableDelegate/TableEvent/TableState — direct swap
-      in `catalog_view.rs`, `detail_panel_view.rs` (entities already
-      migrated in task 2.1)
-- [ ] 3.4 DropdownMenu/PopupMenu/PopupMenuItem/ContextMenuExt — direct swap
-      across `catalog_view.rs`, `toolbar_view.rs`, `bulk_action_bar_view.rs`,
-      `settings_appearance_view.rs`, `title_bar_view.rs`, `status_bar_view.rs`
-- [ ] 3.5 Icon/IconName, Spinner, Tooltip — direct swap, all files
-- [ ] 3.6 Input/InputEvent/InputState, NumberInput — direct swap in
-      remaining view files (entities already migrated in task 2.2)
-- [ ] 3.7 **Popover — the one real rewrite.** `status_bar_view.rs`: replace
-      `.content(...)` with `.anchor(Anchor::TopRight).open(...)
-      .on_open_change(...)`; confirm the exact anchor/open-state wiring
-      against `crates/component/src/popover.rs` while doing this file
-- [ ] 3.8 Sizable/Size — direct swap; confirm `Avatar`'s pixel-exact sizing
-      method against `crates/component/src/avatar/avatar.rs` while touching
-      `settings_account_view.rs`
-- [ ] 3.9 Clipboard — direct swap (`crates/component/src/clipboard.rs`) in
-      `detail_panel_view.rs`, `alert_history_view.rs`
-- [ ] 3.10 Select/SelectEvent/SelectState, Combobox — direct swap
-      (`crates/component/src/select.rs`, `combobox.rs`) in `root_view.rs`,
-      `settings_appearance_view.rs`
-- [ ] 3.11 Dialog/DialogAction/DialogClose/DialogFooter/DialogHeader/
-      DialogTitle/DialogContent — construction pattern is unchanged
-      (`window.open_dialog(cx, |dialog, ...| dialog.content(...))` still
-      exists); swap imports only, in `root_view.rs`,
-      `report_feature_bug_dialog.rs`, `manage_collections_dialog.rs`,
-      `sidebar_view.rs`
-- [ ] 3.12 Sidebar/SidebarMenu/SidebarMenuItem — direct swap
-      (`crates/component/src/sidebar/`) in `sidebar_view.rs`,
-      `settings_view.rs`
-- [ ] 3.13 Tab/TabBar — direct swap (`crates/component/src/tab/`) in
-      `tab_strip_view.rs`, `toolbar_view.rs`
-- [ ] 3.14 ResizableState/h_resizable/resizable_panel — direct swap
-      (`crates/base/src/resizable/`) in `root_view.rs`
-- [ ] 3.15 Avatar — direct swap (`crates/component/src/avatar/`) in
-      `settings_account_view.rs`
-- [ ] 3.16 Separator, StatusBar, Badge, Alert, Collapsible,
-      DescriptionItem/DescriptionList, Notification/NotificationType,
-      ProgressCircle, Switch — direct swap at their respective call sites
-      (`status_bar_view.rs`, `catalog_view.rs`, `detail_panel_view.rs`,
-      `settings_advanced_view.rs`, `settings_storage_view.rs`,
-      `root_view.rs`)
-- [ ] 3.17 `Root`/`init` app bootstrap in `ui/app/mod.rs` (direct swap:
-      `crates/component/src/lib.rs::init`, `crates/base/src/root.rs::Root`)
-- [ ] 3.18 Disableable/ElementExt/ScrollableElement/WindowExt/Selectable
-      traits — direct swap (`crates/base/src/component_traits.rs`,
-      `element_ext.rs`, `crates/component/src/window_ext.rs`,
-      `scroll/scrollable.rs`) across all files importing them
-- [ ] 3.19 TextView/markdown rendering — direct swap
-      (`crates/base/src/text/`, `text_view.rs`, `format/markdown.rs`) in
-      `ui/widgets.rs`, `detail_panel_view.rs`
-- [ ] 3.20 Shared widgets in `ui/library/` (e.g. `drag.rs`'s `ActiveTheme`
-      usage) — direct swap
-- [ ] 3.21 `cargo check --workspace --all-targets`, `cargo clippy
-      --workspace --all-targets -- -D warnings`, `cargo +nightly fmt
-      --check`, `cargo test --workspace`
+## 4. Widget-level import swaps
 
-## 4. Cutover
+- [x] 4.1-4.18 Bulk `gpui_component::` → `gpui_kit::component::` rename
+      across all 31 affected files, then fixed real exceptions found by
+      `cargo check`:
+      - **Popover**: did not need the anticipated `.anchor()/.open()/
+        .on_open_change()` rewrite — `status_bar_view.rs`'s usage compiled
+        as a straight import swap. (ADR 0001's Popover-reshape finding was
+        itself based on Fernrohr-App's call site, not gpui-kit's own API
+        shape at this version — turned out not to need the predicted
+        rewrite after all.)
+      - **Multi-line input**: `InputState::multi_line(true)` no longer
+        exists — multi-line is now a distinct type, `TextareaState`
+        (`InputBaseState<TextareaMode>`), rendered with `Textarea::new`
+        instead of `Input::new`. Fixed in
+        `report_feature_bug_dialog.rs` (the one call site using it).
+      - Every other widget (Button, Checkbox, Radio, Table/DataTable,
+        DropdownMenu, Icon, Spinner, Tooltip, Sizable/Size, Clipboard,
+        Select/Combobox, Dialog, Sidebar, Tab, resizable panels, Avatar,
+        Separator/StatusBar/Badge/Alert/Collapsible/DescriptionList/
+        Notification/ProgressCircle/Switch, Disableable/ElementExt/
+        ScrollableElement/WindowExt/Selectable traits, TextView) — direct
+        rename, no signature changes needed.
 
-- [ ] 4.1 `rg -l "gpui_component" crates/` returns empty
-- [ ] 4.2 Remove `gpui-component`/`gpui-component-assets` git dependencies
-      from every `Cargo.toml`; replace `gpui_component_assets::Assets`
-      fallback in `crates/dtrpg-core/src/app/assets.rs` with a gpui-kit
-      equivalent (`crates/assets/`) or in-house loader
-- [ ] 4.3 Update `CLAUDE.md`'s "Frameworks" and "gpui-component Usage"
-      sections to describe gpui-kit instead
-- [ ] 4.4 Full workspace build/lint/test pass; manual smoke test left to
-      the user (no automated UI verification)
+## 5. Cutover and verification
+
+- [x] 5.1 `rg -l "gpui_component" crates/` returns empty (two harmless
+      historical-comment mentions of `gpui_component_assets`/`gpui-component`
+      remain in `app/assets.rs` and `util/text.rs`'s doc comments, describing
+      prior behavior — not code).
+- [x] 5.2 Removed `gpui-component`/`gpui-component-assets` from every
+      `Cargo.toml`. `crates/dtrpg-core/src/app/assets.rs`'s fallback now
+      uses `gpui_kit::assets::Assets` (same `AssetSource` shape as the old
+      `gpui_component_assets::Assets`, confirmed via
+      `gpui-kit-assets`'s `native_assets.rs`) — one behavior note: gpui-kit's
+      `load()` returns `Err` for an unknown path rather than the old
+      `Ok(None)`, downgraded explicitly to preserve the old contract.
+- [x] 5.3 Updated `AGENTS.md`/`CLAUDE.md`'s Frameworks and gpui-component
+      Usage sections.
+- [x] 5.4 `cargo check --workspace --all-targets`: clean. `cargo clippy
+      --workspace --all-targets -- -D warnings`: clean. `cargo +nightly fmt
+      --check` (via `rustup run nightly cargo fmt`): clean after one
+      `cargo fmt` pass (two import lines exceeded width after the rename).
+      `cargo test --workspace`: 54 (dtrpg-core) + 338 (dtrpg-ui) + 12
+      (doc-tests) passed, 0 failed. Manual smoke test left to the user (no
+      automated UI verification).

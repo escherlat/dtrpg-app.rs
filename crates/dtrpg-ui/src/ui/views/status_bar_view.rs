@@ -15,14 +15,14 @@
 
 use gpui::prelude::*;
 use gpui::{Anchor, Entity, IntoElement, Styled, div, px};
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_component::popover::Popover;
-use gpui_component::progress::ProgressCircle;
-use gpui_component::separator::Separator;
-use gpui_component::status_bar::StatusBar;
-use gpui_component::{Sizable as _, Size};
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::popover::Popover;
+use gpui_kit::component::progress::ProgressCircle;
+use gpui_kit::component::separator::Separator;
+use gpui_kit::component::status_bar::StatusBar;
+use gpui_kit::component::{Sizable as _, Size};
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -189,7 +189,7 @@ pub fn render_status_bar(
     };
     // Idle state (no in-progress loaders) renders at value 0, which draws
     // only the faint background ring — an inactive circle rather than the
-    // former "○" glyph. `gpui-component`'s default `progress_bar` theme
+    // former "○" glyph. `gpui-kit`'s default `progress_bar` theme
     // token is near-black, invisible against a dark status bar, so the
     // circle uses the app's accent color (already used for in-progress
     // activity elsewhere, e.g. `activity_panel_view`) instead.

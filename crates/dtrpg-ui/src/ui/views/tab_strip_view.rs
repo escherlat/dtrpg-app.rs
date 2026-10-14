@@ -2,15 +2,15 @@
 //!
 //! The catalog tab is always first and never closable. Expanded detail tabs
 //! (opened by double-clicking a catalog item, per `main-window-tabs`) are
-//! appended after it and are closable. The strip uses `gpui-component`'s
+//! appended after it and are closable. The strip uses `gpui-kit`'s
 //! `TabBar` overflow menu so tabs beyond the available width remain
 //! reachable through a "more" menu.
 
 use gpui::prelude::*;
 use gpui::{Entity, IntoElement, SharedString, div};
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::tab::{Tab, TabBar};
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::tab::{Tab, TabBar};
 use rust_i18n::t;
 
 use crate::controllers::tabs::{TabTarget, TabsController};

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::{App, AppContext as _, Context, Entity, Window};
-use gpui_component::table::{TableEvent, TableState};
+use gpui_kit::component::table::{TableEvent, TableState};
 
 use crate::controllers::library::LibraryController;
 use crate::data::events::TabsChanged;

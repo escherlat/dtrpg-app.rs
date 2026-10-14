@@ -7,10 +7,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::{App, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::input::{Input, InputState};
-use gpui_component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;

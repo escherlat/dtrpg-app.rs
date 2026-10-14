@@ -11,16 +11,16 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, ElementId, Entity, IntoElement, SharedString, Window, div, px,
 };
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
-use gpui_component::input::{Input, InputState};
-use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
-use gpui_component::sidebar::{
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
+use gpui_kit::component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
-use gpui_component::spinner::Spinner;
-use gpui_component::{
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::{
     ActiveTheme, Collapsible, Side, Sizable as _, Size, StyledExt as _, WindowExt as _,
 };
 use rust_i18n::t;
@@ -116,7 +116,7 @@ type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 /// The Collections section, rendered as plain `div`s rather than
 /// [`SidebarMenuItem`], because `SidebarMenuItem` has no `on_drop`/
 /// `drag_over` hooks — its row is built entirely inside the vendored
-/// `gpui-component` crate with no way to wrap or extend it from here. This
+/// `gpui-kit` crate with no way to wrap or extend it from here. This
 /// is the only sidebar section that needs to be a drop target (see
 /// `catalog-drag-drop-to-collection`), so only this section forgoes
 /// `SidebarMenuItem`; smart-filter and publisher rows are unaffected.
@@ -359,7 +359,7 @@ fn render_collection_row(
         .into_any_element()
 }
 
-/// Renders the full sidebar column using gpui-component `Sidebar`.
+/// Renders the full sidebar column using gpui-kit `Sidebar`.
 ///
 /// Library totals and the activity indicator, previously shown in the
 /// sidebar footer, now live in the status bar (see `status_bar_view.rs`),

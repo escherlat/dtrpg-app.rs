@@ -3,7 +3,7 @@
 //! detail tab's item tier (see `zip-content-preview`).
 //!
 //! Mirrors `item_popover_view`'s anchored/deferred pattern rather than
-//! `gpui-component::Popover`, since it needs hover-to-open and click-to-pin
+//! `gpui-kit::Popover`, since it needs hover-to-open and click-to-pin
 //! as distinct behaviors tied to controller state.
 
 use std::path::Path;
@@ -13,9 +13,9 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, Hsla, IntoElement, Pixels, Point, Styled, anchored, deferred, div, px,
 };
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::scroll::ScrollableElement as _;
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::scroll::ScrollableElement as _;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;

@@ -10,11 +10,11 @@ use gpui::{
     AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
     StatefulInteractiveElement, Styled, div, px,
 };
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::description_list::{DescriptionItem, DescriptionList};
-use gpui_component::input::{InputState, NumberInput};
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
+use gpui_kit::component::input::{InputState, NumberInput};
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::build_info;

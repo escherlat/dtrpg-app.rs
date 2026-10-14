@@ -4,10 +4,10 @@
 use std::path::PathBuf;
 
 use gpui::{AnyElement, Element, Entity, IntoElement, ParentElement, Styled, div, px};
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::input::{Input, InputState, NumberInput};
-use gpui_component::switch::Switch;
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::input::{Input, InputState, NumberInput};
+use gpui_kit::component::switch::Switch;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;

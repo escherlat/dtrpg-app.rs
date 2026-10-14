@@ -12,8 +12,8 @@ use gpui::{
     AnyElement, App, Entity, Image, ImageFormat, ImageSource, MouseButton, ObjectFit,
     ParentElement, Styled, div, img, px,
 };
-use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
-use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};

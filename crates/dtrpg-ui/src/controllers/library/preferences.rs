@@ -10,7 +10,7 @@ impl LibraryController {
     /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart
     /// instead of always resetting to Parchment.
     ///
-    /// Also re-syncs `gpui_component::Theme`'s colors (see
+    /// Also re-syncs `gpui_kit::component::Theme`'s colors (see
     /// [`crate::data::theme::apply_theme_colors`]) so buttons, inputs,
     /// popovers, scrollbars, the sidebar, and the catalog `DataTable` all
     /// track the newly selected Libri palette instead of staying on whichever
@@ -20,7 +20,7 @@ impl LibraryController {
         let new_theme = LibriTheme::new(key, current.density, current.fonts.clone());
         let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
-        cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
+        cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
             apply_theme_colors(theme, &colors);
         });
         crate::data::ui_preferences::UiPreferences::load().save_theme_key(key.as_str());
@@ -46,7 +46,7 @@ impl LibraryController {
 
     /// Applies a new body font family (any font installed on the user's
     /// system, not a curated list — see `settings_appearance_view`), updating
-    /// the GPUI global, `gpui_component`'s `Theme.font_family`, and
+    /// the GPUI global, `gpui_kit`'s `Theme.font_family`, and
     /// persisting the selection via
     /// [`crate::data::ui_preferences::UiPreferences`].
     pub fn set_body_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
@@ -56,7 +56,7 @@ impl LibraryController {
         fonts.body_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
+        cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
             theme.font_family = font.clone();
         });
         crate::data::ui_preferences::UiPreferences::load().save_body_font_name(&font);
