@@ -12,28 +12,28 @@ use crate::data::paths::app_data_dir;
 /// Persisted position and size of the library window, in pixels.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct WindowBoundsPref {
-    pub x:      f32,
-    pub y:      f32,
-    pub width:  f32,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
     pub height: f32,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UiStateFile {
     /// Width of the sidebar panel in pixels.
-    pub sidebar_width:         Option<f32>,
+    pub sidebar_width: Option<f32>,
     /// Width of the detail panel in pixels.
-    pub detail_width:          Option<f32>,
+    pub detail_width: Option<f32>,
     /// Whether the Collections sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub collections_open:      Option<bool>,
+    pub collections_open: Option<bool>,
     /// Whether the Publishers sidebar section is open (`true`) or collapsed
     /// (`false`).
-    pub publishers_open:       Option<bool>,
+    pub publishers_open: Option<bool>,
     /// Index of the last-active settings page (Account/Storage/File
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
-    pub settings_page_ix:      Option<usize>,
+    pub settings_page_ix: Option<usize>,
     /// Position and size the library window was closed at, so it reopens
     /// there instead of always resetting to the default placement.
     pub library_window_bounds: Option<WindowBoundsPref>,
@@ -55,12 +55,10 @@ impl UiState {
     pub fn load() -> Self {
         let path = state_path();
         let file_existed = path.exists();
-        let data =
-            std::fs::read_to_string(&path).ok()
-                                          .and_then(|text| {
-                                              toml::from_str::<UiStateFile>(&text).ok()
-                                          })
-                                          .unwrap_or_default();
+        let data = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| toml::from_str::<UiStateFile>(&text).ok())
+            .unwrap_or_default();
         let state = Self { data };
         if !file_existed {
             state.flush();

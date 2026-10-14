@@ -10,19 +10,25 @@ use crate::constants::{ACCESS_TOKEN_ENV, APPLICATION_KEY_ENV};
 pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
     match error {
         ClientError::Sdk(e) => map_sdk_error(e),
-        ClientError::DecodeFailed { url, status, cause, .. } => {
+        ClientError::DecodeFailed {
+            url, status, cause, ..
+        } => {
             let kind = match status {
                 401 | 403 => CollectionsServiceErrorKind::Session,
                 _ => CollectionsServiceErrorKind::Network,
             };
-            CollectionsServiceError::new(kind,
-                                         format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"))
+            CollectionsServiceError::new(
+                kind,
+                format!("Response from {url} (HTTP {status}) could not be decoded: {cause}"),
+            )
         }
-        ClientError::ApiError { url,
-                                status,
-                                message,
-                                payload,
-                                retry_after, } => {
+        ClientError::ApiError {
+            url,
+            status,
+            message,
+            payload,
+            retry_after,
+        } => {
             let detail = message.unwrap_or(payload);
             // 409 on this service's endpoints means the request conflicts with
             // existing state (e.g. the item is already a member of the product
@@ -37,9 +43,11 @@ pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
                 429 => CollectionsServiceErrorKind::RateLimited,
                 _ => CollectionsServiceErrorKind::Network,
             };
-            CollectionsServiceError::new(kind,
-                                         format!("Request to {url} failed (HTTP {status}): {detail}"))
-                .with_retry_after(retry_after)
+            CollectionsServiceError::new(
+                kind,
+                format!("Request to {url} failed (HTTP {status}): {detail}"),
+            )
+            .with_retry_after(retry_after)
         }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());
@@ -60,8 +68,10 @@ pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
         // These variants are only produced by credential_login, never by
         // library/collections requests.
         ClientError::InvalidCredentials | ClientError::ApplicationKeyRequestFailed { .. } => {
-            CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
-                                         "Unexpected credential exchange error in collections request")
+            CollectionsServiceError::new(
+                CollectionsServiceErrorKind::Session,
+                "Unexpected credential exchange error in collections request",
+            )
         }
     }
 }
@@ -78,22 +88,22 @@ pub(super) fn map_sdk_error(error: SdkError) -> CollectionsServiceError {
 
 pub(super) fn map_connection_error(error: ConnectionError) -> CollectionsServiceError {
     match error {
-        ConnectionError::MissingApiKey => {
-            CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
-                                         "No API key found in keyring or environment. Sign in to continue.")
-        }
-        ConnectionError::MissingApplicationKeyEnv => {
-            CollectionsServiceError::new(CollectionsServiceErrorKind::Network,
-                                         format!("{APPLICATION_KEY_ENV} is required to load SDK-backed collections data."))
-        }
-        ConnectionError::MissingAccessTokenEnv => {
-            CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
-                                         format!("{ACCESS_TOKEN_ENV} is required to load SDK-backed collections data."))
-        }
+        ConnectionError::MissingApiKey => CollectionsServiceError::new(
+            CollectionsServiceErrorKind::Session,
+            "No API key found in keyring or environment. Sign in to continue.",
+        ),
+        ConnectionError::MissingApplicationKeyEnv => CollectionsServiceError::new(
+            CollectionsServiceErrorKind::Network,
+            format!("{APPLICATION_KEY_ENV} is required to load SDK-backed collections data."),
+        ),
+        ConnectionError::MissingAccessTokenEnv => CollectionsServiceError::new(
+            CollectionsServiceErrorKind::Session,
+            format!("{ACCESS_TOKEN_ENV} is required to load SDK-backed collections data."),
+        ),
         ConnectionError::Sdk(error) => map_sdk_error(error),
-        ConnectionError::RuntimeInit(error) => {
-            CollectionsServiceError::new(CollectionsServiceErrorKind::Network,
-                                         format!("Unable to start Rust SDK runtime: {error}"))
-        }
+        ConnectionError::RuntimeInit(error) => CollectionsServiceError::new(
+            CollectionsServiceErrorKind::Network,
+            format!("Unable to start Rust SDK runtime: {error}"),
+        ),
     }
 }

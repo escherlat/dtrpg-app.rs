@@ -12,7 +12,7 @@ use super::model::{Credential, CredentialError};
 /// as the key and sets `email` to `None`.
 #[derive(Serialize, Deserialize)]
 struct KeyringPayload {
-    key:   String,
+    key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     email: Option<String>,
 }
@@ -83,32 +83,34 @@ impl KeyringCredentialStore {
     ///
     /// Use the constants in [`crate::credentials::keys`] for both arguments.
     pub fn new(service: impl Into<String>, account: impl Into<String>) -> Self {
-        Self { service: service.into(),
-               account: account.into(), }
+        Self {
+            service: service.into(),
+            account: account.into(),
+        }
     }
 
     fn entry(&self) -> Result<Entry, CredentialError> {
-        Entry::new(&self.service, &self.account).map_err(|e| {
-                                                    CredentialError::Unavailable(e.to_string())
-                                                })
+        Entry::new(&self.service, &self.account)
+            .map_err(|e| CredentialError::Unavailable(e.to_string()))
     }
 }
 
 impl CredentialStore for KeyringCredentialStore {
     fn store(&self, credential: &Credential) -> Result<(), CredentialError> {
-        let payload = KeyringPayload { key:   credential.secret.clone(),
-                                       email: credential.email.clone(), };
-        let json = serde_json::to_string(&payload).map_err(|e| {
-                                                      CredentialError::Store { account:
-                                                                                   self.account
-                                                                                       .clone(),
-                                                                               reason:
-                                                                                   e.to_string(), }
-                                                  })?;
+        let payload = KeyringPayload {
+            key: credential.secret.clone(),
+            email: credential.email.clone(),
+        };
+        let json = serde_json::to_string(&payload).map_err(|e| CredentialError::Store {
+            account: self.account.clone(),
+            reason: e.to_string(),
+        })?;
         self.entry()?
             .set_password(&json)
-            .map_err(|e| CredentialError::Store { account: self.account.clone(),
-                                                  reason:  e.to_string(), })
+            .map_err(|e| CredentialError::Store {
+                account: self.account.clone(),
+                reason: e.to_string(),
+            })
     }
 
     fn load(&self) -> Result<Option<Credential>, CredentialError> {
@@ -120,14 +122,18 @@ impl CredentialStore for KeyringCredentialStore {
                     Ok(p) => (p.key, p.email),
                     Err(_) => (raw, None),
                 };
-                Ok(Some(Credential { service: self.service.clone(),
-                                     account: self.account.clone(),
-                                     secret,
-                                     email }))
+                Ok(Some(Credential {
+                    service: self.service.clone(),
+                    account: self.account.clone(),
+                    secret,
+                    email,
+                }))
             }
             Err(keyring::Error::NoEntry) => Ok(None),
-            Err(e) => Err(CredentialError::Load { account: self.account.clone(),
-                                                  reason:  e.to_string(), }),
+            Err(e) => Err(CredentialError::Load {
+                account: self.account.clone(),
+                reason: e.to_string(),
+            }),
         }
     }
 
@@ -136,8 +142,10 @@ impl CredentialStore for KeyringCredentialStore {
             Ok(()) => Ok(()),
             // Already gone — treat as success.
             Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(CredentialError::Delete { account: self.account.clone(),
-                                                    reason:  e.to_string(), }),
+            Err(e) => Err(CredentialError::Delete {
+                account: self.account.clone(),
+                reason: e.to_string(),
+            }),
         }
     }
 }
@@ -157,67 +165,81 @@ mod tests {
 
     #[derive(Default)]
     struct MockCredentialStore {
-        stored:       Arc<Mutex<Option<Credential>>>,
-        store_error:  bool,
-        load_error:   bool,
+        stored: Arc<Mutex<Option<Credential>>>,
+        store_error: bool,
+        load_error: bool,
         delete_error: bool,
     }
 
     impl CredentialStore for MockCredentialStore {
         fn store(&self, credential: &Credential) -> Result<(), CredentialError> {
             if self.store_error {
-                return Err(CredentialError::Store { account: "mock".into(),
-                                                    reason:  "injected error".into(), });
+                return Err(CredentialError::Store {
+                    account: "mock".into(),
+                    reason: "injected error".into(),
+                });
             }
-            *self.stored
-                 .lock()
-                 .map_err(|_| CredentialError::Unavailable("lock poisoned".into()))? =
+            *self
+                .stored
+                .lock()
+                .map_err(|_| CredentialError::Unavailable("lock poisoned".into()))? =
                 Some(credential.clone());
             Ok(())
         }
 
         fn load(&self) -> Result<Option<Credential>, CredentialError> {
             if self.load_error {
-                return Err(CredentialError::Load { account: "mock".into(),
-                                                   reason:  "injected error".into(), });
+                return Err(CredentialError::Load {
+                    account: "mock".into(),
+                    reason: "injected error".into(),
+                });
             }
-            Ok(self.stored
-                   .lock()
-                   .map_err(|_| CredentialError::Unavailable("lock poisoned".into()))?
-                   .clone())
+            Ok(self
+                .stored
+                .lock()
+                .map_err(|_| CredentialError::Unavailable("lock poisoned".into()))?
+                .clone())
         }
 
         fn delete(&self) -> Result<(), CredentialError> {
             if self.delete_error {
-                return Err(CredentialError::Delete { account: "mock".into(),
-                                                     reason:  "injected error".into(), });
+                return Err(CredentialError::Delete {
+                    account: "mock".into(),
+                    reason: "injected error".into(),
+                });
             }
-            *self.stored
-                 .lock()
-                 .map_err(|_| CredentialError::Unavailable("lock poisoned".into()))? = None;
+            *self
+                .stored
+                .lock()
+                .map_err(|_| CredentialError::Unavailable("lock poisoned".into()))? = None;
             Ok(())
         }
     }
 
     fn make_credential(secret: &str) -> Credential {
-        Credential { service: KEYRING_SERVICE.into(),
-                     account: KEYRING_API_KEY.into(),
-                     secret:  secret.into(),
-                     email:   None, }
+        Credential {
+            service: KEYRING_SERVICE.into(),
+            account: KEYRING_API_KEY.into(),
+            secret: secret.into(),
+            email: None,
+        }
     }
 
     fn make_credential_with_email(secret: &str, email: &str) -> Credential {
-        Credential { service: KEYRING_SERVICE.into(),
-                     account: KEYRING_API_KEY.into(),
-                     secret:  secret.into(),
-                     email:   Some(email.into()), }
+        Credential {
+            service: KEYRING_SERVICE.into(),
+            account: KEYRING_API_KEY.into(),
+            secret: secret.into(),
+            email: Some(email.into()),
+        }
     }
 
     #[test]
     fn mock_store_then_load_returns_secret() {
         let store = MockCredentialStore::default();
-        store.store(&make_credential("test-secret"))
-             .expect("store should succeed");
+        store
+            .store(&make_credential("test-secret"))
+            .expect("store should succeed");
         let loaded = store.load().expect("load should succeed");
         assert!(loaded.is_some());
         assert_eq!(loaded.unwrap().secret, "test-secret");
@@ -226,8 +248,9 @@ mod tests {
     #[test]
     fn mock_store_then_load_preserves_email() {
         let store = MockCredentialStore::default();
-        store.store(&make_credential_with_email("the-key", "user@example.com"))
-             .expect("store should succeed");
+        store
+            .store(&make_credential_with_email("the-key", "user@example.com"))
+            .expect("store should succeed");
         let loaded = store.load().expect("load should succeed").unwrap();
         assert_eq!(loaded.secret, "the-key");
         assert_eq!(loaded.email.as_deref(), Some("user@example.com"));
@@ -243,8 +266,9 @@ mod tests {
     #[test]
     fn mock_delete_clears_stored_credential() {
         let store = MockCredentialStore::default();
-        store.store(&make_credential("secret"))
-             .expect("store should succeed");
+        store
+            .store(&make_credential("secret"))
+            .expect("store should succeed");
         store.delete().expect("delete should succeed");
         let loaded = store.load().expect("load should succeed");
         assert!(loaded.is_none());
@@ -253,14 +277,17 @@ mod tests {
     #[test]
     fn mock_delete_on_empty_store_succeeds() {
         let store = MockCredentialStore::default();
-        store.delete()
-             .expect("delete on empty store should succeed");
+        store
+            .delete()
+            .expect("delete on empty store should succeed");
     }
 
     #[test]
     fn mock_store_error_is_propagated() {
-        let store = MockCredentialStore { store_error: true,
-                                          ..Default::default() };
+        let store = MockCredentialStore {
+            store_error: true,
+            ..Default::default()
+        };
         let result = store.store(&make_credential("s"));
         assert!(result.is_err());
         assert!(matches!(result, Err(CredentialError::Store { .. })));
@@ -268,8 +295,10 @@ mod tests {
 
     #[test]
     fn mock_load_error_is_propagated() {
-        let store = MockCredentialStore { load_error: true,
-                                          ..Default::default() };
+        let store = MockCredentialStore {
+            load_error: true,
+            ..Default::default()
+        };
         let result = store.load();
         assert!(result.is_err());
         assert!(matches!(result, Err(CredentialError::Load { .. })));
@@ -288,8 +317,10 @@ mod tests {
 
     #[test]
     fn payload_round_trips_key_and_email() {
-        let p = KeyringPayload { key:   "my-api-key".into(),
-                                 email: Some("user@example.com".into()), };
+        let p = KeyringPayload {
+            key: "my-api-key".into(),
+            email: Some("user@example.com".into()),
+        };
         let json = serde_json::to_string(&p).unwrap();
         let back: KeyringPayload = serde_json::from_str(&json).unwrap();
         assert_eq!(back.key, "my-api-key");
@@ -298,8 +329,10 @@ mod tests {
 
     #[test]
     fn payload_omits_email_field_when_none() {
-        let p = KeyringPayload { key:   "my-api-key".into(),
-                                 email: None, };
+        let p = KeyringPayload {
+            key: "my-api-key".into(),
+            email: None,
+        };
         let json = serde_json::to_string(&p).unwrap();
         assert!(!json.contains("email"));
     }
@@ -307,8 +340,9 @@ mod tests {
     #[test]
     fn mock_store_and_load_preserves_email() {
         let store = MockCredentialStore::default();
-        store.store(&make_credential_with_email("key-abc", "user@example.com"))
-             .expect("store should succeed");
+        store
+            .store(&make_credential_with_email("key-abc", "user@example.com"))
+            .expect("store should succeed");
         // The mock stores only the secret string, so email passthrough isn't
         // exercised here — that is covered by KeyringPayload round-trip tests.
         let loaded = store.load().expect("load should succeed");

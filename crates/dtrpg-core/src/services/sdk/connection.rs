@@ -24,7 +24,7 @@ use crate::constants::{
 };
 
 pub(super) struct SdkConnection {
-    pub(super) client:  SdkLibraryClient,
+    pub(super) client: SdkLibraryClient,
     pub(super) runtime: Runtime,
 }
 
@@ -45,32 +45,37 @@ pub(super) enum ConnectionError {
 
 /// Builds a connection using only the keyring for the API key and the given
 /// in-memory `tokens` obtained at startup or login.
-pub(super) fn connect_from_keyring_with_tokens(tokens: LoginTokens)
-                                               -> Result<SdkConnection, ConnectionError> {
+pub(super) fn connect_from_keyring_with_tokens(
+    tokens: LoginTokens,
+) -> Result<SdkConnection, ConnectionError> {
     let application_key = resolve_keyring_api_key()?;
-    build_connection(application_key,
-                     tokens.access_token,
-                     tokens.refresh_token,
-                     tokens.refresh_token_ttl)
+    build_connection(
+        application_key,
+        tokens.access_token,
+        tokens.refresh_token,
+        tokens.refresh_token_ttl,
+    )
 }
 
 /// Builds a connection reading every credential from environment variables.
 #[allow(dead_code)]
 pub(super) fn connect_from_environment() -> Result<SdkConnection, ConnectionError> {
-    let application_key =
-        std::env::var(APPLICATION_KEY_ENV).map_err(|_| ConnectionError::MissingApplicationKeyEnv)?;
+    let application_key = std::env::var(APPLICATION_KEY_ENV)
+        .map_err(|_| ConnectionError::MissingApplicationKeyEnv)?;
     let access_token =
         std::env::var(ACCESS_TOKEN_ENV).map_err(|_| ConnectionError::MissingAccessTokenEnv)?;
     let refresh_token = std::env::var(REFRESH_TOKEN_ENV).unwrap_or_default();
-    let refresh_token_ttl =
-        std::env::var(REFRESH_TOKEN_TTL_ENV).ok()
-                                            .and_then(|value| value.parse::<u64>().ok())
-                                            .unwrap_or(u64::MAX);
+    let refresh_token_ttl = std::env::var(REFRESH_TOKEN_TTL_ENV)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(u64::MAX);
 
-    build_connection(application_key,
-                     access_token,
-                     refresh_token,
-                     refresh_token_ttl)
+    build_connection(
+        application_key,
+        access_token,
+        refresh_token,
+        refresh_token_ttl,
+    )
 }
 
 fn resolve_keyring_api_key() -> Result<String, ConnectionError> {
@@ -83,22 +88,27 @@ fn resolve_keyring_api_key() -> Result<String, ConnectionError> {
         .ok_or(ConnectionError::MissingApiKey)
 }
 
-fn build_connection(application_key: String, access_token: String, refresh_token: String,
-                    refresh_token_ttl: u64)
-                    -> Result<SdkConnection, ConnectionError> {
+fn build_connection(
+    application_key: String, access_token: String, refresh_token: String, refresh_token_ttl: u64,
+) -> Result<SdkConnection, ConnectionError> {
     let config = match std::env::var(API_BASE_URL_ENV) {
         Ok(base_url) => Config::with_base_url(application_key, base_url),
         Err(_) => Config::new(application_key),
     };
 
     let mut sdk = DriveThruRpgSdk::with_config(config);
-    sdk.apply_auth_response(AuthTokenResponse::new(access_token, refresh_token, refresh_token_ttl))
-       .map_err(ConnectionError::Sdk)?;
+    sdk.apply_auth_response(AuthTokenResponse::new(
+        access_token,
+        refresh_token,
+        refresh_token_ttl,
+    ))
+    .map_err(ConnectionError::Sdk)?;
 
     let client = sdk.library_client().map_err(ConnectionError::Sdk)?;
-    let runtime = Builder::new_multi_thread().enable_all()
-                                             .build()
-                                             .map_err(ConnectionError::RuntimeInit)?;
+    let runtime = Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(ConnectionError::RuntimeInit)?;
 
     Ok(SdkConnection { client, runtime })
 }

@@ -22,7 +22,7 @@ pub fn now_secs() -> i64 {
 /// a user would expect, not `elapsed / (30 * 86_400)`.
 fn months_between(then: DateTime<Utc>, now: DateTime<Utc>) -> i64 {
     let mut months = (i64::from(now.year()) - i64::from(then.year())) * 12
-                     + (i64::from(now.month()) - i64::from(then.month()));
+        + (i64::from(now.month()) - i64::from(then.month()));
     if now.day() < then.day() {
         months -= 1;
     }
@@ -115,8 +115,9 @@ pub fn format_relative(ts: i64) -> String {
 /// assert_eq!(ts, Some(1_721_144_752));
 /// ```
 pub fn parse_rfc3339_to_epoch(input: &str) -> Option<i64> {
-    DateTime::parse_from_rfc3339(input).ok()
-                                       .map(|dt| dt.timestamp())
+    DateTime::parse_from_rfc3339(input)
+        .ok()
+        .map(|dt| dt.timestamp())
 }
 
 /// Formats a Unix timestamp as an RFC 3339 / ISO 8601 string in UTC (e.g.
@@ -301,8 +302,8 @@ mod tests {
         let target_year = total.div_euclid(12) as i32;
         let target_month = total.rem_euclid(12) as u32 + 1;
         Utc.with_ymd_and_hms(target_year, target_month, 1, 12, 0, 0)
-           .single()
-           .map_or(0, |dt| dt.timestamp())
+            .single()
+            .map_or(0, |dt| dt.timestamp())
     }
 
     #[test]
@@ -317,8 +318,10 @@ mod tests {
     #[test]
     fn absolute_known_date() {
         // 2024-01-05 15:42:00 UTC = 1704469320
-        assert_eq!(format_absolute_fixed(1_704_469_320),
-                   "January 5, 2024 at 3:42 PM");
+        assert_eq!(
+            format_absolute_fixed(1_704_469_320),
+            "January 5, 2024 at 3:42 PM"
+        );
     }
 
     #[test]
@@ -330,21 +333,27 @@ mod tests {
     #[test]
     fn parses_rfc3339_with_negative_offset() {
         // 2024-07-16T10:45:52-05:00 == 2024-07-16T15:45:52Z
-        assert_eq!(parse_rfc3339_to_epoch("2024-07-16T10:45:52-05:00"),
-                   Some(1_721_144_752));
+        assert_eq!(
+            parse_rfc3339_to_epoch("2024-07-16T10:45:52-05:00"),
+            Some(1_721_144_752)
+        );
     }
 
     #[test]
     fn parses_rfc3339_with_positive_offset() {
         // 2024-07-17T00:45:52+09:00 == 2024-07-16T15:45:52Z
-        assert_eq!(parse_rfc3339_to_epoch("2024-07-17T00:45:52+09:00"),
-                   Some(1_721_144_752));
+        assert_eq!(
+            parse_rfc3339_to_epoch("2024-07-17T00:45:52+09:00"),
+            Some(1_721_144_752)
+        );
     }
 
     #[test]
     fn parses_rfc3339_with_z_suffix() {
-        assert_eq!(parse_rfc3339_to_epoch("2024-01-05T15:42:00Z"),
-                   Some(1_704_469_320));
+        assert_eq!(
+            parse_rfc3339_to_epoch("2024-01-05T15:42:00Z"),
+            Some(1_704_469_320)
+        );
     }
 
     #[test]

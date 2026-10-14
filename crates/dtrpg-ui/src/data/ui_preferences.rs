@@ -15,30 +15,30 @@ pub struct UiPreferencesFile {
     /// Persisted key of the active color theme (`ThemeKey`'s variant name,
     /// lowercased). `None` before this preference existed, or if never
     /// changed from the default.
-    pub theme_key:                 Option<String>,
+    pub theme_key: Option<String>,
     /// Persisted font family name of the active body font. Any font
     /// installed on the user's system is valid, not a curated list.
-    pub body_font_name:            Option<String>,
+    pub body_font_name: Option<String>,
     /// Persisted font family name of the active value font.
-    pub value_font_name:           Option<String>,
+    pub value_font_name: Option<String>,
     /// Persisted font family name of the active label font.
-    pub label_font_name:           Option<String>,
+    pub label_font_name: Option<String>,
     /// Persisted font family name of the active monospace font.
-    pub mono_font_name:            Option<String>,
+    pub mono_font_name: Option<String>,
     /// Text scale multiplier (e.g. `1.1`), where `1.0` is the app's normal
     /// text scale — the same value shown and adjusted in Settings >
     /// Appearance, not a derived absolute pixel size.
-    pub text_scale:                Option<f32>,
+    pub text_scale: Option<f32>,
     /// Persisted sidebar Collections sort method (`CollectionSortMethod`'s
     /// variant name: `"name"`, `"date_created"`, or `"item_count"`).
-    pub collection_sort:           Option<String>,
+    pub collection_sort: Option<String>,
     /// Persisted sidebar Collections sort direction (`"ascending"` or
     /// `"descending"`).
     pub collection_sort_direction: Option<String>,
     /// Persisted locale code (`"en"`, `"fr"`, `"de"`), read ahead of
     /// OS-locale detection at startup. `None` before this preference existed,
     /// or if never changed from the OS-detected default.
-    pub locale:                    Option<String>,
+    pub locale: Option<String>,
 }
 
 /// Persists and restores user-facing UI preferences.
@@ -57,11 +57,10 @@ impl UiPreferences {
     pub fn load() -> Self {
         let path = preferences_path();
         let file_existed = path.exists();
-        let data = std::fs::read_to_string(&path).ok()
-                                                 .and_then(|text| {
-                                                     toml::from_str::<UiPreferencesFile>(&text).ok()
-                                                 })
-                                                 .unwrap_or_default();
+        let data = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| toml::from_str::<UiPreferencesFile>(&text).ok())
+            .unwrap_or_default();
         let prefs = Self { data };
         if !file_existed {
             prefs.flush();
@@ -159,15 +158,21 @@ impl UiPreferences {
 
     /// Persist the sidebar Collections sort method and direction together.
     pub fn save_collection_sort(&mut self, method: CollectionSortMethod, direction: SortDirection) {
-        self.data.collection_sort = Some(match method {
-                                             CollectionSortMethod::Name => "name",
-                                             CollectionSortMethod::DateCreated => "date_created",
-                                             CollectionSortMethod::ItemCount => "item_count",
-                                         }.to_string());
-        self.data.collection_sort_direction = Some(match direction {
-                                                       SortDirection::Ascending => "ascending",
-                                                       SortDirection::Descending => "descending",
-                                                   }.to_string());
+        self.data.collection_sort = Some(
+            match method {
+                CollectionSortMethod::Name => "name",
+                CollectionSortMethod::DateCreated => "date_created",
+                CollectionSortMethod::ItemCount => "item_count",
+            }
+            .to_string(),
+        );
+        self.data.collection_sort_direction = Some(
+            match direction {
+                SortDirection::Ascending => "ascending",
+                SortDirection::Descending => "descending",
+            }
+            .to_string(),
+        );
         self.flush();
     }
 

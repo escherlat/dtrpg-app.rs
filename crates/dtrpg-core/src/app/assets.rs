@@ -42,9 +42,10 @@ impl AssetSource for Assets {
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
-        let mut names: Vec<SharedString> = Self::iter().filter(|p| p.starts_with(path))
-                                                       .map(Into::into)
-                                                       .collect();
+        let mut names: Vec<SharedString> = Self::iter()
+            .filter(|p| p.starts_with(path))
+            .map(Into::into)
+            .collect();
         names.extend(gpui_component_assets::Assets.list(path)?);
         Ok(names)
     }

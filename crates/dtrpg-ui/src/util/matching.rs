@@ -21,8 +21,7 @@ const DAY_SECS: i64 = 24 * 60 * 60;
 /// without a date.
 #[must_use]
 pub fn item_recently_updated(item: &LibraryItem, now_secs: i64, window_days: u32) -> bool {
-    let Some(ts) = item.date_updated.or(item.date_added)
-    else {
+    let Some(ts) = item.date_updated.or(item.date_added) else {
         return false;
     };
     ts >= now_secs - i64::from(window_days) * DAY_SECS
@@ -38,9 +37,10 @@ pub fn item_recently_updated(item: &LibraryItem, now_secs: i64, window_days: u32
 /// `window_days` is the user-configured "Recently Updated window" applied
 /// when `filter` is [`SidebarFilter::RecentlyUpdated`]; ignored otherwise.
 #[must_use]
-pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
-                           collection_members: &HashSet<u64>, now_secs: i64, window_days: u32)
-                           -> bool {
+pub fn item_matches_filter(
+    item: &LibraryItem, filter: &SidebarFilter, collection_members: &HashSet<u64>, now_secs: i64,
+    window_days: u32,
+) -> bool {
     match filter {
         SidebarFilter::AllTitles => true,
         SidebarFilter::RecentlyUpdated => item_recently_updated(item, now_secs, window_days),
@@ -49,7 +49,7 @@ pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
         SidebarFilter::Publisher(name) => item.publisher.as_ref() == name.as_ref(),
         SidebarFilter::Collection(_, _) => {
             (item.order_product_id > 0 && collection_members.contains(&item.order_product_id))
-            || (item.product_id > 0 && collection_members.contains(&item.product_id))
+                || (item.product_id > 0 && collection_members.contains(&item.product_id))
         }
     }
 }
@@ -66,7 +66,7 @@ pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
 #[must_use]
 pub fn member_ids_contain(member_ids: &[u64], order_product_id: u64, product_id: u64) -> bool {
     (order_product_id > 0 && member_ids.contains(&order_product_id))
-    || (product_id > 0 && member_ids.contains(&product_id))
+        || (product_id > 0 && member_ids.contains(&product_id))
 }
 
 /// Resolves the id used for collection membership: `order_product_id`,
@@ -80,8 +80,7 @@ pub fn member_ids_contain(member_ids: &[u64], order_product_id: u64, product_id:
 pub fn collection_member_id(item: &LibraryItem) -> u64 {
     if item.order_product_id > 0 {
         item.order_product_id
-    }
-    else {
+    } else {
         item.product_id
     }
 }
@@ -95,8 +94,8 @@ pub fn item_matches_query(item: &LibraryItem, query: &str) -> bool {
     }
     let q = query.to_lowercase();
     item.title.to_lowercase().contains(&q)
-    || item.publisher.to_lowercase().contains(&q)
-    || item.line.to_lowercase().contains(&q)
+        || item.publisher.to_lowercase().contains(&q)
+        || item.line.to_lowercase().contains(&q)
 }
 
 /// Returns `true` if `name` contains `query` (case-insensitive).
@@ -143,20 +142,22 @@ mod tests {
     }
 
     fn item(date_added: Option<i64>, date_updated: Option<i64>) -> LibraryItem {
-        let mut item = LibraryItem::new("e1",
-                                        "Moria",
-                                        "Free League",
-                                        "",
-                                        "",
-                                        "",
-                                        0,
-                                        0.0,
-                                        0,
-                                        0,
-                                        ItemStatus::Cloud,
-                                        "#000000",
-                                        "",
-                                        date_added);
+        let mut item = LibraryItem::new(
+            "e1",
+            "Moria",
+            "Free League",
+            "",
+            "",
+            "",
+            0,
+            0.0,
+            0,
+            0,
+            ItemStatus::Cloud,
+            "#000000",
+            "",
+            date_added,
+        );
         item.date_updated = date_updated;
         item
     }
@@ -164,19 +165,31 @@ mod tests {
     #[test]
     fn item_recently_updated_matches_within_30_days_via_date_updated() {
         let now = 1_800_000_000;
-        assert!(item_recently_updated(&item(None, Some(now - 10 * DAY_SECS)), now, 30));
+        assert!(item_recently_updated(
+            &item(None, Some(now - 10 * DAY_SECS)),
+            now,
+            30
+        ));
     }
 
     #[test]
     fn item_recently_updated_falls_back_to_date_added_when_no_date_updated() {
         let now = 1_800_000_000;
-        assert!(item_recently_updated(&item(Some(now - 10 * DAY_SECS), None), now, 30));
+        assert!(item_recently_updated(
+            &item(Some(now - 10 * DAY_SECS), None),
+            now,
+            30
+        ));
     }
 
     #[test]
     fn item_recently_updated_excludes_just_past_the_30_day_window() {
         let now = 1_800_000_000;
-        assert!(!item_recently_updated(&item(None, Some(now - 30 * DAY_SECS - 1)), now, 30));
+        assert!(!item_recently_updated(
+            &item(None, Some(now - 30 * DAY_SECS - 1)),
+            now,
+            30
+        ));
     }
 
     #[test]
@@ -201,7 +214,19 @@ mod tests {
         let recent = item(None, Some(now - 10 * DAY_SECS));
         let stale = item(None, Some(now - 40 * DAY_SECS));
         let members = HashSet::new();
-        assert!(item_matches_filter(&recent, &SidebarFilter::RecentlyUpdated, &members, now, 30));
-        assert!(!item_matches_filter(&stale, &SidebarFilter::RecentlyUpdated, &members, now, 30));
+        assert!(item_matches_filter(
+            &recent,
+            &SidebarFilter::RecentlyUpdated,
+            &members,
+            now,
+            30
+        ));
+        assert!(!item_matches_filter(
+            &stale,
+            &SidebarFilter::RecentlyUpdated,
+            &members,
+            now,
+            30
+        ));
     }
 }

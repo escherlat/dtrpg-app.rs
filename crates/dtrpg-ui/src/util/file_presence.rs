@@ -12,10 +12,12 @@ use crate::data::storage::StorageConfig;
 /// download path and this verification path agree on "where does this file
 /// live."
 #[must_use]
-pub fn resolved_file_path(storage: &StorageConfig, item: &LibraryItem, file: &LibraryItemFile)
-                          -> PathBuf {
-    storage.path_for_publisher(&item.publisher)
-           .join(file.name.as_ref())
+pub fn resolved_file_path(
+    storage: &StorageConfig, item: &LibraryItem, file: &LibraryItemFile,
+) -> PathBuf {
+    storage
+        .path_for_publisher(&item.publisher)
+        .join(file.name.as_ref())
 }
 
 /// Sets every file's `downloaded` flag to whether it actually exists at its
@@ -62,29 +64,33 @@ mod tests {
     }
 
     fn make_item(id: &str, publisher: &str) -> LibraryItem {
-        LibraryItem::new(id,
-                         "Test Title",
-                         publisher,
-                         "",
-                         "Core",
-                         "PDF",
-                         100,
-                         10.0,
-                         2024,
-                         1,
-                         ItemStatus::Cloud,
-                         "#1C2A44",
-                         "Desc.",
-                         None)
+        LibraryItem::new(
+            id,
+            "Test Title",
+            publisher,
+            "",
+            "Core",
+            "PDF",
+            100,
+            10.0,
+            2024,
+            1,
+            ItemStatus::Cloud,
+            "#1C2A44",
+            "Desc.",
+            None,
+        )
     }
 
     fn make_file(id: &str, name: &str, downloaded: bool) -> LibraryItemFile {
-        LibraryItemFile { id: id.into(),
-                          index: 0,
-                          name: name.into(),
-                          format: "PDF".into(),
-                          size_mb: 1.0,
-                          downloaded }
+        LibraryItemFile {
+            id: id.into(),
+            index: 0,
+            name: name.into(),
+            format: "PDF".into(),
+            size_mb: 1.0,
+            downloaded,
+        }
     }
 
     #[test]
@@ -139,8 +145,10 @@ mod tests {
         let dir = test_dir("mixed");
         let storage = storage_at(&dir);
         let mut it = make_item("verify-4", "Presence Publisher");
-        it.files = vec![make_file("f1", "Present.pdf", false),
-                        make_file("f2", "Missing.pdf", true)];
+        it.files = vec![
+            make_file("f1", "Present.pdf", false),
+            make_file("f2", "Missing.pdf", true),
+        ];
 
         let dest_dir = storage.path_for_publisher(&it.publisher);
         std::fs::create_dir_all(&dest_dir).unwrap();

@@ -17,27 +17,28 @@ use gpui_component::ActiveTheme;
 #[derive(Clone)]
 pub struct DraggedLibraryItem {
     /// Title shown in the drag preview.
-    pub title:      SharedString,
+    pub title: SharedString,
     /// The id to add to a collection's `member_ids` on drop.
-    pub member_id:  u64,
+    pub member_id: u64,
     /// The catalog `product_id` sent on the network add call.
     pub product_id: u64,
 }
 
 impl Render for DraggedLibraryItem {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div().id("drag-library-item")
-             .cursor_grab()
-             .py_1()
-             .px_2()
-             .max_w(px(220.))
-             .truncate()
-             .rounded(cx.theme().radius)
-             .border_1()
-             .border_color(cx.theme().border)
-             .bg(cx.theme().background)
-             .text_sm()
-             .text_color(cx.theme().foreground)
-             .child(self.title.clone())
+        div()
+            .id("drag-library-item")
+            .cursor_grab()
+            .py_1()
+            .px_2()
+            .max_w(px(220.))
+            .truncate()
+            .rounded(cx.theme().radius)
+            .border_1()
+            .border_color(cx.theme().border)
+            .bg(cx.theme().background)
+            .text_sm()
+            .text_color(cx.theme().foreground)
+            .child(self.title.clone())
     }
 }

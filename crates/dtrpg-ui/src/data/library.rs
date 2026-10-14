@@ -22,62 +22,62 @@ fn default_true() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryItem {
     /// Stable unique identifier (e.g. `"b1"`).
-    pub id:                        Arc<str>,
+    pub id: Arc<str>,
     /// Numeric API identifier used for SDK detail fetches.
-    pub numeric_id:                u64,
+    pub numeric_id: u64,
     /// The `orderProductId` from the API — used for collection membership
     /// matching.
     #[serde(default)]
-    pub order_product_id:          u64,
+    pub order_product_id: u64,
     /// The `productId` from the API — used as a fallback for collection
     /// membership matching when product list items return `productId`
     /// rather than `orderProductId`.
     #[serde(default)]
-    pub product_id:                u64,
-    pub title:                     Arc<str>,
-    pub publisher:                 Arc<str>,
+    pub product_id: u64,
+    pub title: Arc<str>,
+    pub publisher: Arc<str>,
     /// Game line / series name.
-    pub line:                      Arc<str>,
+    pub line: Arc<str>,
     /// Category tag: Core, Supplement, Adventure, Bestiary, Setting …
-    pub kind:                      Arc<str>,
+    pub kind: Arc<str>,
     /// File format string, e.g. `"PDF"` or `"PDF + EPUB"`.
-    pub format:                    Arc<str>,
-    pub pages:                     u32,
-    pub size_mb:                   f64,
-    pub year:                      u32,
+    pub format: Arc<str>,
+    pub pages: u32,
+    pub size_mb: f64,
+    pub year: u32,
     /// Relative ordering — lower means more recently added.
-    pub added_order:               u32,
-    pub status:                    ItemStatus,
+    pub added_order: u32,
+    pub status: ItemStatus,
     /// Hex color string for the generative cover background, e.g. `"#1C2A44"`.
-    pub color:                     Arc<str>,
-    pub desc:                      Arc<str>,
+    pub color: Arc<str>,
+    pub desc: Arc<str>,
     /// Optional URL for a small-context cover thumbnail (grid card, thumb
     /// row).
     #[serde(default)]
-    pub cover_url:                 Option<Arc<str>>,
+    pub cover_url: Option<Arc<str>>,
     /// Optional URL for a large-context cover image (detail panel), preferring
     /// the full-size/WebP source over the pre-generated thumbnails.
     #[serde(default)]
-    pub detail_cover_url:          Option<Arc<str>>,
+    pub detail_cover_url: Option<Arc<str>>,
     /// Unix timestamp (seconds since epoch) when the item was added to the
     /// library.
     #[serde(default)]
-    pub date_added:                Option<i64>,
+    pub date_added: Option<i64>,
     /// Unix timestamp (seconds since epoch) when the item's files were last
     /// updated by the publisher, if known.
     #[serde(default)]
-    pub date_updated:              Option<i64>,
+    pub date_updated: Option<i64>,
     /// Last time a thumbnail fetch was attempted for this item; not persisted
     /// to cache.
     #[serde(skip)]
-    pub thumbnail_last_attempted:  Option<std::time::SystemTime>,
+    pub thumbnail_last_attempted: Option<std::time::SystemTime>,
     /// Whether this item was present in the most recent successful live
     /// catalog fetch. `false` means the server no longer lists it, but the
     /// item is kept (not deleted) so previously-downloaded files stay
     /// reachable. Defaults to `true` for cache files written before this
     /// field existed and for items newly added from a live fetch.
     #[serde(default = "default_true")]
-    pub is_available:              bool,
+    pub is_available: bool,
     /// Last time an individual server check
     /// (`catalog-item-level-reconciliation`) ran for this item; not
     /// persisted to cache.
@@ -89,39 +89,42 @@ pub struct LibraryItem {
     /// capability). Defaults to empty for cache entries written before this
     /// field existed.
     #[serde(default)]
-    pub files:                     Vec<LibraryItemFile>,
+    pub files: Vec<LibraryItemFile>,
 }
 
 impl LibraryItem {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(id: &str, title: &str, publisher: &str, line: &str, kind: &str, format: &str,
-               pages: u32, size_mb: f64, year: u32, added_order: u32, status: ItemStatus,
-               color: &str, desc: &str, date_added: Option<i64>)
-               -> Self {
-        Self { id: id.into(),
-               numeric_id: 0,
-               order_product_id: 0,
-               product_id: 0,
-               title: title.into(),
-               publisher: publisher.into(),
-               line: line.into(),
-               kind: kind.into(),
-               format: format.into(),
-               pages,
-               size_mb,
-               year,
-               added_order,
-               status,
-               color: color.into(),
-               desc: desc.into(),
-               cover_url: None,
-               detail_cover_url: None,
-               date_added,
-               date_updated: None,
-               thumbnail_last_attempted: None,
-               is_available: true,
-               availability_last_checked: None,
-               files: Vec::new() }
+    pub fn new(
+        id: &str, title: &str, publisher: &str, line: &str, kind: &str, format: &str, pages: u32,
+        size_mb: f64, year: u32, added_order: u32, status: ItemStatus, color: &str, desc: &str,
+        date_added: Option<i64>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            numeric_id: 0,
+            order_product_id: 0,
+            product_id: 0,
+            title: title.into(),
+            publisher: publisher.into(),
+            line: line.into(),
+            kind: kind.into(),
+            format: format.into(),
+            pages,
+            size_mb,
+            year,
+            added_order,
+            status,
+            color: color.into(),
+            desc: desc.into(),
+            cover_url: None,
+            detail_cover_url: None,
+            date_added,
+            date_updated: None,
+            thumbnail_last_attempted: None,
+            is_available: true,
+            availability_last_checked: None,
+            files: Vec::new(),
+        }
     }
 
     /// Returns `true` if this catalog entry bundles more than one
@@ -170,8 +173,7 @@ impl LibraryItem {
     pub fn recompute_status(&mut self) {
         self.status = if !self.files.is_empty() && self.files.iter().all(|f| f.downloaded) {
             ItemStatus::Downloaded
-        }
-        else {
+        } else {
             ItemStatus::Cloud
         };
     }
@@ -186,20 +188,20 @@ impl LibraryItem {
 pub struct LibraryItemFile {
     /// Stable identifier for this file within its entry (the SDK's
     /// `orderProductDownloadId`).
-    pub id:         Arc<str>,
+    pub id: Arc<str>,
     /// This file's position within the entry's file list (the SDK's
     /// `OrderProductFile::index`). Required by the download-preparation API
     /// alongside the entry's `order_product_id` — see
     /// `real-file-download-transfer`.
-    pub index:      u32,
+    pub index: u32,
     /// Display name of the file (the SDK file's `title`, e.g.
     /// `"Player's Handbook.pdf"`).
-    pub name:       Arc<str>,
+    pub name: Arc<str>,
     /// Uppercase format label derived from the filename extension (e.g.
     /// `"PDF"`).
-    pub format:     Arc<str>,
+    pub format: Arc<str>,
     /// File size in megabytes.
-    pub size_mb:    f64,
+    pub size_mb: f64,
     /// Whether this specific file has been downloaded to disk.
     ///
     /// The entry's aggregate `LibraryItem::status` is derived from this
@@ -216,10 +218,10 @@ pub struct LibraryItemFile {
 /// Counts for each smart sidebar section given the full catalog.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SectionCounts {
-    pub all:              usize,
+    pub all: usize,
     pub recently_updated: usize,
-    pub on_device:        usize,
-    pub in_cloud:         usize,
+    pub on_device: usize,
+    pub in_cloud: usize,
 }
 
 /// Computes smart section counts from the full catalog.
@@ -228,17 +230,21 @@ pub struct SectionCounts {
 /// the `recently_updated` count.
 #[must_use]
 pub fn section_counts(catalog: &[LibraryItem], now_secs: i64, window_days: u32) -> SectionCounts {
-    SectionCounts { all:              catalog.len(),
-                    recently_updated:
-                        catalog.iter()
-                               .filter(|i| item_recently_updated(i, now_secs, window_days))
-                               .count(),
-                    on_device:        catalog.iter()
-                                             .filter(|i| i.status == ItemStatus::Downloaded)
-                                             .count(),
-                    in_cloud:         catalog.iter()
-                                             .filter(|i| i.status == ItemStatus::Cloud)
-                                             .count(), }
+    SectionCounts {
+        all: catalog.len(),
+        recently_updated: catalog
+            .iter()
+            .filter(|i| item_recently_updated(i, now_secs, window_days))
+            .count(),
+        on_device: catalog
+            .iter()
+            .filter(|i| i.status == ItemStatus::Downloaded)
+            .count(),
+        in_cloud: catalog
+            .iter()
+            .filter(|i| i.status == ItemStatus::Cloud)
+            .count(),
+    }
 }
 
 // ── Thumbnail cooldown
@@ -248,12 +254,12 @@ pub fn section_counts(catalog: &[LibraryItem], now_secs: i64, window_days: u32) 
 /// was more than 5 minutes ago.
 #[must_use]
 pub fn thumbnail_cooldown_elapsed(item: &LibraryItem) -> bool {
-    let Some(last) = item.thumbnail_last_attempted
-    else {
+    let Some(last) = item.thumbnail_last_attempted else {
         return true;
     };
-    std::time::SystemTime::now().duration_since(last)
-                                .is_ok_and(|d| d.as_secs() >= THUMBNAIL_COOLDOWN_SECS)
+    std::time::SystemTime::now()
+        .duration_since(last)
+        .is_ok_and(|d| d.as_secs() >= THUMBNAIL_COOLDOWN_SECS)
 }
 
 // ── Footer totals
@@ -265,8 +271,7 @@ pub fn format_total_size(items: &[LibraryItem]) -> String {
     let total_mb: f64 = items.iter().map(|i| i.size_mb).sum();
     if total_mb >= 1024.0 {
         format!("{:.1} GB", total_mb / 1024.0)
-    }
-    else {
+    } else {
         format!("{:.0} MB", total_mb)
     }
 }
@@ -276,32 +281,38 @@ mod tests {
     use super::*;
 
     fn file(id: &str, name: &str) -> LibraryItemFile {
-        LibraryItemFile { id:         id.into(),
-                          index:      0,
-                          name:       name.into(),
-                          format:     "PDF".into(),
-                          size_mb:    1.0,
-                          downloaded: false, }
+        LibraryItemFile {
+            id: id.into(),
+            index: 0,
+            name: name.into(),
+            format: "PDF".into(),
+            size_mb: 1.0,
+            downloaded: false,
+        }
     }
 
     #[test]
     fn dedupe_files_removes_repeated_ids() {
-        let mut item = LibraryItem::new("e1",
-                                        "Moria",
-                                        "Free League",
-                                        "",
-                                        "",
-                                        "",
-                                        0,
-                                        0.0,
-                                        0,
-                                        0,
-                                        ItemStatus::Cloud,
-                                        "#000000",
-                                        "",
-                                        None);
-        item.files = vec![file("1234", "Moria Rulebook"),
-                          file("1234", "Moria Rulebook"),];
+        let mut item = LibraryItem::new(
+            "e1",
+            "Moria",
+            "Free League",
+            "",
+            "",
+            "",
+            0,
+            0.0,
+            0,
+            0,
+            ItemStatus::Cloud,
+            "#000000",
+            "",
+            None,
+        );
+        item.files = vec![
+            file("1234", "Moria Rulebook"),
+            file("1234", "Moria Rulebook"),
+        ];
 
         item.dedupe_files();
 
@@ -310,20 +321,22 @@ mod tests {
     }
 
     fn item_with_files(files: Vec<LibraryItemFile>) -> LibraryItem {
-        let mut item = LibraryItem::new("e1",
-                                        "Moria",
-                                        "Free League",
-                                        "",
-                                        "",
-                                        "",
-                                        0,
-                                        0.0,
-                                        0,
-                                        0,
-                                        ItemStatus::Cloud,
-                                        "#000000",
-                                        "",
-                                        None);
+        let mut item = LibraryItem::new(
+            "e1",
+            "Moria",
+            "Free League",
+            "",
+            "",
+            "",
+            0,
+            0.0,
+            0,
+            0,
+            ItemStatus::Cloud,
+            "#000000",
+            "",
+            None,
+        );
         item.files = files;
         item
     }
@@ -411,22 +424,26 @@ mod tests {
 
     #[test]
     fn dedupe_files_keeps_distinct_ids() {
-        let mut item = LibraryItem::new("e1",
-                                        "Moria",
-                                        "Free League",
-                                        "",
-                                        "",
-                                        "",
-                                        0,
-                                        0.0,
-                                        0,
-                                        0,
-                                        ItemStatus::Cloud,
-                                        "#000000",
-                                        "",
-                                        None);
-        item.files = vec![file("1234", "Moria Rulebook"),
-                          file("1235", "Moria Map Sheet"),];
+        let mut item = LibraryItem::new(
+            "e1",
+            "Moria",
+            "Free League",
+            "",
+            "",
+            "",
+            0,
+            0.0,
+            0,
+            0,
+            ItemStatus::Cloud,
+            "#000000",
+            "",
+            None,
+        );
+        item.files = vec![
+            file("1234", "Moria Rulebook"),
+            file("1235", "Moria Map Sheet"),
+        ];
 
         item.dedupe_files();
 
@@ -441,22 +458,26 @@ mod tests {
         // `id` alone would collapse this real 2-file bundle down to 1 and
         // hide its item-count badge — the `name` must differ, not just the
         // id, before two entries are treated as duplicates.
-        let mut item = LibraryItem::new("e1",
-                                        "Moria",
-                                        "Free League",
-                                        "",
-                                        "",
-                                        "",
-                                        0,
-                                        0.0,
-                                        0,
-                                        0,
-                                        ItemStatus::Cloud,
-                                        "#000000",
-                                        "",
-                                        None);
-        item.files = vec![file("1234", "Moria Rulebook"),
-                          file("1234", "Moria Map Sheet"),];
+        let mut item = LibraryItem::new(
+            "e1",
+            "Moria",
+            "Free League",
+            "",
+            "",
+            "",
+            0,
+            0.0,
+            0,
+            0,
+            ItemStatus::Cloud,
+            "#000000",
+            "",
+            None,
+        );
+        item.files = vec![
+            file("1234", "Moria Rulebook"),
+            file("1234", "Moria Map Sheet"),
+        ];
 
         item.dedupe_files();
 
@@ -465,20 +486,22 @@ mod tests {
     }
 
     fn item_with_dates(status: ItemStatus, date_updated: Option<i64>) -> LibraryItem {
-        let mut item = LibraryItem::new("e1",
-                                        "Moria",
-                                        "Free League",
-                                        "",
-                                        "",
-                                        "",
-                                        0,
-                                        0.0,
-                                        0,
-                                        0,
-                                        status,
-                                        "#000000",
-                                        "",
-                                        None);
+        let mut item = LibraryItem::new(
+            "e1",
+            "Moria",
+            "Free League",
+            "",
+            "",
+            "",
+            0,
+            0.0,
+            0,
+            0,
+            status,
+            "#000000",
+            "",
+            None,
+        );
         item.date_updated = date_updated;
         item
     }
@@ -488,8 +511,10 @@ mod tests {
     #[test]
     fn section_counts_recently_updated_reflects_only_items_in_window() {
         let now = 1_800_000_000;
-        let catalog = vec![item_with_dates(ItemStatus::Downloaded, Some(now - 10 * DAY_SECS)),
-                           item_with_dates(ItemStatus::Cloud, Some(now - 40 * DAY_SECS)),];
+        let catalog = vec![
+            item_with_dates(ItemStatus::Downloaded, Some(now - 10 * DAY_SECS)),
+            item_with_dates(ItemStatus::Cloud, Some(now - 40 * DAY_SECS)),
+        ];
 
         let counts = section_counts(&catalog, now, 30);
 
@@ -500,8 +525,10 @@ mod tests {
     #[test]
     fn section_counts_recently_updated_respects_a_non_default_window() {
         let now = 1_800_000_000;
-        let catalog = vec![item_with_dates(ItemStatus::Downloaded, Some(now - 10 * DAY_SECS)),
-                           item_with_dates(ItemStatus::Cloud, Some(now - 40 * DAY_SECS)),];
+        let catalog = vec![
+            item_with_dates(ItemStatus::Downloaded, Some(now - 10 * DAY_SECS)),
+            item_with_dates(ItemStatus::Cloud, Some(now - 40 * DAY_SECS)),
+        ];
 
         // A 7-day window excludes the item that a 30-day default includes.
         let counts = section_counts(&catalog, now, 7);

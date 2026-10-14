@@ -9,7 +9,7 @@ use thiserror::Error;
 /// A single internal entry of a previewed Zip archive.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ZipEntry {
-    pub name:       String,
+    pub name: String,
     pub size_bytes: u64,
 }
 
@@ -40,10 +40,13 @@ pub fn list_entries(path: &Path) -> Result<Vec<ZipEntry>, ZipPreviewError> {
 
     let mut entries = Vec::with_capacity(archive.len());
     for i in 0..archive.len() {
-        let entry = archive.by_index_raw(i)
-                           .map_err(|_| ZipPreviewError::InvalidArchive)?;
-        entries.push(ZipEntry { name:       entry.name().to_string(),
-                                size_bytes: entry.size(), });
+        let entry = archive
+            .by_index_raw(i)
+            .map_err(|_| ZipPreviewError::InvalidArchive)?;
+        entries.push(ZipEntry {
+            name: entry.name().to_string(),
+            size_bytes: entry.size(),
+        });
     }
     Ok(entries)
 }
@@ -90,8 +93,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("missing.zip");
 
-        assert_eq!(list_entries(&path),
-                   Err(ZipPreviewError::NotFound(path.display().to_string())));
+        assert_eq!(
+            list_entries(&path),
+            Err(ZipPreviewError::NotFound(path.display().to_string()))
+        );
     }
 
     #[test]

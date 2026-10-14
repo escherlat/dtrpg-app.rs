@@ -27,10 +27,10 @@ use crate::util::text::truncate_with_ellipsis;
 /// toolbar/keyboard-driven selection.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ViewMenuState {
-    pub presentation:   CatalogPresentation,
-    pub sort:           SortMethod,
+    pub presentation: CatalogPresentation,
+    pub sort: SortMethod,
     pub sort_direction: SortDirection,
-    pub grouped:        bool,
+    pub grouped: bool,
 }
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
@@ -39,10 +39,9 @@ pub struct ViewMenuState {
 /// a service that reflects the unauthenticated state without crashing.
 ///
 /// Set this global before calling [`setup`].
-pub struct ServiceFactory(pub  Box<dyn Fn(Option<LoginTokens>) -> Box<dyn LibraryService>
-                                       + Send
-                                       + Sync
-                                       + 'static>);
+pub struct ServiceFactory(
+    pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn LibraryService> + Send + Sync + 'static>,
+);
 
 impl Global for ServiceFactory {}
 
@@ -52,11 +51,9 @@ impl Global for ServiceFactory {}
 /// a service that reflects the unauthenticated state without crashing.
 ///
 /// Set this global before calling [`setup`].
-pub struct CollectionsServiceFactory(pub  Box<dyn Fn(Option<LoginTokens>)
-                                                     -> Box<dyn CollectionsService>
-                                                  + Send
-                                                  + Sync
-                                                  + 'static>);
+pub struct CollectionsServiceFactory(
+    pub Box<dyn Fn(Option<LoginTokens>) -> Box<dyn CollectionsService> + Send + Sync + 'static>,
+);
 
 impl Global for CollectionsServiceFactory {}
 
@@ -77,7 +74,7 @@ impl Global for LoginServiceFactory {}
 /// `ShowSettings`/`ShowActivity`/ `ShowAlertHistory`/`AddCollection` fallbacks
 /// below.
 struct LibraryWindowHandle {
-    view:   Entity<LibraryRootView>,
+    view: Entity<LibraryRootView>,
     window: WindowHandle<Root>,
 }
 
@@ -140,17 +137,25 @@ pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
 /// currently connected display.
 fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
     let saved = UiState::load().library_window_bounds()?;
-    let bounds = Bounds { origin: Point { x: px(saved.x),
-                                          y: px(saved.y), },
-                          size:   Size { width:  px(saved.width),
-                                         height: px(saved.height), }, };
+    let bounds = Bounds {
+        origin: Point {
+            x: px(saved.x),
+            y: px(saved.y),
+        },
+        size: Size {
+            width: px(saved.width),
+            height: px(saved.height),
+        },
+    };
     let display_bounds: Vec<_> = cx.displays().iter().map(|d| d.bounds()).collect();
     let fits_a_display = display_bounds.iter().any(|db| bounds.intersects(db));
-    debug!(?saved,
-           ?bounds,
-           ?display_bounds,
-           fits_a_display,
-           "restoring library window bounds");
+    debug!(
+        ?saved,
+        ?bounds,
+        ?display_bounds,
+        fits_a_display,
+        "restoring library window bounds"
+    );
     fits_a_display.then_some(WindowBounds::Windowed(bounds))
 }
 
@@ -164,14 +169,12 @@ fn restore_library_window_bounds(cx: &App) -> Option<WindowBounds> {
 pub fn save_library_window_bounds(window: &Window) {
     let bounds = window.bounds();
     debug!(?bounds, "saving library window bounds");
-    UiState::load().save_library_window_bounds(WindowBoundsPref { x:      bounds.origin.x.as_f32(),
-                                                                  y:      bounds.origin.y.as_f32(),
-                                                                  width:  bounds.size
-                                                                                .width
-                                                                                .as_f32(),
-                                                                  height: bounds.size
-                                                                                .height
-                                                                                .as_f32(), });
+    UiState::load().save_library_window_bounds(WindowBoundsPref {
+        x: bounds.origin.x.as_f32(),
+        y: bounds.origin.y.as_f32(),
+        width: bounds.size.width.as_f32(),
+        height: bounds.size.height.as_f32(),
+    });
 }
 
 /// Opens the settings window as a separate, non-modal window.
@@ -187,59 +190,61 @@ pub fn save_library_window_bounds(window: &Window) {
 ///
 /// Panics if the window cannot be opened.
 #[allow(clippy::expect_used)]
-pub fn open_settings_window(settings: Entity<SettingsController>,
-                            library: Entity<crate::controllers::library::LibraryController>,
-                            file_opener_extension_input: Entity<InputState>, cx: &mut App)
-                            -> WindowHandle<Root> {
+pub fn open_settings_window(
+    settings: Entity<SettingsController>,
+    library: Entity<crate::controllers::library::LibraryController>,
+    file_opener_extension_input: Entity<InputState>, cx: &mut App,
+) -> WindowHandle<Root> {
     let settings_for_close = settings.clone();
-    let window_size = Size { width:  px(720.),
-                             height: px(520.), };
-    cx.open_window(WindowOptions { // `appears_transparent: true` hides the native opaque title
-                                   // bar and title text (same
-                                   // pattern as the main library window's
-                                   // `title_bar_view.rs`) while keeping the macOS traffic-light
-                                   // window controls, which `titlebar: None` removes entirely on
-                                   // this platform (there is no dedicated close-only chrome
-                                   // option
-                                   // in gpui). `is_minimizable: false` and `is_resizable: false`
-                                   // disable the minimize and zoom buttons, leaving only close —
-                                   // resizing is no longer needed now that the panel content
-                                   // scrolls (see `settings_view::render_settings_panel`).
-                                   titlebar: Some(TitlebarOptions { appears_transparent:
-                                                                        true,
-                                                                    // Vertically centers the
-                                                                    // traffic lights within
-                                                                    // `settings_view.rs`'s
-                                                                    // 28px-tall `settings-drag-region`
-                                                                    // —
-                                                                    // see the main window's
-                                                                    // equivalent comment in
-                                                                    // `open_library_window`
-                                                                    // for the (28 - 16) / 2
-                                                                    // math.
-                                                                    traffic_light_position:
-                                                                        Some(point(px(12.0),
-                                                                                   px(6.0))),
-                                                                    ..Default::default() }),
-                                   window_bounds: Some(WindowBounds::centered(window_size, cx)),
-                                   is_resizable: false,
-                                   is_minimizable: false,
-                                   ..Default::default() },
-                   move |window, cx| {
-                       window.on_window_should_close(cx, move |_window, cx| {
-                                 settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
-                                 true
-                             });
-                       let view = cx.new(|cx| {
-                                        SettingsWindowView::new(window,
-                                                                cx,
-                                                                settings,
-                                                                library,
-                                                                file_opener_extension_input)
-                                    });
-                       cx.new(|cx| Root::new(view, window, cx).bordered(false))
-                   })
-      .expect("failed to open settings window")
+    let window_size = Size {
+        width: px(720.),
+        height: px(520.),
+    };
+    cx.open_window(
+        WindowOptions {
+            // `appears_transparent: true` hides the native opaque title
+            // bar and title text (same
+            // pattern as the main library window's
+            // `title_bar_view.rs`) while keeping the macOS traffic-light
+            // window controls, which `titlebar: None` removes entirely on
+            // this platform (there is no dedicated close-only chrome
+            // option
+            // in gpui). `is_minimizable: false` and `is_resizable: false`
+            // disable the minimize and zoom buttons, leaving only close —
+            // resizing is no longer needed now that the panel content
+            // scrolls (see `settings_view::render_settings_panel`).
+            titlebar: Some(TitlebarOptions {
+                appears_transparent: true,
+                // Vertically centers the
+                // traffic lights within
+                // `settings_view.rs`'s
+                // 28px-tall `settings-drag-region`
+                // —
+                // see the main window's
+                // equivalent comment in
+                // `open_library_window`
+                // for the (28 - 16) / 2
+                // math.
+                traffic_light_position: Some(point(px(12.0), px(6.0))),
+                ..Default::default()
+            }),
+            window_bounds: Some(WindowBounds::centered(window_size, cx)),
+            is_resizable: false,
+            is_minimizable: false,
+            ..Default::default()
+        },
+        move |window, cx| {
+            window.on_window_should_close(cx, move |_window, cx| {
+                settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
+                true
+            });
+            let view = cx.new(|cx| {
+                SettingsWindowView::new(window, cx, settings, library, file_opener_extension_input)
+            });
+            cx.new(|cx| Root::new(view, window, cx).bordered(false))
+        },
+    )
+    .expect("failed to open settings window")
 }
 
 /// Initializes the GPUI application and routes to the login or library window.
@@ -257,30 +262,32 @@ pub fn setup(cx: &mut App) {
     // theme is active.
     let initial_theme = cx.global::<crate::data::theme::LibriTheme>().clone();
     cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
-          theme.font_family = initial_theme.fonts.body_font.clone();
-          crate::data::theme::apply_theme_colors(theme, &initial_theme.colors);
-      });
+        theme.font_family = initial_theme.fonts.body_font.clone();
+        crate::data::theme::apply_theme_colors(theme, &initial_theme.colors);
+    });
 
     // Key bindings
-    cx.bind_keys([KeyBinding::new("cmd-q", Quit, None),
-                  KeyBinding::new("cmd-,", ShowSettings, None),
-                  KeyBinding::new("cmd-h", HideApplication, None),
-                  KeyBinding::new("alt-cmd-h", HideOthers, None),
-                  KeyBinding::new("cmd-m", Minimize, None),
-                  KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
-                  KeyBinding::new("cmd-shift-n", AddCollection, None),
-                  KeyBinding::new("cmd-r", ReloadCatalog, None),
-                  KeyBinding::new("cmd-shift-r", RefreshThumbnails, None),
-                  KeyBinding::new("cmd-0", SelectTab0, None),
-                  KeyBinding::new("cmd-1", SelectTab1, None),
-                  KeyBinding::new("cmd-2", SelectTab2, None),
-                  KeyBinding::new("cmd-3", SelectTab3, None),
-                  KeyBinding::new("cmd-4", SelectTab4, None),
-                  KeyBinding::new("cmd-5", SelectTab5, None),
-                  KeyBinding::new("cmd-6", SelectTab6, None),
-                  KeyBinding::new("cmd-7", SelectTab7, None),
-                  KeyBinding::new("cmd-8", SelectTab8, None),
-                  KeyBinding::new("cmd-9", SelectTab9, None)]);
+    cx.bind_keys([
+        KeyBinding::new("cmd-q", Quit, None),
+        KeyBinding::new("cmd-,", ShowSettings, None),
+        KeyBinding::new("cmd-h", HideApplication, None),
+        KeyBinding::new("alt-cmd-h", HideOthers, None),
+        KeyBinding::new("cmd-m", Minimize, None),
+        KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
+        KeyBinding::new("cmd-shift-n", AddCollection, None),
+        KeyBinding::new("cmd-r", ReloadCatalog, None),
+        KeyBinding::new("cmd-shift-r", RefreshThumbnails, None),
+        KeyBinding::new("cmd-0", SelectTab0, None),
+        KeyBinding::new("cmd-1", SelectTab1, None),
+        KeyBinding::new("cmd-2", SelectTab2, None),
+        KeyBinding::new("cmd-3", SelectTab3, None),
+        KeyBinding::new("cmd-4", SelectTab4, None),
+        KeyBinding::new("cmd-5", SelectTab5, None),
+        KeyBinding::new("cmd-6", SelectTab6, None),
+        KeyBinding::new("cmd-7", SelectTab7, None),
+        KeyBinding::new("cmd-8", SelectTab8, None),
+        KeyBinding::new("cmd-9", SelectTab9, None),
+    ]);
 
     // App-level action handlers
     cx.on_action::<Quit>(|_, cx| cx.quit());
@@ -294,21 +301,21 @@ pub fn setup(cx: &mut App) {
     // `LibraryRootView`'s `ReportFeatureBug` handler.
     cx.on_action::<ReportFeatureBug>(|_, _cx| {});
     cx.on_action::<Minimize>(|_, cx| {
-          if let Some(win) = cx.active_window() {
-              win.update(cx, |_, window, _| window.minimize_window()).ok();
-          }
-      });
+        if let Some(win) = cx.active_window() {
+            win.update(cx, |_, window, _| window.minimize_window()).ok();
+        }
+    });
     cx.on_action::<Zoom>(|_, cx| {
-          if let Some(win) = cx.active_window() {
-              win.update(cx, |_, window, _| window.zoom_window()).ok();
-          }
-      });
+        if let Some(win) = cx.active_window() {
+            win.update(cx, |_, window, _| window.zoom_window()).ok();
+        }
+    });
     cx.on_action::<ToggleFullscreen>(|_, cx| {
-          if let Some(win) = cx.active_window() {
-              win.update(cx, |_, window, _| window.toggle_fullscreen())
-                 .ok();
-          }
-      });
+        if let Some(win) = cx.active_window() {
+            win.update(cx, |_, window, _| window.toggle_fullscreen())
+                .ok();
+        }
+    });
     // The following fallbacks always keep Settings/Activity/Alert
     // History/Add Collection enabled in the native menu, regardless of which
     // element in the library window currently owns keyboard focus (native
@@ -318,43 +325,51 @@ pub fn setup(cx: &mut App) {
     // primary path and run first; these only fire when nothing in the
     // window's dispatch path claims the action.
     cx.on_action::<ShowSettings>(|_, cx| {
-          let Some(view) = cx.try_global::<LibraryWindowHandle>()
-                             .map(|h| h.view.clone())
-          else {
-              return;
-          };
-          view.update(cx, |view, cx| view.show_settings(cx));
-      });
+        let Some(view) = cx
+            .try_global::<LibraryWindowHandle>()
+            .map(|h| h.view.clone())
+        else {
+            return;
+        };
+        view.update(cx, |view, cx| view.show_settings(cx));
+    });
     cx.on_action::<ShowActivity>(|_, cx| {
-          let Some(view) = cx.try_global::<LibraryWindowHandle>()
-                             .map(|h| h.view.clone())
-          else {
-              return;
-          };
-          view.update(cx, |view, cx| view.show_activity(cx));
-      });
+        let Some(view) = cx
+            .try_global::<LibraryWindowHandle>()
+            .map(|h| h.view.clone())
+        else {
+            return;
+        };
+        view.update(cx, |view, cx| view.show_activity(cx));
+    });
     cx.on_action::<ShowAlertHistory>(|_, cx| {
-          let Some(view) = cx.try_global::<LibraryWindowHandle>()
-                             .map(|h| h.view.clone())
-          else {
-              return;
-          };
-          view.update(cx, |view, cx| view.show_alert_history(cx));
-      });
+        let Some(view) = cx
+            .try_global::<LibraryWindowHandle>()
+            .map(|h| h.view.clone())
+        else {
+            return;
+        };
+        view.update(cx, |view, cx| view.show_alert_history(cx));
+    });
     cx.on_action::<AddCollection>(|_, cx| {
-          let Some((view, window)) = cx.try_global::<LibraryWindowHandle>()
-                                       .map(|h| (h.view.clone(), h.window))
-          else {
-              return;
-          };
-          window.update(cx, |_, window, cx| {
-                    view.update(cx, |view, cx| view.show_add_collection_dialog(window, cx));
-                })
-                .ok();
-      });
+        let Some((view, window)) = cx
+            .try_global::<LibraryWindowHandle>()
+            .map(|h| (h.view.clone(), h.window))
+        else {
+            return;
+        };
+        window
+            .update(cx, |_, window, cx| {
+                view.update(cx, |view, cx| view.show_add_collection_dialog(window, cx));
+            })
+            .ok();
+    });
 
     // Menu bar
-    cx.set_menus(build_menus(&ViewMenuState::default(), &TabsController::new().snapshot()));
+    cx.set_menus(build_menus(
+        &ViewMenuState::default(),
+        &TabsController::new().snapshot(),
+    ));
 
     let startup_api_key = match KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
     {
@@ -385,7 +400,9 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
     // the named variants the menu offers; map each back to the menu item it
     // corresponds to so the checkmark still tracks column-driven sorts.
     let normalized_sort = match state.sort {
-        SortMethod::Custom { col_key: "publisher", } => Some(SortMethod::Publisher),
+        SortMethod::Custom {
+            col_key: "publisher",
+        } => Some(SortMethod::Publisher),
         SortMethod::Custom { col_key: "added" } => Some(SortMethod::DateAdded),
         SortMethod::Custom { col_key: "pages" } => Some(SortMethod::PageCount),
         SortMethod::Custom { .. } => None,
@@ -400,19 +417,28 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
     // this position is the currently active tab.
     let tab_label = |position: usize| -> (SharedString, bool, bool) {
         match tabs.open_tabs.get(position) {
-            Some(target @ TabTarget::Catalog) => {
-                (t!("tabs.catalog_tab").to_string().into(), true, *target == tabs.active)
-            }
+            Some(target @ TabTarget::Catalog) => (
+                t!("tabs.catalog_tab").to_string().into(),
+                true,
+                *target == tabs.active,
+            ),
             Some(target @ TabTarget::Detail(id)) => {
-                let title = tabs.titles
-                                .get(id)
-                                .cloned()
-                                .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
-                (truncate_with_ellipsis(&title, DETAIL_TAB_TITLE_MAX_CHARS).into(),
-                 true,
-                 *target == tabs.active)
+                let title = tabs
+                    .titles
+                    .get(id)
+                    .cloned()
+                    .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
+                (
+                    truncate_with_ellipsis(&title, DETAIL_TAB_TITLE_MAX_CHARS).into(),
+                    true,
+                    *target == tabs.active,
+                )
             }
-            None => (t!("menu.window_select_tab_empty").to_string().into(), false, false),
+            None => (
+                t!("menu.window_select_tab_empty").to_string().into(),
+                false,
+                false,
+            ),
         }
     };
 

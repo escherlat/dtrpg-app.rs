@@ -30,13 +30,12 @@ pub(crate) const MAX_CONCURRENT_DOWNLOADS: usize = 5;
 /// `storage_path_exists` is `false`, and an editable field for the shared
 /// thumbnail/download concurrency limit.
 #[allow(clippy::too_many_arguments)]
-pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: bool,
-                              entity: Entity<SettingsController>, colors: &ColorTokens,
-                              storage_path_input: Option<Entity<InputState>>,
-                              max_concurrent_downloads: usize,
-                              max_concurrent_downloads_input: Option<Entity<InputState>>,
-                              create_collections: bool)
-                              -> impl IntoElement + 'static + use<> {
+pub fn render_storage_section(
+    storage_root_path: PathBuf, storage_path_exists: bool, entity: Entity<SettingsController>,
+    colors: &ColorTokens, storage_path_input: Option<Entity<InputState>>,
+    max_concurrent_downloads: usize, max_concurrent_downloads_input: Option<Entity<InputState>>,
+    create_collections: bool,
+) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
@@ -157,74 +156,95 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
 
     // ── Missing-path warning ──────────────────────────────────────────────
     if !storage_path_exists {
-        section = section.child(div().rounded(px(6.0))
-                                     .px(px(10.0))
-                                     .py(px(6.0))
-                                     .bg(warning_bg)
-                                     .flex()
-                                     .items_center()
-                                     .gap(px(6.0))
-                                     .child(div().text_sm().text_color(warning_text).child("⚠"))
-                                     .child(div().text_xs()
-                                                 .text_color(warning_text)
-                                                 .child(t!("settings.storage_missing"))));
+        section = section.child(
+            div()
+                .rounded(px(6.0))
+                .px(px(10.0))
+                .py(px(6.0))
+                .bg(warning_bg)
+                .flex()
+                .items_center()
+                .gap(px(6.0))
+                .child(div().text_sm().text_color(warning_text).child("⚠"))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(warning_text)
+                        .child(t!("settings.storage_missing")),
+                ),
+        );
     }
 
     section
-           // ── Divider ───────────────────────────────────────────────────────
-           .child(div().h(px(1.0)).bg(border))
-           // ── Note ─────────────────────────────────────────────────────────
-           .child(div().text_xs()
-                       .text_color(warning_text)
-                       .child(format!("\u{26A0} {}", t!("settings.storage_note"))))
-           // ── Divider ───────────────────────────────────────────────────────
-           .child(div().h(px(1.0)).bg(border))
-           // ── Concurrency field ─────────────────────────────────────────────
-           .child(render_concurrency_row(max_concurrent_downloads,
-                                         max_concurrent_downloads_input,
-                                         colors))
-           // ── Divider ───────────────────────────────────────────────────────
-           .child(div().h(px(1.0)).bg(border))
-           // ── Create collections toggle ───────────────────────────────────
-           .child(render_create_collections_toggle(create_collections, entity, colors))
+        // ── Divider ───────────────────────────────────────────────────────
+        .child(div().h(px(1.0)).bg(border))
+        // ── Note ─────────────────────────────────────────────────────────
+        .child(
+            div()
+                .text_xs()
+                .text_color(warning_text)
+                .child(format!("\u{26A0} {}", t!("settings.storage_note"))),
+        )
+        // ── Divider ───────────────────────────────────────────────────────
+        .child(div().h(px(1.0)).bg(border))
+        // ── Concurrency field ─────────────────────────────────────────────
+        .child(render_concurrency_row(
+            max_concurrent_downloads,
+            max_concurrent_downloads_input,
+            colors,
+        ))
+        // ── Divider ───────────────────────────────────────────────────────
+        .child(div().h(px(1.0)).bg(border))
+        // ── Create collections toggle ───────────────────────────────────
+        .child(render_create_collections_toggle(
+            create_collections,
+            entity,
+            colors,
+        ))
 }
 
 /// Renders the "Create collections" toggle row: a label/note pair and a
 /// switch, matching the layout style used for the concurrency stepper above.
-fn render_create_collections_toggle(create_collections: bool,
-                                    entity: Entity<SettingsController>, colors: &ColorTokens)
-                                    -> impl IntoElement + 'static + use<> {
+fn render_create_collections_toggle(
+    create_collections: bool, entity: Entity<SettingsController>, colors: &ColorTokens,
+) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
 
-    div().flex()
-         .flex_col()
-         .gap(px(6.0))
-         .child(
-             div().flex()
-                 .items_center()
-                 .justify_between()
-                 .child(
-                     div().text_sm()
-                         .font_weight(gpui::FontWeight::SEMIBOLD)
-                         .text_color(text_primary)
-                         .child(t!("settings.create_collections_title")),
-                 )
-                 .child(
-                     Switch::new("create-collections")
-                         .checked(create_collections)
-                         .tooltip(t!("settings.create_collections_tooltip").to_string())
-                         .on_click(move |checked, _window, cx| {
-                             let checked = *checked;
-                             entity.update(cx, |ctrl, cx| {
-                                       ctrl.set_create_collections(checked, cx);
-                                   });
-                         }),
-                 ),
-         )
-         .child(div().text_xs()
-                     .text_color(text_secondary)
-                     .child(create_collections_note()))
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(6.0))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(text_primary)
+                        .child(t!("settings.create_collections_title")),
+                )
+                .child(
+                    Switch::new("create-collections")
+                        .checked(create_collections)
+                        .tooltip(t!("settings.create_collections_tooltip").to_string())
+                        .on_click(move |checked, _window, cx| {
+                            let checked = *checked;
+                            entity.update(cx, |ctrl, cx| {
+                                ctrl.set_create_collections(checked, cx);
+                            });
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(text_secondary)
+                .child(create_collections_note()),
+        )
 }
 
 /// Returns the "Create collections" note text, appending the Windows
@@ -232,9 +252,11 @@ fn render_create_collections_toggle(create_collections: bool,
 /// to macOS or Linux, where symlink creation needs no elevated privilege.
 fn create_collections_note() -> String {
     #[cfg(target_os = "windows")]
-    return format!("{} {}",
-                   t!("settings.create_collections_note"),
-                   t!("settings.create_collections_note_windows"));
+    return format!(
+        "{} {}",
+        t!("settings.create_collections_note"),
+        t!("settings.create_collections_note_windows")
+    );
     #[cfg(not(target_os = "windows"))]
     t!("settings.create_collections_note").to_string()
 }
@@ -247,33 +269,40 @@ fn create_collections_note() -> String {
 /// Falls back to a plain, non-editable value when `input` is `None` (before
 /// the root view attaches the shared input state), matching the pattern used
 /// for `recently_updated_window_input` in `settings_advanced_view`.
-fn render_concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<InputState>>,
-                          colors: &ColorTokens)
-                          -> impl IntoElement + 'static + use<> {
+fn render_concurrency_row(
+    max_concurrent_downloads: usize, input: Option<Entity<InputState>>, colors: &ColorTokens,
+) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
 
     let field: AnyElement = if let Some(input_state) = input {
         NumberInput::new(&input_state).into_any_element()
-    }
-    else {
-        div().text_sm()
-             .text_color(text_primary)
-             .child(max_concurrent_downloads.to_string())
-             .into_any_element()
+    } else {
+        div()
+            .text_sm()
+            .text_color(text_primary)
+            .child(max_concurrent_downloads.to_string())
+            .into_any_element()
     };
 
-    div().flex()
-         .flex_col()
-         .gap(px(6.0))
-         .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .text_color(text_primary)
-                     .child(t!("settings.max_concurrent_downloads_title")))
-         .child(div().w(px(140.0)).child(field))
-         .child(div().text_xs()
-                     .text_color(text_secondary)
-                     .child(t!("settings.max_concurrent_downloads_note")))
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(6.0))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(text_primary)
+                .child(t!("settings.max_concurrent_downloads_title")),
+        )
+        .child(div().w(px(140.0)).child(field))
+        .child(
+            div()
+                .text_xs()
+                .text_color(text_secondary)
+                .child(t!("settings.max_concurrent_downloads_note")),
+        )
 }
 
 // ── Helpers

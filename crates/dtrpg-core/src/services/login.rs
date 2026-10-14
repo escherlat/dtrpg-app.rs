@@ -10,7 +10,7 @@ use crate::constants::API_BASE_URL_ENV;
 /// [`LoginService`] implementation backed by the DriveThruRPG SDK auth
 /// endpoint.
 pub struct SdkLoginService {
-    config:  Config,
+    config: Config,
     runtime: Runtime,
 }
 
@@ -43,14 +43,16 @@ impl LoginService for SdkLoginService {
         let password = password.to_string();
         let config = self.config.clone();
         self.runtime
-            .block_on(credential_login::login_with_credentials(&email, &password, &config))
+            .block_on(credential_login::login_with_credentials(
+                &email, &password, &config,
+            ))
             .map_err(|e| match e {
                 ClientError::InvalidCredentials => {
                     LoginError("Invalid email or password.".to_owned())
                 }
-                ClientError::ApplicationKeyRequestFailed { status } => {
-                    LoginError(format!("Sign-in failed: server returned status '{status}'."))
-                }
+                ClientError::ApplicationKeyRequestFailed { status } => LoginError(format!(
+                    "Sign-in failed: server returned status '{status}'."
+                )),
                 ClientError::Http(err) => {
                     LoginError(format!("Network error during sign-in: {err}"))
                 }
@@ -63,9 +65,11 @@ impl LoginService for SdkLoginService {
         let key = api_key.to_string();
         self.runtime
             .block_on(key_exchange::authenticate(&key, &config))
-            .map(|r| LoginTokens { access_token:      r.token,
-                                   refresh_token:     r.refresh_token,
-                                   refresh_token_ttl: r.refresh_token_ttl, })
+            .map(|r| LoginTokens {
+                access_token: r.token,
+                refresh_token: r.refresh_token,
+                refresh_token_ttl: r.refresh_token_ttl,
+            })
             .map_err(|e| LoginError(format!("Authentication failed: {e}")))
     }
 }

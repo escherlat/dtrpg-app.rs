@@ -16,8 +16,9 @@ pub fn on_disk_file_size(entry_dir: &Path, file_name: &str) -> Option<u64> {
     if file_name.is_empty() {
         return None;
     }
-    std::fs::metadata(entry_dir.join(file_name)).ok()
-                                                .map(|m| m.len())
+    std::fs::metadata(entry_dir.join(file_name))
+        .ok()
+        .map(|m| m.len())
 }
 
 /// Formats a byte count as a `"{:.1} MB"`-style string, matching the
@@ -34,8 +35,10 @@ pub fn format_bytes(bytes: u64) -> String {
 /// supplementary detail, not a replacement (see `detail-file-size-on-disk`).
 pub fn with_on_disk_suffix(catalog_size: String, on_disk_bytes: Option<u64>) -> String {
     match on_disk_bytes {
-        Some(bytes) => format!("{catalog_size} {}",
-                               t!("detail.on_disk_suffix", size = format_bytes(bytes))),
+        Some(bytes) => format!(
+            "{catalog_size} {}",
+            t!("detail.on_disk_suffix", size = format_bytes(bytes))
+        ),
         None => catalog_size,
     }
 }
@@ -65,8 +68,7 @@ mod tests {
         let dir = std::env::temp_dir().join("dtrpg_on_disk_file_size_present_test");
         let _ = std::fs::create_dir_all(&dir);
         let file_path = dir.join("book.pdf");
-        let Ok(mut file) = File::create(&file_path)
-        else {
+        let Ok(mut file) = File::create(&file_path) else {
             return;
         };
         let _ = file.write_all(b"0123456789");

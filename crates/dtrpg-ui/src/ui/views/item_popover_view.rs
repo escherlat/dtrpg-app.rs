@@ -38,10 +38,10 @@ use crate::util::datetime::{format_absolute, format_relative};
 /// are responsible for computing it (see
 /// `catalog_view::popover_anchor_point`) so the popover sits beside the
 /// catalog entry rather than over it.
-pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
-                           entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-                           colors: &ColorTokens, is_checking: bool, is_verifying: bool)
-                           -> AnyElement {
+pub fn render_item_popover(
+    item: &LibraryItem, position: Point<Pixels>, entity: Entity<LibraryController>,
+    tabs: Entity<TabsController>, colors: &ColorTokens, is_checking: bool, is_verifying: bool,
+) -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
     let text_primary = colors.text_primary;
@@ -202,22 +202,25 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                                     let id = Arc::clone(&id);
                                     alert
                                         .confirm()
-                                        .title(t!("catalog.remove_download_confirm_title",
-                                                   title = remove_title.clone())
-                                            .to_string())
+                                        .title(
+                                            t!(
+                                                "catalog.remove_download_confirm_title",
+                                                title = remove_title.clone()
+                                            )
+                                            .to_string(),
+                                        )
                                         .description(
                                             t!("catalog.remove_download_confirm_description")
                                                 .to_string(),
                                         )
                                         .on_ok(move |_, _window, cx| {
                                             entity_download.update(cx, |ctrl, cx| {
-                                                              ctrl.remove_download(&id, cx)
-                                                          });
+                                                ctrl.remove_download(&id, cx)
+                                            });
                                             true
                                         })
                                 });
-                            }
-                            else {
+                            } else {
                                 entity_download.update(cx, |ctrl, cx| {
                                     ctrl.request_download(&id, item_title_for_download.clone(), cx);
                                 });
@@ -249,10 +252,14 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                 ),
         );
 
-    deferred(anchored().snap_to_window_with_margin(px(ITEM_POPOVER_MARGIN))
-                       .position(position)
-                       .child(content)).with_priority(1)
-                                       .into_any_element()
+    deferred(
+        anchored()
+            .snap_to_window_with_margin(px(ITEM_POPOVER_MARGIN))
+            .position(position)
+            .child(content),
+    )
+    .with_priority(1)
+    .into_any_element()
 }
 
 /// Returns the icon for the popover's download action button: a checkmark
@@ -260,8 +267,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
 fn download_button_icon(is_downloaded: bool) -> IconName {
     if is_downloaded {
         IconName::CircleCheck
-    }
-    else {
+    } else {
         IconName::ArrowDown
     }
 }

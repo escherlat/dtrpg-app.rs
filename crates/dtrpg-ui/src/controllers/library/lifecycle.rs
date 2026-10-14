@@ -13,71 +13,72 @@ impl LibraryController {
     /// # Panics
     ///
     /// Does not panic; service errors are reflected in [`pane_state`].
-    pub fn new(service: Box<dyn LibraryService>,
-               collections_service: Box<dyn CollectionsService>,
-               activity: Entity<ActivityController>, cx: &mut Context<Self>)
-               -> Self {
+    pub fn new(
+        service: Box<dyn LibraryService>, collections_service: Box<dyn CollectionsService>,
+        activity: Entity<ActivityController>, cx: &mut Context<Self>,
+    ) -> Self {
         let vm = LibraryViewModel::new(service);
         let prefs = crate::data::ui_preferences::UiPreferences::load();
         let view_prefs = crate::data::file_openers::CatalogViewPrefs::load();
         let storage = StorageConfig::load();
 
-        let mut ctrl =
-            Self { vm,
-                   activity,
-                   catalog: Vec::new(),
-                   filter: view_prefs.to_filter(),
-                   search_query: String::new(),
-                   sort: view_prefs.to_sort(),
-                   sort_direction: SortDirection::default(),
-                   collection_sort: prefs.collection_sort(),
-                   collection_sort_direction: prefs.collection_sort_direction(),
-                   grouped: view_prefs.grouped.unwrap_or(false),
-                   presentation: view_prefs.to_presentation(),
-                   selection: Selection::default(),
-                   section_counts: SectionCounts::default(),
-                   publishers: Vec::new(),
-                   collections: Vec::new(),
-                   collections_loaded: false,
-                   collections_service: Arc::from(collections_service),
-                   collection_members: HashSet::new(),
-                   thumbnail_queue: VecDeque::new(),
-                   active_thumbnail_fetches: 0,
-                   thumbnail_activity_id: None,
-                   thumbnail_processed: 0,
-                   thumbnail_refresh_active: false,
-                   thumbnail_refresh_pending: HashSet::new(),
-                   thumbnail_refresh_succeeded: 0,
-                   thumbnail_refresh_failed: 0,
-                   catalog_loading: true,
-                   load_generation: 0,
-                   catalog_sync_in_flight: false,
-                   pending_reload: false,
-                   network_monitor: Arc::new(NetworkMonitor::new()),
-                   items_cache: None,
-                   publisher_search_open: false,
-                   publisher_search_query: String::new(),
-                   collection_search_open: false,
-                   collection_search_query: String::new(),
-                   detail_panel_width: crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
-                   entry_bounds: HashMap::new(),
-                   selected_item_file: HashMap::new(),
-                   other_details_open: HashMap::new(),
-                   file_other_details_open: HashMap::new(),
-                   zip_preview: None,
-                   file_info_cache: HashMap::new(),
-                   checking_items: HashSet::new(),
-                   verifying_downloads: HashSet::new(),
-                   check_queue: VecDeque::new(),
-                   download_queue: VecDeque::new(),
-                   active_downloads: 0,
-                   download_cancel_flags: HashMap::new(),
-                   download_activity_ids: HashMap::new(),
-                   max_concurrent_downloads: storage.max_concurrent_downloads(),
-                   recently_updated_window_days: storage.recently_updated_window_days(),
-                   pending_download: None,
-                   bulk_selection_mode: false,
-                   bulk_selected_ids: HashSet::new() };
+        let mut ctrl = Self {
+            vm,
+            activity,
+            catalog: Vec::new(),
+            filter: view_prefs.to_filter(),
+            search_query: String::new(),
+            sort: view_prefs.to_sort(),
+            sort_direction: SortDirection::default(),
+            collection_sort: prefs.collection_sort(),
+            collection_sort_direction: prefs.collection_sort_direction(),
+            grouped: view_prefs.grouped.unwrap_or(false),
+            presentation: view_prefs.to_presentation(),
+            selection: Selection::default(),
+            section_counts: SectionCounts::default(),
+            publishers: Vec::new(),
+            collections: Vec::new(),
+            collections_loaded: false,
+            collections_service: Arc::from(collections_service),
+            collection_members: HashSet::new(),
+            thumbnail_queue: VecDeque::new(),
+            active_thumbnail_fetches: 0,
+            thumbnail_activity_id: None,
+            thumbnail_processed: 0,
+            thumbnail_refresh_active: false,
+            thumbnail_refresh_pending: HashSet::new(),
+            thumbnail_refresh_succeeded: 0,
+            thumbnail_refresh_failed: 0,
+            catalog_loading: true,
+            load_generation: 0,
+            catalog_sync_in_flight: false,
+            pending_reload: false,
+            network_monitor: Arc::new(NetworkMonitor::new()),
+            items_cache: None,
+            publisher_search_open: false,
+            publisher_search_query: String::new(),
+            collection_search_open: false,
+            collection_search_query: String::new(),
+            detail_panel_width: crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
+            entry_bounds: HashMap::new(),
+            selected_item_file: HashMap::new(),
+            other_details_open: HashMap::new(),
+            file_other_details_open: HashMap::new(),
+            zip_preview: None,
+            file_info_cache: HashMap::new(),
+            checking_items: HashSet::new(),
+            verifying_downloads: HashSet::new(),
+            check_queue: VecDeque::new(),
+            download_queue: VecDeque::new(),
+            active_downloads: 0,
+            download_cancel_flags: HashMap::new(),
+            download_activity_ids: HashMap::new(),
+            max_concurrent_downloads: storage.max_concurrent_downloads(),
+            recently_updated_window_days: storage.recently_updated_window_days(),
+            pending_download: None,
+            bulk_selection_mode: false,
+            bulk_selected_ids: HashSet::new(),
+        };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
@@ -95,21 +96,22 @@ impl LibraryController {
     /// once the controller entity is dropped (`this.update` starts failing).
     pub(super) fn start_periodic_check_batch_timer(&self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
-              loop {
-                  async_cx
+            loop {
+                async_cx
                     .background_executor()
                     .timer(std::time::Duration::from_secs(
                         crate::data::constants::ITEM_CHECK_BATCH_TIMER_SECS,
                     ))
                     .await;
-                  let alive = this.update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
-                                  .is_ok();
-                  if !alive {
-                      break;
-                  }
-              }
-          })
-          .detach();
+                let alive = this
+                    .update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
+                    .is_ok();
+                if !alive {
+                    break;
+                }
+            }
+        })
+        .detach();
     }
 
     /// Starts a background loop that re-runs the catalog staleness check
@@ -127,21 +129,22 @@ impl LibraryController {
     /// exits once the controller entity is dropped.
     pub(super) fn start_periodic_catalog_refresh_timer(&self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
-              loop {
-                  async_cx
+            loop {
+                async_cx
                     .background_executor()
                     .timer(std::time::Duration::from_secs(
                         crate::data::constants::CATALOG_REFRESH_TIMER_INTERVAL_SECS,
                     ))
                     .await;
-                  let alive = this.update(async_cx, |ctrl, cx| ctrl.start_load(cx))
-                                  .is_ok();
-                  if !alive {
-                      break;
-                  }
-              }
-          })
-          .detach();
+                let alive = this
+                    .update(async_cx, |ctrl, cx| ctrl.start_load(cx))
+                    .is_ok();
+                if !alive {
+                    break;
+                }
+            }
+        })
+        .detach();
     }
 
     /// Spawns a background task to load collections and the catalog — from
@@ -179,35 +182,37 @@ impl LibraryController {
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
-              let (catalog, changed) = async_cx.background_executor()
-                                               .spawn(async move {
-                                                   let storage = StorageConfig::load();
-                                                   let mut catalog = catalog;
-                                                   let mut changed = false;
-                                                   for item in &mut catalog {
-                                                       changed |=
-                                                           verify_item_downloads(item, &storage);
-                                                   }
-                                                   (catalog, changed)
-                                               })
-                                               .await;
+            let (catalog, changed) = async_cx
+                .background_executor()
+                .spawn(async move {
+                    let storage = StorageConfig::load();
+                    let mut catalog = catalog;
+                    let mut changed = false;
+                    for item in &mut catalog {
+                        changed |= verify_item_downloads(item, &storage);
+                    }
+                    (catalog, changed)
+                })
+                .await;
 
-              this.update(async_cx, |ctrl, cx| {
-                      for id in &ids {
-                          ctrl.verifying_downloads.remove(id);
-                      }
-                      if changed {
-                          ctrl.catalog = catalog;
-                          ctrl.section_counts = section_counts(&ctrl.catalog,
-                                                               now_secs(),
-                                                               ctrl.recently_updated_window_days);
-                          ctrl.invalidate_cache();
-                      }
-                      cx.emit(LibraryChanged);
-                  })
-                  .ok();
-          })
-          .detach();
+            this.update(async_cx, |ctrl, cx| {
+                for id in &ids {
+                    ctrl.verifying_downloads.remove(id);
+                }
+                if changed {
+                    ctrl.catalog = catalog;
+                    ctrl.section_counts = section_counts(
+                        &ctrl.catalog,
+                        now_secs(),
+                        ctrl.recently_updated_window_days,
+                    );
+                    ctrl.invalidate_cache();
+                }
+                cx.emit(LibraryChanged);
+            })
+            .ok();
+        })
+        .detach();
     }
 
     /// Clears `catalog_sync_in_flight` and, if a load was requested while

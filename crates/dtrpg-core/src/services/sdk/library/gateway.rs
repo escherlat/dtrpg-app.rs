@@ -18,8 +18,9 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] on network or session failures.
-    fn list_order_products(&self, params: LibraryItemsParams)
-                           -> Result<OrderProductListResponse, LibraryServiceError>;
+    fn list_order_products(
+        &self, params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError>;
 
     /// Loads an ordered product detail by its numeric id.
     ///
@@ -35,20 +36,22 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] on network or session failures.
-    fn prepare_download(&self, order_product_id: u64, index: u32)
-                        -> Result<serde_json::Value, LibraryServiceError>;
+    fn prepare_download(
+        &self, order_product_id: u64, index: u32,
+    ) -> Result<serde_json::Value, LibraryServiceError>;
 }
 
 pub(super) struct HttpSdkLibraryGateway {
-    client:  SdkLibraryClient,
+    client: SdkLibraryClient,
     runtime: Runtime,
 }
 
 impl HttpSdkLibraryGateway {
     /// Reads only the API key from the keyring and uses the provided in-memory
     /// tokens.
-    pub(super) fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens)
-                                           -> Result<Self, LibraryServiceError> {
+    pub(super) fn from_keyring_with_tokens(
+        tokens: dtrpg_ui::services::LoginTokens,
+    ) -> Result<Self, LibraryServiceError> {
         let SdkConnection { client, runtime } =
             connection::connect_from_keyring_with_tokens(tokens).map_err(map_connection_error)?;
         Ok(Self { client, runtime })
@@ -63,8 +66,9 @@ impl HttpSdkLibraryGateway {
 }
 
 impl SdkLibraryGateway for HttpSdkLibraryGateway {
-    fn list_order_products(&self, params: LibraryItemsParams)
-                           -> Result<OrderProductListResponse, LibraryServiceError> {
+    fn list_order_products(
+        &self, params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError> {
         self.runtime
             .block_on(self.client.list_order_products(params))
             .map_err(map_client_error)
@@ -76,8 +80,9 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
             .map_err(map_client_error)
     }
 
-    fn prepare_download(&self, order_product_id: u64, index: u32)
-                        -> Result<serde_json::Value, LibraryServiceError> {
+    fn prepare_download(
+        &self, order_product_id: u64, index: u32,
+    ) -> Result<serde_json::Value, LibraryServiceError> {
         self.runtime
             .block_on(self.client.prepare_download(order_product_id, index))
             .map_err(map_client_error)
@@ -95,8 +100,9 @@ impl UnavailableSdkGateway {
 }
 
 impl SdkLibraryGateway for UnavailableSdkGateway {
-    fn list_order_products(&self, _params: LibraryItemsParams)
-                           -> Result<OrderProductListResponse, LibraryServiceError> {
+    fn list_order_products(
+        &self, _params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError> {
         Err(self.error.clone())
     }
 
@@ -104,8 +110,9 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
         Err(self.error.clone())
     }
 
-    fn prepare_download(&self, _order_product_id: u64, _index: u32)
-                        -> Result<serde_json::Value, LibraryServiceError> {
+    fn prepare_download(
+        &self, _order_product_id: u64, _index: u32,
+    ) -> Result<serde_json::Value, LibraryServiceError> {
         Err(self.error.clone())
     }
 }

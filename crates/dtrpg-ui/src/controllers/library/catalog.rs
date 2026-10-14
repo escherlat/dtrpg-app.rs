@@ -15,13 +15,13 @@ impl LibraryController {
     /// `clear_and_reload`); `true` merges `items` into the existing catalog
     /// by id via `reconcile_catalog` (items missing from `items` are kept,
     /// flagged `is_available = false`, rather than dropped).
-    pub(super) fn set_catalog(&mut self, items: Vec<LibraryItem>, reconcile: bool,
-                              cx: &mut Context<Self>) {
+    pub(super) fn set_catalog(
+        &mut self, items: Vec<LibraryItem>, reconcile: bool, cx: &mut Context<Self>,
+    ) {
         self.enqueue_thumbnails(&items, cx);
         self.catalog = if reconcile {
             reconcile_catalog(std::mem::take(&mut self.catalog), items)
-        }
-        else {
+        } else {
             items
         };
         self.catalog_loading = false;
@@ -44,7 +44,7 @@ impl LibraryController {
     /// where the publisher reappears restores it.
     pub fn validate_publisher_filter(&mut self, known_publishers: &[Arc<str>]) {
         if let SidebarFilter::Publisher(name) = &self.filter
-           && !known_publishers.contains(name)
+            && !known_publishers.contains(name)
         {
             self.filter = SidebarFilter::AllTitles;
         }
@@ -61,10 +61,11 @@ impl LibraryController {
     /// these left a restored `Publisher` filter that no longer matched
     /// permanently un-validated on an ordinary cache-hit cold start.
     pub(super) fn revalidate_publisher_filter(&mut self) {
-        let known_publishers: Vec<Arc<str>> = self.publishers
-                                                  .iter()
-                                                  .map(|p| Arc::clone(&p.name))
-                                                  .collect();
+        let known_publishers: Vec<Arc<str>> = self
+            .publishers
+            .iter()
+            .map(|p| Arc::clone(&p.name))
+            .collect();
         self.validate_publisher_filter(&known_publishers);
     }
 
@@ -75,8 +76,9 @@ impl LibraryController {
     ///
     /// Unlike a full reconcile, this never flags any existing item
     /// unavailable — a partial response is never a complete listing.
-    pub(super) fn apply_partial_fetch(&mut self, partial: Vec<LibraryItem>,
-                                      cx: &mut Context<Self>) {
+    pub(super) fn apply_partial_fetch(
+        &mut self, partial: Vec<LibraryItem>, cx: &mut Context<Self>,
+    ) {
         self.enqueue_thumbnails(&partial, cx);
         self.catalog = merge_partial_fetch(std::mem::take(&mut self.catalog), partial);
         self.catalog_loading = false;
@@ -112,9 +114,10 @@ impl LibraryController {
     /// no network fetch, no change to `catalog_loading` or the catalog.
     pub fn reload_catalog(&mut self, cx: &mut Context<Self>) {
         let meta = load_cache_metadata(&cache_dir());
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-                                              .map(|d| d.as_secs())
-                                              .unwrap_or_default();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or_default();
         if reload_cooldown_active(meta.as_ref(), now) {
             return;
         }
@@ -156,7 +159,7 @@ impl LibraryController {
         // branch — without this, the aggregated activity item would be
         // left showing "in progress" indefinitely.
         if self.active_thumbnail_fetches == 0
-           && let Some(id) = self.thumbnail_activity_id.take()
+            && let Some(id) = self.thumbnail_activity_id.take()
         {
             self.thumbnail_processed = 0;
             self.activity.update(cx, |a, cx| a.complete(id, cx));
@@ -180,48 +183,53 @@ impl LibraryController {
     pub fn snapshot(&self) -> LibrarySnapshot {
         let now_secs = now_secs();
         let window_days = self.recently_updated_window_days;
-        let filter_count = self.catalog
-                               .iter()
-                               .filter(|i| {
-                                   item_matches_filter(i,
-                                                       &self.filter,
-                                                       &self.collection_members,
-                                                       now_secs,
-                                                       window_days)
-                               })
-                               .count();
+        let filter_count = self
+            .catalog
+            .iter()
+            .filter(|i| {
+                item_matches_filter(
+                    i,
+                    &self.filter,
+                    &self.collection_members,
+                    now_secs,
+                    window_days,
+                )
+            })
+            .count();
         let items = self.visible_items();
         let matched_count = items.len();
         let selected_item = self.selected_item().cloned();
         let catalog_ids = self.catalog_ids();
-        LibrarySnapshot { filter: self.filter.clone(),
-                          counts: self.section_counts,
-                          publishers: self.publishers.clone(),
-                          collections: self.collections.clone(),
-                          collections_loaded: self.collections_loaded,
-                          catalog_ids,
-                          total_count: self.section_counts.all,
-                          total_mb: self.total_size_mb(),
-                          filter_count,
-                          matched_count,
-                          search_query: self.search_query.clone(),
-                          sort: self.sort,
-                          sort_direction: self.sort_direction,
-                          collection_sort: self.collection_sort,
-                          collection_sort_direction: self.collection_sort_direction,
-                          grouped: self.grouped,
-                          presentation: self.presentation,
-                          selected_item,
-                          items,
-                          catalog_loading: self.catalog_loading,
-                          publisher_search_open: self.publisher_search_open,
-                          publisher_search_query: self.publisher_search_query.clone(),
-                          collection_search_open: self.collection_search_open,
-                          collection_search_query: self.collection_search_query.clone(),
-                          detail_panel_width: self.detail_panel_width,
-                          bulk_selection_mode: self.bulk_selection_mode,
-                          bulk_selected_ids: self.bulk_selected_ids.clone(),
-                          bulk_selection_count: self.bulk_selected_ids.len() }
+        LibrarySnapshot {
+            filter: self.filter.clone(),
+            counts: self.section_counts,
+            publishers: self.publishers.clone(),
+            collections: self.collections.clone(),
+            collections_loaded: self.collections_loaded,
+            catalog_ids,
+            total_count: self.section_counts.all,
+            total_mb: self.total_size_mb(),
+            filter_count,
+            matched_count,
+            search_query: self.search_query.clone(),
+            sort: self.sort,
+            sort_direction: self.sort_direction,
+            collection_sort: self.collection_sort,
+            collection_sort_direction: self.collection_sort_direction,
+            grouped: self.grouped,
+            presentation: self.presentation,
+            selected_item,
+            items,
+            catalog_loading: self.catalog_loading,
+            publisher_search_open: self.publisher_search_open,
+            publisher_search_query: self.publisher_search_query.clone(),
+            collection_search_open: self.collection_search_open,
+            collection_search_query: self.collection_search_query.clone(),
+            detail_panel_width: self.detail_panel_width,
+            bulk_selection_mode: self.bulk_selection_mode,
+            bulk_selected_ids: self.bulk_selected_ids.clone(),
+            bulk_selection_count: self.bulk_selected_ids.len(),
+        }
     }
 
     /// Returns true while the initial catalog fetch is still in flight and no
@@ -263,18 +271,20 @@ impl LibraryController {
     pub(super) fn invalidate_cache(&mut self) {
         let now_secs = now_secs();
         let window_days = self.recently_updated_window_days;
-        let mut items: Vec<LibraryItem> = self.catalog
-                                              .iter()
-                                              .filter(|i| {
-                                                  item_matches_filter(i,
-                                                                      &self.filter,
-                                                                      &self.collection_members,
-                                                                      now_secs,
-                                                                      window_days)
-                                                  && item_matches_query(i, &self.search_query)
-                                              })
-                                              .cloned()
-                                              .collect();
+        let mut items: Vec<LibraryItem> = self
+            .catalog
+            .iter()
+            .filter(|i| {
+                item_matches_filter(
+                    i,
+                    &self.filter,
+                    &self.collection_members,
+                    now_secs,
+                    window_days,
+                ) && item_matches_query(i, &self.search_query)
+            })
+            .cloned()
+            .collect();
         sort_items(&mut items, self.sort, self.sort_direction);
         self.items_cache = Some(items);
     }
