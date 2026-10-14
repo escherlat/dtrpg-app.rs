@@ -13,39 +13,39 @@ impl LibraryController {
     /// the item, and a local `Path::exists()` call per file is cheap enough
     /// that gating it adds complexity without a real cost problem to solve.
     pub(super) fn verify_selected_item_download(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(mut item) = self.item_by_id(&id).cloned() else {
+        let Some(mut item) = self.item_by_id(&id).cloned()
+        else {
             return;
         };
         self.verifying_downloads.insert(Arc::clone(&id));
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
-            let (item, changed) = async_cx
-                .background_executor()
-                .spawn(async move {
-                    let storage = StorageConfig::load();
-                    let changed = verify_item_downloads(&mut item, &storage);
-                    (item, changed)
-                })
-                .await;
+              let (item, changed) = async_cx.background_executor()
+                                            .spawn(async move {
+                                                let storage = StorageConfig::load();
+                                                let changed =
+                                                    verify_item_downloads(&mut item, &storage);
+                                                (item, changed)
+                                            })
+                                            .await;
 
-            this.update(async_cx, |ctrl, cx| {
-                ctrl.verifying_downloads.remove(&id);
-                if changed && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
-                {
-                    *existing = item;
-                    ctrl.section_counts = section_counts(
-                        &ctrl.catalog,
-                        now_secs(),
-                        ctrl.recently_updated_window_days,
-                    );
-                    ctrl.invalidate_cache();
-                }
-                cx.emit(LibraryChanged);
-            })
-            .ok();
-        })
-        .detach();
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.verifying_downloads.remove(&id);
+                      if changed
+                         && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
+                      {
+                          *existing = item;
+                          ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                               now_secs(),
+                                                               ctrl.recently_updated_window_days);
+                          ctrl.invalidate_cache();
+                      }
+                      cx.emit(LibraryChanged);
+                  })
+                  .ok();
+          })
+          .detach();
     }
 
     /// Returns `true` if `id`'s files are currently being verified against
@@ -95,7 +95,8 @@ impl LibraryController {
     /// popover via [`Self::select_item`], or an expanded detail tab — see
     /// each `open_detail_tab` call site).
     pub fn maybe_check_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(item) = self.item_by_id(&id) else {
+        let Some(item) = self.item_by_id(&id)
+        else {
             return;
         };
         if !item_check_due(item.availability_last_checked) {
@@ -120,32 +121,29 @@ impl LibraryController {
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { service_arc.get_item(numeric_id) })
-                .await;
+            let result = async_cx.background_executor()
+                                 .spawn(async move { service_arc.get_item(numeric_id) })
+                                 .await;
             if let Err(e) = &result
-                && e.kind != LibraryServiceErrorKind::NotFound
+               && e.kind != LibraryServiceErrorKind::NotFound
             {
                 // Transient failure: not evidence of removal, leave the item
                 // and its flag entirely unchanged.
                 tracing::warn!(id = %id, error = %e, "item availability check failed transiently");
             }
             this.update(async_cx, |ctrl, cx| {
-                if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
-                    apply_check_result(existing, result, std::time::SystemTime::now());
-                    ctrl.section_counts = section_counts(
-                        &ctrl.catalog,
-                        now_secs(),
-                        ctrl.recently_updated_window_days,
-                    );
-                    ctrl.invalidate_cache();
-                }
-                ctrl.checking_items.remove(&id);
-                cx.emit(LibraryChanged);
-                ctrl.drain_check_queue(cx);
-            })
-            .ok();
+                    if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
+                        apply_check_result(existing, result, std::time::SystemTime::now());
+                        ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                             now_secs(),
+                                                             ctrl.recently_updated_window_days);
+                        ctrl.invalidate_cache();
+                    }
+                    ctrl.checking_items.remove(&id);
+                    cx.emit(LibraryChanged);
+                    ctrl.drain_check_queue(cx);
+                })
+                .ok();
         })
         .detach();
     }
@@ -173,7 +171,8 @@ impl LibraryController {
         if !self.checking_items.is_empty() {
             return;
         }
-        let Some(id) = self.check_queue.pop_front() else {
+        let Some(id) = self.check_queue.pop_front()
+        else {
             return;
         };
         self.start_item_check(id, cx);
@@ -194,10 +193,9 @@ impl LibraryController {
         let root = cache_dir();
         let last_batch_secs = load_cache_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
         let now = std::time::SystemTime::now();
-        let now_secs = now
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or_default();
+        let now_secs = now.duration_since(std::time::UNIX_EPOCH)
+                          .map(|d| d.as_secs())
+                          .unwrap_or_default();
         if check_batch_cooldown_active(last_batch_secs, now_secs) {
             return;
         }

@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionEntry {
     /// Numeric product list identifier.
-    pub id: u64,
+    pub id:         u64,
     /// Display name of the collection.
-    pub name: Arc<str>,
+    pub name:       Arc<str>,
     /// Product `order_product_id` values belonging to this collection.
     pub member_ids: Arc<[u64]>,
     /// Creation timestamp, Unix epoch seconds. Defaults to `0` when

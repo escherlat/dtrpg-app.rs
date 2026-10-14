@@ -30,9 +30,9 @@ pub enum LibraryServiceErrorKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LibraryServiceError {
     /// The machine-classified failure kind.
-    pub kind: LibraryServiceErrorKind,
+    pub kind:        LibraryServiceErrorKind,
     /// Human-readable baseline error message.
-    pub message: String,
+    pub message:     String,
     /// The server-specified wait duration from a `Retry-After` header, when
     /// the failure was a [`LibraryServiceErrorKind::RateLimited`] response
     /// that included one.
@@ -42,11 +42,9 @@ pub struct LibraryServiceError {
 impl LibraryServiceError {
     /// Creates a new service error.
     pub fn new(kind: LibraryServiceErrorKind, message: impl Into<String>) -> Self {
-        Self {
-            kind,
-            message: message.into(),
-            retry_after: None,
-        }
+        Self { kind,
+               message: message.into(),
+               retry_after: None }
     }
 
     /// Attaches a `Retry-After`-derived wait duration to this error.
@@ -117,9 +115,9 @@ pub trait LibraryService: Send + Sync + 'static {
     /// delivered to `on_page` before the failure are not rolled back.
     ///
     /// [`list_items`]: LibraryService::list_items
-    fn list_items_paged(
-        &self, on_page: &mut dyn FnMut(Vec<LibraryItem>), on_total: Option<&mut dyn FnMut(usize)>,
-    ) -> Result<(), LibraryServiceError> {
+    fn list_items_paged(&self, on_page: &mut dyn FnMut(Vec<LibraryItem>),
+                        on_total: Option<&mut dyn FnMut(usize)>)
+                        -> Result<(), LibraryServiceError> {
         let _ = on_total;
         on_page(self.list_items()?);
         Ok(())
@@ -165,9 +163,9 @@ pub trait LibraryService: Send + Sync + 'static {
     /// The inner `Result` is a [`LibraryServiceError`] if any page request
     /// fails. Items delivered to `on_page` before the failure are not rolled
     /// back.
-    fn list_items_updated_since(
-        &self, since_iso8601: &str, on_page: &mut dyn FnMut(Vec<LibraryItem>),
-    ) -> Option<Result<(), LibraryServiceError>> {
+    fn list_items_updated_since(&self, since_iso8601: &str,
+                                on_page: &mut dyn FnMut(Vec<LibraryItem>))
+                                -> Option<Result<(), LibraryServiceError>> {
         let _ = (since_iso8601, on_page);
         None
     }
@@ -197,11 +195,10 @@ pub trait LibraryService: Send + Sync + 'static {
     /// Returns a [`LibraryServiceError`] on any preparation, network, or I/O
     /// failure, or if the transfer is cancelled. `dest` is left untouched
     /// (never partially written) on any error path.
-    fn download_item(
-        &self, order_product_id: u64, index: u32, dest: &std::path::Path,
-        cancel: &std::sync::atomic::AtomicBool,
-        on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>,
-    ) -> Result<(), LibraryServiceError>;
+    fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
+                     cancel: &std::sync::atomic::AtomicBool,
+                     on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>)
+                     -> Result<(), LibraryServiceError>;
 }
 
 // ── LoginService
@@ -211,9 +208,9 @@ pub trait LibraryService: Send + Sync + 'static {
 #[derive(Clone)]
 pub struct LoginTokens {
     /// Short-lived JWT bearer token for API requests.
-    pub access_token: String,
+    pub access_token:      String,
     /// Long-lived token used to refresh the access token.
-    pub refresh_token: String,
+    pub refresh_token:     String,
     /// Unix timestamp (seconds) at which the refresh token expires.
     pub refresh_token_ttl: u64,
 }

@@ -18,26 +18,23 @@ use std::path::Path;
 pub fn reveal_in_file_manager(path: &Path) -> io::Result<()> {
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
-            .args(["-R", &path.to_string_lossy()])
-            .status()
-            .map(|_| ())
+        std::process::Command::new("open").args(["-R", &path.to_string_lossy()])
+                                          .status()
+                                          .map(|_| ())
     }
 
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(format!("/select,{}", path.display()))
-            .status()
-            .map(|_| ())
+        std::process::Command::new("explorer").arg(format!("/select,{}", path.display()))
+                                              .status()
+                                              .map(|_| ())
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let parent = path.parent().unwrap_or(path);
-        std::process::Command::new("xdg-open")
-            .arg(parent)
-            .status()
-            .map(|_| ())
+        std::process::Command::new("xdg-open").arg(parent)
+                                              .status()
+                                              .map(|_| ())
     }
 }

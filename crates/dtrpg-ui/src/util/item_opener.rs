@@ -62,17 +62,18 @@ impl ItemOpener {
 
         // Attempt to open the file with the system's default application
         launch(path).map_err(|e| {
-            let error_msg = e.to_string();
+                        let error_msg = e.to_string();
 
-            // Try to classify the error
-            if error_msg.contains("no default application")
-                || error_msg.contains("no associated application")
-            {
-                OpenError::NoDefaultApp
-            } else {
-                OpenError::OsFailed(error_msg)
-            }
-        })
+                        // Try to classify the error
+                        if error_msg.contains("no default application")
+                           || error_msg.contains("no associated application")
+                        {
+                            OpenError::NoDefaultApp
+                        }
+                        else {
+                            OpenError::OsFailed(error_msg)
+                        }
+                    })
     }
 
     /// Opens a catalog entry's downloaded content, given its per-item file
@@ -118,7 +119,8 @@ mod tests {
     fn test_open_existing_file() {
         // Create a temporary file
         let temp_path = std::env::temp_dir().join("dtrpg_test_file.txt");
-        let Ok(mut file) = File::create(&temp_path) else {
+        let Ok(mut file) = File::create(&temp_path)
+        else {
             // Skip test if we can't create the temp file
             return;
         };
@@ -154,14 +156,12 @@ mod tests {
     }
 
     fn make_file(name: &str) -> LibraryItemFile {
-        LibraryItemFile {
-            id: name.into(),
-            index: 0,
-            name: name.into(),
-            format: "PDF".into(),
-            size_mb: 1.0,
-            downloaded: false,
-        }
+        LibraryItemFile { id:         name.into(),
+                          index:      0,
+                          name:       name.into(),
+                          format:     "PDF".into(),
+                          size_mb:    1.0,
+                          downloaded: false, }
     }
 
     #[test]
@@ -182,7 +182,8 @@ mod tests {
         let dir = std::env::temp_dir().join("dtrpg_open_item_single_test");
         let _ = std::fs::create_dir_all(&dir);
         let file_path = dir.join("book.pdf");
-        let Ok(mut file) = File::create(&file_path) else {
+        let Ok(mut file) = File::create(&file_path)
+        else {
             return;
         };
         let _ = file.write_all(b"stub");

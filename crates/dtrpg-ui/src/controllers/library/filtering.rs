@@ -25,10 +25,9 @@ impl LibraryController {
     #[must_use]
     pub fn visible_items_slice(&self, range: std::ops::Range<usize>) -> Vec<LibraryItem> {
         let items = self.visible_items();
-        items
-            .get(range)
-            .map(<[LibraryItem]>::to_vec)
-            .unwrap_or_default()
+        items.get(range)
+             .map(<[LibraryItem]>::to_vec)
+             .unwrap_or_default()
     }
 
     // ── Sidebar filter mutations
@@ -41,13 +40,13 @@ impl LibraryController {
     /// filters, `collection_members` is cleared.
     pub fn set_filter(&mut self, filter: SidebarFilter, cx: &mut Context<Self>) {
         if let SidebarFilter::Collection(id, _) = &filter {
-            self.collection_members = self
-                .collections
-                .iter()
-                .find(|c| c.id == *id)
-                .map(|c| c.member_ids.iter().copied().collect())
-                .unwrap_or_default();
-        } else {
+            self.collection_members = self.collections
+                                          .iter()
+                                          .find(|c| c.id == *id)
+                                          .map(|c| c.member_ids.iter().copied().collect())
+                                          .unwrap_or_default();
+        }
+        else {
             self.collection_members.clear();
         }
         self.filter = filter;
@@ -137,12 +136,10 @@ impl LibraryController {
     pub fn set_collection_sort(&mut self, method: CollectionSortMethod, cx: &mut Context<Self>) {
         self.collection_sort = method;
         let catalog_ids = self.catalog_ids();
-        sort_collections(
-            &mut self.collections,
-            method,
-            self.collection_sort_direction,
-            &catalog_ids,
-        );
+        sort_collections(&mut self.collections,
+                         method,
+                         self.collection_sort_direction,
+                         &catalog_ids);
         crate::data::ui_preferences::UiPreferences::load()
             .save_collection_sort(method, self.collection_sort_direction);
         cx.emit(LibraryChanged);
@@ -150,17 +147,14 @@ impl LibraryController {
 
     /// Sets the sidebar Collections sort direction, persists it, and
     /// re-sorts `self.collections` in place.
-    pub fn set_collection_sort_direction(
-        &mut self, direction: SortDirection, cx: &mut Context<Self>,
-    ) {
+    pub fn set_collection_sort_direction(&mut self, direction: SortDirection,
+                                         cx: &mut Context<Self>) {
         self.collection_sort_direction = direction;
         let catalog_ids = self.catalog_ids();
-        sort_collections(
-            &mut self.collections,
-            self.collection_sort,
-            direction,
-            &catalog_ids,
-        );
+        sort_collections(&mut self.collections,
+                         self.collection_sort,
+                         direction,
+                         &catalog_ids);
         crate::data::ui_preferences::UiPreferences::load()
             .save_collection_sort(self.collection_sort, direction);
         cx.emit(LibraryChanged);
@@ -186,12 +180,9 @@ impl LibraryController {
     /// state to disk. Best-effort — I/O failures are logged and ignored (see
     /// [`crate::data::file_openers::CatalogViewPrefs::save`]).
     pub(super) fn save_view_prefs(&self) {
-        crate::data::file_openers::CatalogViewPrefs::from_state(
-            &self.filter,
-            self.sort,
-            self.grouped,
-            self.presentation,
-        )
-        .save();
+        crate::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
+                                                                self.sort,
+                                                                self.grouped,
+                                                                self.presentation).save();
     }
 }

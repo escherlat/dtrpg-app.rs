@@ -60,9 +60,8 @@ pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
 /// Returns [`CollectionsCacheError::Io`] if the directory cannot be created or
 /// the file cannot be written or renamed. Returns
 /// [`CollectionsCacheError::Json`] if serialization fails.
-pub fn save_collections_cache(
-    root: &Path, entries: &[CollectionEntry],
-) -> Result<(), CollectionsCacheError> {
+pub fn save_collections_cache(root: &Path, entries: &[CollectionEntry])
+                              -> Result<(), CollectionsCacheError> {
     fs::create_dir_all(root)?;
     let tmp = root.join(COLLECTIONS_CACHE_TMP);
     let json = serde_json::to_string(entries)?;
@@ -85,12 +84,10 @@ mod tests {
     }
 
     fn make_entry(id: u64, name: &str) -> CollectionEntry {
-        CollectionEntry {
-            id,
-            name: Arc::from(name),
-            member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
-            created_at: 1_700_000_000,
-        }
+        CollectionEntry { id,
+                          name: Arc::from(name),
+                          member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
+                          created_at: 1_700_000_000 }
     }
 
     #[test]

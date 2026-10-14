@@ -27,7 +27,7 @@ pub fn detail_cache_key(item_id: &str) -> Arc<str> {
 /// coordination overhead.
 pub struct CoverCache {
     /// Decoded GPUI images keyed by item id.
-    pub images: HashMap<Arc<str>, Arc<Image>>,
+    pub images:    HashMap<Arc<str>, Arc<Image>>,
     /// Tracks items whose download is currently in flight.
     pub in_flight: HashSet<Arc<str>>,
 }
@@ -37,10 +37,8 @@ impl gpui::Global for CoverCache {}
 impl CoverCache {
     /// Returns a new, empty cache.
     pub fn new() -> Self {
-        Self {
-            images: HashMap::new(),
-            in_flight: HashSet::new(),
-        }
+        Self { images:    HashMap::new(),
+               in_flight: HashSet::new(), }
     }
 
     /// Returns the cached GPUI image for `id`, if present.
@@ -95,13 +93,13 @@ pub enum Motif {
 /// All style parameters needed to render a generative cover.
 #[derive(Debug, Clone)]
 pub struct CoverStyle {
-    pub background: Hsla,
-    pub foreground: Hsla,
+    pub background:    Hsla,
+    pub foreground:    Hsla,
     pub foreground_70: Hsla,
     pub foreground_45: Hsla,
     pub foreground_22: Hsla,
     pub foreground_12: Hsla,
-    pub motif: Motif,
+    pub motif:         Motif,
 }
 
 /// ITU-R 601 luminance check: returns `true` when the hex color is perceptually
@@ -111,7 +109,8 @@ fn is_light_hex(hex: &str) -> bool {
     if h.len() < 6 {
         return true;
     }
-    let Ok(n) = u32::from_str_radix(&h[..6], 16) else {
+    let Ok(n) = u32::from_str_radix(&h[..6], 16)
+    else {
         return true;
     };
     let r = (n >> 16) & 0xFF;
@@ -136,7 +135,8 @@ pub fn cover_style(item: &LibraryItem) -> CoverStyle {
 
     let (fg_r, fg_g, fg_b) = if light {
         (0x1C_u8, 0x18_u8, 0x13_u8) // near-black on light backgrounds
-    } else {
+    }
+    else {
         (0xEF_u8, 0xE6_u8, 0xD2_u8) // cream on dark backgrounds
     };
 
@@ -156,15 +156,13 @@ pub fn cover_style(item: &LibraryItem) -> CoverStyle {
         _ => Motif::Triangle,
     };
 
-    CoverStyle {
-        background,
-        foreground: fg(1.0),
-        foreground_70: fg(0.70),
-        foreground_45: fg(0.45),
-        foreground_22: fg(0.22),
-        foreground_12: fg(0.12),
-        motif,
-    }
+    CoverStyle { background,
+                 foreground: fg(1.0),
+                 foreground_70: fg(0.70),
+                 foreground_45: fg(0.45),
+                 foreground_22: fg(0.22),
+                 foreground_12: fg(0.12),
+                 motif }
 }
 
 // ── Generative cover element
@@ -178,22 +176,20 @@ fn render_motif(motif: Motif, fg: Hsla) -> impl IntoElement {
         // ◇ diamond outline (Unicode avoids CSS rotate)
         Motif::Diamond => div().text_xl().text_color(fg).child("◇").into_any_element(),
         // two horizontal rules
-        Motif::DoubleRule => div()
-            .flex()
-            .flex_col()
-            .gap_1()
-            .child(div().w(size).h(px(1.0)).bg(fg))
-            .child(div().w(size).h(px(1.0)).bg(fg))
-            .into_any_element(),
+        Motif::DoubleRule => div().flex()
+                                  .flex_col()
+                                  .gap_1()
+                                  .child(div().w(size).h(px(1.0)).bg(fg))
+                                  .child(div().w(size).h(px(1.0)).bg(fg))
+                                  .into_any_element(),
         // △ triangle outline (Unicode avoids CSS rotate)
         Motif::Triangle => div().text_xl().text_color(fg).child("△").into_any_element(),
     }
 }
 
 /// Renders a generative cover tile at the given pixel dimensions.
-pub fn render_generative_cover(
-    item: &LibraryItem, width: f32, height: f32, render_text: bool,
-) -> impl IntoElement + 'static + use<> {
+pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32, render_text: bool)
+                               -> impl IntoElement + 'static + use<> {
     let style = cover_style(item);
     let bg = style.background;
     let fg = style.foreground;
@@ -201,60 +197,46 @@ pub fn render_generative_cover(
     let fg45 = style.foreground_45;
     let motif = style.motif;
 
-    let mut cover = div()
-        .w(px(width))
-        .h(px(height))
-        .bg(bg)
-        .flex()
-        .flex_col()
-        .overflow_hidden();
+    let mut cover = div().w(px(width))
+                         .h(px(height))
+                         .bg(bg)
+                         .flex()
+                         .flex_col()
+                         .overflow_hidden();
 
     if render_text {
         let publisher = item.publisher.to_string();
         let title = item.title.to_string();
         let line = item.line.to_string();
 
-        cover = cover
-            .justify_between()
-            .child(
-                div()
-                    .px_2()
-                    .pt_2()
-                    .text_color(fg70)
-                    .text_xs()
-                    .truncate()
-                    .child(publisher),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .gap_1()
-                    .px_1()
-                    .child(render_motif(motif, fg45))
-                    .child(
-                        div()
-                            .text_color(fg)
-                            .text_xs()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .child(title),
-                    ),
-            )
-            .child(
-                div()
-                    .px_2()
-                    .pb_2()
-                    .text_color(fg45)
-                    .text_xs()
-                    .truncate()
-                    .child(line),
-            );
-    } else {
-        cover = cover
-            .items_center()
-            .justify_center()
-            .child(render_motif(motif, fg45));
+        cover = cover.justify_between()
+                     .child(div().px_2()
+                                 .pt_2()
+                                 .text_color(fg70)
+                                 .text_xs()
+                                 .truncate()
+                                 .child(publisher))
+                     .child(div().flex()
+                                 .flex_col()
+                                 .items_center()
+                                 .gap_1()
+                                 .px_1()
+                                 .child(render_motif(motif, fg45))
+                                 .child(div().text_color(fg)
+                                             .text_xs()
+                                             .font_weight(gpui::FontWeight::SEMIBOLD)
+                                             .child(title)))
+                     .child(div().px_2()
+                                 .pb_2()
+                                 .text_color(fg45)
+                                 .text_xs()
+                                 .truncate()
+                                 .child(line));
+    }
+    else {
+        cover = cover.items_center()
+                     .justify_center()
+                     .child(render_motif(motif, fg45));
     }
 
     cover
@@ -269,32 +251,30 @@ mod tests {
     use crate::util::stubs::*;
 
     fn make_item(id: &str, title: &str, color: &str) -> LibraryItem {
-        LibraryItem {
-            id: id.into(),
-            numeric_id: 0,
-            order_product_id: 0,
-            product_id: 0,
-            title: title.into(),
-            publisher: "Test".into(),
-            line: "Test Line".into(),
-            kind: "Core".into(),
-            format: "PDF".into(),
-            pages: 200,
-            size_mb: 50.0,
-            year: 2020,
-            added_order: 100,
-            status: ItemStatus::Downloaded,
-            color: color.into(),
-            desc: "A test item.".into(),
-            cover_url: None,
-            detail_cover_url: None,
-            date_added: None,
-            date_updated: None,
-            thumbnail_last_attempted: None,
-            is_available: true,
-            availability_last_checked: None,
-            files: Vec::new(),
-        }
+        LibraryItem { id:                        id.into(),
+                      numeric_id:                0,
+                      order_product_id:          0,
+                      product_id:                0,
+                      title:                     title.into(),
+                      publisher:                 "Test".into(),
+                      line:                      "Test Line".into(),
+                      kind:                      "Core".into(),
+                      format:                    "PDF".into(),
+                      pages:                     200,
+                      size_mb:                   50.0,
+                      year:                      2020,
+                      added_order:               100,
+                      status:                    ItemStatus::Downloaded,
+                      color:                     color.into(),
+                      desc:                      "A test item.".into(),
+                      cover_url:                 None,
+                      detail_cover_url:          None,
+                      date_added:                None,
+                      date_updated:              None,
+                      thumbnail_last_attempted:  None,
+                      is_available:              true,
+                      availability_last_checked: None,
+                      files:                     Vec::new(), }
     }
 
     #[test]
@@ -310,10 +290,8 @@ mod tests {
         let item = make_item("b1", "Dark Book", "#1C2A44");
         let style = cover_style(&item);
         // Cream has high lightness
-        assert!(
-            style.foreground.l > 0.8,
-            "expected cream foreground on dark bg"
-        );
+        assert!(style.foreground.l > 0.8,
+                "expected cream foreground on dark bg");
     }
 
     #[test]
@@ -322,10 +300,8 @@ mod tests {
         // (201*299+160*587+44*114)/1000 ≈ 160 > 150
         let item = make_item("b_light", "Light Book", "#C9A02C");
         let style = cover_style(&item);
-        assert!(
-            style.foreground.l < 0.2,
-            "expected dark foreground on light bg"
-        );
+        assert!(style.foreground.l < 0.2,
+                "expected dark foreground on light bg");
     }
 
     #[test]
@@ -334,19 +310,13 @@ mod tests {
         let key_b = detail_cache_key("b1");
         let key_other = detail_cache_key("b2");
 
-        assert_ne!(
-            key_a.as_ref(),
-            "b1",
-            "must not collide with the small-context cache key"
-        );
-        assert_eq!(
-            key_a, key_b,
-            "same item id must derive the same detail cache key"
-        );
-        assert_ne!(
-            key_a, key_other,
-            "different item ids must derive different detail cache keys"
-        );
+        assert_ne!(key_a.as_ref(),
+                   "b1",
+                   "must not collide with the small-context cache key");
+        assert_eq!(key_a, key_b,
+                   "same item id must derive the same detail cache key");
+        assert_ne!(key_a, key_other,
+                   "different item ids must derive different detail cache keys");
     }
 
     #[test]
@@ -368,10 +338,8 @@ mod tests {
             let item = make_item("b_malformed", "Malformed Color Book", color);
             let style = cover_style(&item);
             let default_background: Hsla = rgb(0x1C_2A_44).into();
-            assert_eq!(
-                style.background, default_background,
-                "expected fallback background for malformed color {color:?}"
-            );
+            assert_eq!(style.background, default_background,
+                       "expected fallback background for malformed color {color:?}");
         }
     }
 }

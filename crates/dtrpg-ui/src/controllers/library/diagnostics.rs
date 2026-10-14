@@ -17,16 +17,19 @@ pub(crate) fn app_backtrace() -> String {
                 out.push(line);
                 take_location = false;
             }
-        } else if line.contains("dtrpg_") {
+        }
+        else if line.contains("dtrpg_") {
             out.push(line);
             take_location = true;
-        } else {
+        }
+        else {
             take_location = false;
         }
     }
     if out.is_empty() {
         "<no app frames found in backtrace>".to_string()
-    } else {
+    }
+    else {
         out.join("\n")
     }
 }

@@ -32,14 +32,14 @@ pub type FontSelectState = Entity<SelectState<Vec<String>>>;
 #[derive(Clone, Copy, Default)]
 pub struct CacheCounts {
     /// Number of items in the cached catalog/collections metadata.
-    pub metadata_items: usize,
+    pub metadata_items:             usize,
     /// Number of cached cover thumbnail files.
-    pub cover_thumbnails: usize,
+    pub cover_thumbnails:           usize,
     /// `true` if an avatar image is currently cached.
-    pub avatar_cached: bool,
+    pub avatar_cached:              bool,
     /// Unix timestamp (seconds) when the catalog/collections metadata cache
     /// was last written. `None` when no cache metadata exists yet.
-    pub metadata_saved_at_secs: Option<i64>,
+    pub metadata_saved_at_secs:     Option<i64>,
     /// Unix timestamp (seconds) of the last per-item availability check
     /// batch (manual or automatic). `None` when no batch has run yet, or
     /// predates the field being tracked.
@@ -58,7 +58,7 @@ pub enum AuthState {
     /// login.
     LoggedIn {
         /// Account email address, if known.
-        email: Option<String>,
+        email:        Option<String>,
         /// Cached Gravatar image bytes, or `None` while the fetch is in flight
         /// or unavailable.
         avatar_bytes: Option<Arc<Vec<u8>>>,
@@ -69,16 +69,16 @@ pub enum AuthState {
 #[derive(Clone)]
 pub struct AuthStateSnapshot {
     /// `true` when a user is signed in.
-    pub is_logged_in: bool,
+    pub is_logged_in:    bool,
     /// Account email address when signed in.
-    pub email: Option<String>,
+    pub email:           Option<String>,
     /// First character of the email, uppercased — used as the avatar fallback
     /// initial.
     pub display_initial: Option<char>,
     /// Cached avatar image bytes from Gravatar, or `None`.
-    pub avatar_bytes: Option<Arc<Vec<u8>>>,
+    pub avatar_bytes:    Option<Arc<Vec<u8>>>,
     /// Masked API key hint (first 4 + bullets + last 1), set at sign-in time.
-    pub api_key_hint: Option<String>,
+    pub api_key_hint:    Option<String>,
 }
 
 // ── SettingsController
@@ -86,101 +86,101 @@ pub struct AuthStateSnapshot {
 
 /// Snapshot of settings state needed by the views for a single render pass.
 pub struct SettingsSnapshot {
-    pub is_open: bool,
-    pub file_openers: Vec<FileOpenerEntry>,
+    pub is_open:                        bool,
+    pub file_openers:                   Vec<FileOpenerEntry>,
     /// `true` when credentials are present in the keyring.
-    pub is_authenticated: bool,
+    pub is_authenticated:               bool,
     /// Resolved storage root path (override or platform default).
-    pub storage_root_path: PathBuf,
+    pub storage_root_path:              PathBuf,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
-    pub storage_unavailable: bool,
+    pub storage_unavailable:            bool,
     /// `true` when the configured storage root exists on disk.
-    pub storage_path_exists: bool,
+    pub storage_path_exists:            bool,
     /// Current auth state for the toolbar avatar button.
-    pub auth: AuthStateSnapshot,
+    pub auth:                           AuthStateSnapshot,
     /// Current value of the email draft field in the Account tab.
-    pub email_draft: String,
+    pub email_draft:                    String,
     /// Current value of the password draft field in the Account tab.
-    pub password_draft: String,
+    pub password_draft:                 String,
     /// `true` while a sign-in request is in flight.
-    pub sign_in_in_progress: bool,
+    pub sign_in_in_progress:            bool,
     /// Error message from the last failed sign-in attempt, if any.
-    pub sign_in_error: Option<String>,
+    pub sign_in_error:                  Option<String>,
     /// Shared input state for the email text field in the Account tab.
-    pub email_input: Option<Entity<InputState>>,
+    pub email_input:                    Option<Entity<InputState>>,
     /// Shared input state for the password text field in the Account tab.
-    pub password_input: Option<Entity<InputState>>,
+    pub password_input:                 Option<Entity<InputState>>,
     /// Current draft value of the storage path text field.
-    pub storage_path_draft: String,
+    pub storage_path_draft:             String,
     /// Shared input state for the storage path text field in the Storage tab.
-    pub storage_path_input: Option<Entity<InputState>>,
+    pub storage_path_input:             Option<Entity<InputState>>,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
-    pub pending_file_opener: Option<PathBuf>,
+    pub pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
-    pub active_page_ix: usize,
+    pub active_page_ix:                 usize,
     /// Current per-type counts of cached data, for the Advanced section's
     /// "Cache details" area.
-    pub cache_counts: CacheCounts,
+    pub cache_counts:                   CacheCounts,
     /// Shared maximum number of concurrent thumbnail/download fetches.
-    pub max_concurrent_downloads: usize,
+    pub max_concurrent_downloads:       usize,
     /// Shared input state for the "Max concurrent downloads" number field in
     /// the Storage tab.
     pub max_concurrent_downloads_input: Option<Entity<InputState>>,
     /// `true` when completing a download should also symlink the item under
     /// `{root}/collections/{collection name}/` for each collection it
     /// belongs to.
-    pub create_collections: bool,
+    pub create_collections:             bool,
     /// User-configured "Recently Updated" sidebar window, in days.
-    pub recently_updated_window_days: u32,
+    pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
     /// the Advanced tab.
-    pub recently_updated_window_input: Option<Entity<InputState>>,
+    pub recently_updated_window_input:  Option<Entity<InputState>>,
     /// Font picker state for the Appearance page's body-font row.
-    pub body_font_select: Option<FontSelectState>,
+    pub body_font_select:               Option<FontSelectState>,
     /// Font picker state for the Appearance page's value-font row.
-    pub value_font_select: Option<FontSelectState>,
+    pub value_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's label-font row.
-    pub label_font_select: Option<FontSelectState>,
+    pub label_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's monospace-font row.
-    pub mono_font_select: Option<FontSelectState>,
+    pub mono_font_select:               Option<FontSelectState>,
 }
 
 /// Owns all mutable settings state: panel visibility, file-opener overrides,
 /// catalog storage configuration, and sign-in form state.
 pub struct SettingsController {
-    is_open: bool,
-    file_openers: FileOpenerConfig,
-    is_authenticated: bool,
-    auth_state: AuthState,
-    storage: StorageConfig,
-    storage_unavailable: bool,
-    storage_path_exists: bool,
-    login_service: Arc<dyn LoginService>,
-    email_draft: String,
-    password_draft: String,
-    sign_in_in_progress: bool,
-    sign_in_error: Option<String>,
+    is_open:                        bool,
+    file_openers:                   FileOpenerConfig,
+    is_authenticated:               bool,
+    auth_state:                     AuthState,
+    storage:                        StorageConfig,
+    storage_unavailable:            bool,
+    storage_path_exists:            bool,
+    login_service:                  Arc<dyn LoginService>,
+    email_draft:                    String,
+    password_draft:                 String,
+    sign_in_in_progress:            bool,
+    sign_in_error:                  Option<String>,
     /// Input state for the email text field; set by the root view after
     /// creation.
-    email_input: Option<Entity<InputState>>,
+    email_input:                    Option<Entity<InputState>>,
     /// Input state for the password text field; set by the root view after
     /// creation.
-    password_input: Option<Entity<InputState>>,
+    password_input:                 Option<Entity<InputState>>,
     /// Draft value of the storage path text field.
-    storage_path_draft: String,
+    storage_path_draft:             String,
     /// Input state for the storage path text field; set by the root view after
     /// creation.
-    storage_path_input: Option<Entity<InputState>>,
+    storage_path_input:             Option<Entity<InputState>>,
     /// Masked API key hint computed at sign-in time (first 4 + bullets + last
     /// 1).
-    api_key_hint: Option<String>,
+    api_key_hint:                   Option<String>,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
-    pending_file_opener: Option<PathBuf>,
+    pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
     ///
     /// Persisted to [`crate::data::ui_state::UiState`] so the settings window
@@ -189,35 +189,35 @@ pub struct SettingsController {
     /// tracks page selection in its own per-window state with no way to read
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.
-    active_page_ix: usize,
+    active_page_ix:                 usize,
     /// Cached per-type cache counts for the Advanced page. Refreshed on the
     /// panel-open, page-change, and cache-clear paths — see
     /// [`Self::refresh_cache_counts`] — rather than recomputed on every
     /// render pass, so rendering performs no disk I/O.
-    cache_counts: CacheCounts,
+    cache_counts:                   CacheCounts,
     /// `true` when the email input should be focused on the settings
     /// window's next render pass. Set by
     /// [`Self::request_email_focus_on_account_tab`] and consumed (cleared)
     /// by the settings window's render — see `SettingsWindowView::render`.
-    focus_email_pending: bool,
+    focus_email_pending:            bool,
     /// Input state for the "Recently Updated window" number field; set by
     /// the root view after creation.
-    recently_updated_window_input: Option<Entity<InputState>>,
+    recently_updated_window_input:  Option<Entity<InputState>>,
     /// Input state for the "Max concurrent downloads" number field; set by
     /// the root view after creation.
     max_concurrent_downloads_input: Option<Entity<InputState>>,
     /// Font picker state for the Appearance page's body-font row; set by the
     /// root view after creation.
-    body_font_select: Option<FontSelectState>,
+    body_font_select:               Option<FontSelectState>,
     /// Font picker state for the Appearance page's value-font row; set by the
     /// root view after creation.
-    value_font_select: Option<FontSelectState>,
+    value_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's label-font row; set by the
     /// root view after creation.
-    label_font_select: Option<FontSelectState>,
+    label_font_select:              Option<FontSelectState>,
     /// Font picker state for the Appearance page's monospace-font row; set by
     /// the root view after creation.
-    mono_font_select: Option<FontSelectState>,
+    mono_font_select:               Option<FontSelectState>,
 }
 
 impl SettingsController {
@@ -236,25 +236,25 @@ impl SettingsController {
     /// fresh install.
     pub fn new(login_service: Box<dyn LoginService>, cx: &mut Context<Self>) -> Self {
         let file_openers = FileOpenerConfig::load();
-        let loaded_credential = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY)
-            .load()
-            .ok()
-            .flatten();
+        let loaded_credential =
+            KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY).load()
+                                                                         .ok()
+                                                                         .flatten();
         let is_authenticated = loaded_credential.is_some();
         // Pre-fill email from the stored credential; fall back to ProfileConfig
         // for users whose email was saved there before this field moved to the
         // keyring entry.
-        let email_draft = loaded_credential
-            .as_ref()
-            .and_then(|c| c.email.as_deref())
-            .map(str::to_owned)
-            .or_else(|| ProfileConfig::load().email().map(str::to_owned))
-            .unwrap_or_default();
+        let email_draft =
+            loaded_credential.as_ref()
+                             .and_then(|c| c.email.as_deref())
+                             .map(str::to_owned)
+                             .or_else(|| ProfileConfig::load().email().map(str::to_owned))
+                             .unwrap_or_default();
 
         let storage = StorageConfig::load();
         if storage.is_default()
-            && !storage.is_accessible()
-            && let Err(e) = storage.ensure_root_exists()
+           && !storage.is_accessible()
+           && let Err(e) = storage.ensure_root_exists()
         {
             tracing::warn!(
                 error = %e,
@@ -272,37 +272,35 @@ impl SettingsController {
         let initial_path = storage.root_path();
         let storage_path_draft = initial_path.to_string_lossy().into_owned();
 
-        let mut ctrl = Self {
-            is_open: false,
-            file_openers,
-            is_authenticated,
-            auth_state: AuthState::LoggedOut,
-            storage_path_exists: true,
-            storage,
-            storage_unavailable,
-            login_service: Arc::from(login_service),
-            email_draft,
-            password_draft: String::new(),
-            sign_in_in_progress: false,
-            sign_in_error: None,
-            email_input: None,
-            password_input: None,
-            storage_path_draft,
-            storage_path_input: None,
-            api_key_hint: None,
-            pending_file_opener: None,
-            active_page_ix: crate::data::ui_state::UiState::load()
-                .settings_page_ix()
-                .unwrap_or(0),
-            cache_counts: CacheCounts::default(),
-            focus_email_pending: false,
-            recently_updated_window_input: None,
-            max_concurrent_downloads_input: None,
-            body_font_select: None,
-            value_font_select: None,
-            label_font_select: None,
-            mono_font_select: None,
-        };
+        let mut ctrl = Self { is_open: false,
+                              file_openers,
+                              is_authenticated,
+                              auth_state: AuthState::LoggedOut,
+                              storage_path_exists: true,
+                              storage,
+                              storage_unavailable,
+                              login_service: Arc::from(login_service),
+                              email_draft,
+                              password_draft: String::new(),
+                              sign_in_in_progress: false,
+                              sign_in_error: None,
+                              email_input: None,
+                              password_input: None,
+                              storage_path_draft,
+                              storage_path_input: None,
+                              api_key_hint: None,
+                              pending_file_opener: None,
+                              active_page_ix:
+                                  crate::data::ui_state::UiState::load().settings_page_ix()
+                                                                        .unwrap_or(0),
+                              cache_counts: CacheCounts::default(),
+                              focus_email_pending: false,
+                              recently_updated_window_input: None,
+                              max_concurrent_downloads_input: None,
+                              body_font_select: None,
+                              value_font_select: None,
+                              label_font_select: None,
+                              mono_font_select: None };
         ctrl.check_storage_path_exists(initial_path, cx);
         ctrl.refresh_cache_counts();
         ctrl
@@ -317,35 +315,33 @@ impl SettingsController {
     /// without those side effects.
     #[cfg(test)]
     pub(crate) fn for_test(login_service: Arc<dyn LoginService>) -> Self {
-        Self {
-            is_open: false,
-            file_openers: FileOpenerConfig::default(),
-            is_authenticated: false,
-            auth_state: AuthState::LoggedOut,
-            storage_path_exists: true,
-            storage: StorageConfig::for_test(std::env::temp_dir()),
-            storage_unavailable: false,
-            login_service,
-            email_draft: String::new(),
-            password_draft: String::new(),
-            sign_in_in_progress: false,
-            sign_in_error: None,
-            email_input: None,
-            password_input: None,
-            storage_path_draft: String::new(),
-            storage_path_input: None,
-            api_key_hint: None,
-            pending_file_opener: None,
-            active_page_ix: 0,
-            cache_counts: CacheCounts::default(),
-            focus_email_pending: false,
-            recently_updated_window_input: None,
-            max_concurrent_downloads_input: None,
-            body_font_select: None,
-            value_font_select: None,
-            label_font_select: None,
-            mono_font_select: None,
-        }
+        Self { is_open: false,
+               file_openers: FileOpenerConfig::default(),
+               is_authenticated: false,
+               auth_state: AuthState::LoggedOut,
+               storage_path_exists: true,
+               storage: StorageConfig::for_test(std::env::temp_dir()),
+               storage_unavailable: false,
+               login_service,
+               email_draft: String::new(),
+               password_draft: String::new(),
+               sign_in_in_progress: false,
+               sign_in_error: None,
+               email_input: None,
+               password_input: None,
+               storage_path_draft: String::new(),
+               storage_path_input: None,
+               api_key_hint: None,
+               pending_file_opener: None,
+               active_page_ix: 0,
+               cache_counts: CacheCounts::default(),
+               focus_email_pending: false,
+               recently_updated_window_input: None,
+               max_concurrent_downloads_input: None,
+               body_font_select: None,
+               value_font_select: None,
+               label_font_select: None,
+               mono_font_select: None }
     }
 
     /// Attaches the email input state entity created by the root view.
@@ -439,27 +435,23 @@ impl SettingsController {
     /// When `email` is `Some`, spawns a background task to fetch the Gravatar
     /// avatar. Emits [`SettingsChanged`] immediately and again once avatar
     /// bytes arrive (if applicable).
-    pub fn set_logged_in(
-        &mut self, email: Option<String>, api_key: Option<&str>, cx: &mut Context<Self>,
-    ) {
+    pub fn set_logged_in(&mut self, email: Option<String>, api_key: Option<&str>,
+                         cx: &mut Context<Self>) {
         self.is_authenticated = true;
-        self.auth_state = AuthState::LoggedIn {
-            email: email.clone(),
-            avatar_bytes: None,
-        };
+        self.auth_state = AuthState::LoggedIn { email:        email.clone(),
+                                                avatar_bytes: None, };
         self.api_key_hint = api_key.map(mask_api_key);
         cx.emit(SettingsChanged);
 
         if let Some(addr) = email {
             cx.spawn(async move |this, async_cx| {
-                let bytes = async_cx
-                    .background_executor()
-                    .spawn(async move { fetch_avatar_bytes(addr) })
-                    .await;
-                this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx))
-                    .ok();
-            })
-            .detach();
+                  let bytes = async_cx.background_executor()
+                                      .spawn(async move { fetch_avatar_bytes(addr) })
+                                      .await;
+                  this.update(async_cx, |ctrl, cx| ctrl.set_avatar_bytes(bytes, cx))
+                      .ok();
+              })
+              .detach();
         }
     }
 
@@ -502,9 +494,8 @@ impl SettingsController {
     ///
     /// Returns a [`StorageError`] if `path` is missing, unwritable, or on an
     /// unavailable volume.
-    pub fn apply_storage_path(
-        &mut self, path: PathBuf, cx: &mut Context<Self>,
-    ) -> Result<(), StorageError> {
+    pub fn apply_storage_path(&mut self, path: PathBuf, cx: &mut Context<Self>)
+                              -> Result<(), StorageError> {
         validate_writable(&path)?;
         self.storage.set_root_path(path.clone());
         self.storage_unavailable = false;
@@ -552,17 +543,16 @@ impl SettingsController {
     /// Writes the result back to `storage_path_exists` and notifies the UI.
     fn check_storage_path_exists(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
-            let exists = async_cx
-                .background_executor()
-                .spawn(async move { path.exists() })
-                .await;
-            this.update(async_cx, |ctrl, cx| {
-                ctrl.storage_path_exists = exists;
-                cx.notify();
-            })
-            .ok();
-        })
-        .detach();
+              let exists = async_cx.background_executor()
+                                   .spawn(async move { path.exists() })
+                                   .await;
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.storage_path_exists = exists;
+                      cx.notify();
+                  })
+                  .ok();
+          })
+          .detach();
     }
 
     /// Opens the OS file manager at the configured storage root, creating the
@@ -586,7 +576,7 @@ impl SettingsController {
     pub fn clear_cache(&mut self, cx: &mut Context<Self>) {
         let dir = app_cache_dir();
         if let Err(e) = std::fs::remove_dir_all(&dir)
-            && e.kind() != std::io::ErrorKind::NotFound
+           && e.kind() != std::io::ErrorKind::NotFound
         {
             tracing::warn!("clear cache: failed to remove {}: {e}", dir.display());
         }
@@ -659,7 +649,8 @@ impl SettingsController {
             let trimmed = self.email_draft.trim();
             if trimmed.is_empty() {
                 None
-            } else {
+            }
+            else {
                 Some(trimmed.to_owned())
             }
         };
@@ -668,25 +659,24 @@ impl SettingsController {
         cx.emit(StartupAuthBegun);
 
         cx.spawn(async move |this, async_cx| {
-            let api_key_hint = api_key.clone();
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { svc.authenticate(&api_key) })
-                .await;
+              let api_key_hint = api_key.clone();
+              let result = async_cx.background_executor()
+                                   .spawn(async move { svc.authenticate(&api_key) })
+                                   .await;
 
-            this.update(async_cx, |ctrl, cx| match result {
-                Ok(tokens) => {
-                    ctrl.set_logged_in(email, Some(api_key_hint.as_str()), cx);
-                    cx.emit(SignInSucceeded(tokens));
-                }
-                Err(e) => {
-                    tracing::warn!("startup re-authentication failed: {e}");
-                    cx.emit(StartupAuthFailed);
-                }
-            })
-            .ok();
-        })
-        .detach();
+              this.update(async_cx, |ctrl, cx| match result {
+                      Ok(tokens) => {
+                          ctrl.set_logged_in(email, Some(api_key_hint.as_str()), cx);
+                          cx.emit(SignInSucceeded(tokens));
+                      }
+                      Err(e) => {
+                          tracing::warn!("startup re-authentication failed: {e}");
+                          cx.emit(StartupAuthFailed);
+                      }
+                  })
+                  .ok();
+          })
+          .detach();
     }
 
     /// Signs in using the current `email_draft` and `password_draft`.
@@ -709,69 +699,68 @@ impl SettingsController {
         let svc = self.login_service.clone();
 
         cx.spawn(async move |this, async_cx| {
-            // Step 1: exchange email + password for application key.
-            let credential_result = async_cx
-                .background_executor()
-                .spawn({
-                    let email = email.clone();
-                    let password = password.clone();
-                    async move {
-                        svc.login_with_credentials(&email, &password)
-                            .map(|key| (svc, key))
-                    }
-                })
-                .await;
+              // Step 1: exchange email + password for application key.
+              let credential_result = async_cx.background_executor()
+                                              .spawn({
+                                                  let email = email.clone();
+                                                  let password = password.clone();
+                                                  async move {
+                                                      svc.login_with_credentials(&email, &password)
+                                                         .map(|key| (svc, key))
+                                                  }
+                                              })
+                                              .await;
 
-            let (svc, api_key) = match credential_result {
-                Ok(pair) => pair,
-                Err(e) => {
-                    this.update(async_cx, |ctrl, cx| {
-                        ctrl.sign_in_in_progress = false;
-                        ctrl.sign_in_error = Some(e.0);
-                        cx.emit(SettingsChanged);
-                    })
-                    .ok();
-                    return;
-                }
-            };
+              let (svc, api_key) = match credential_result {
+                  Ok(pair) => pair,
+                  Err(e) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.sign_in_in_progress = false;
+                              ctrl.sign_in_error = Some(e.0);
+                              cx.emit(SettingsChanged);
+                          })
+                          .ok();
+                      return;
+                  }
+              };
 
-            // Step 2: exchange application key for session tokens.
-            let auth_result = async_cx
-                .background_executor()
-                .spawn({
-                    let key = api_key.clone();
-                    async move { svc.authenticate(&key).map(|t| (key, t)) }
-                })
-                .await;
+              // Step 2: exchange application key for session tokens.
+              let auth_result = async_cx.background_executor()
+                                        .spawn({
+                                            let key = api_key.clone();
+                                            async move { svc.authenticate(&key).map(|t| (key, t)) }
+                                        })
+                                        .await;
 
-            this.update(async_cx, |ctrl, cx| {
-                ctrl.sign_in_in_progress = false;
-                match auth_result {
-                    Ok((key, tokens)) => {
-                        let store = KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
-                        if let Err(e) = store.store(&Credential {
-                            service: KEYRING_SERVICE.into(),
-                            account: KEYRING_API_KEY.into(),
-                            secret: key.clone(),
-                            email: Some(email.clone()),
-                        }) {
-                            tracing::warn!("failed to save credential to keyring: {e}");
-                        }
-                        ProfileConfig::save(Some(&email));
-                        ctrl.password_draft.clear();
-                        ctrl.set_logged_in(Some(email), Some(key.as_str()), cx);
-                        cx.emit(SignInSucceeded(tokens));
-                    }
-                    Err(e) => {
-                        ctrl.sign_in_error =
-                            Some(format!("{}: {}", t!("activity.session_setup_failed"), e.0));
-                        cx.emit(SettingsChanged);
-                    }
-                }
-            })
-            .ok();
-        })
-        .detach();
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.sign_in_in_progress = false;
+                      match auth_result {
+                          Ok((key, tokens)) => {
+                              let store =
+                                  KeyringCredentialStore::new(KEYRING_SERVICE, KEYRING_API_KEY);
+                              if let Err(e) =
+                                  store.store(&Credential { service: KEYRING_SERVICE.into(),
+                                                            account: KEYRING_API_KEY.into(),
+                                                            secret:  key.clone(),
+                                                            email:   Some(email.clone()), })
+                              {
+                                  tracing::warn!("failed to save credential to keyring: {e}");
+                              }
+                              ProfileConfig::save(Some(&email));
+                              ctrl.password_draft.clear();
+                              ctrl.set_logged_in(Some(email), Some(key.as_str()), cx);
+                              cx.emit(SignInSucceeded(tokens));
+                          }
+                          Err(e) => {
+                              ctrl.sign_in_error =
+                                  Some(format!("{}: {}", t!("activity.session_setup_failed"), e.0));
+                              cx.emit(SettingsChanged);
+                          }
+                      }
+                  })
+                  .ok();
+          })
+          .detach();
     }
 
     // ── Panel visibility
@@ -809,9 +798,8 @@ impl SettingsController {
     }
 
     /// Adds or replaces a file-opener entry and persists the change.
-    pub fn add_file_opener(
-        &mut self, entry: FileOpenerEntry, cx: &mut Context<Self>,
-    ) -> AddOutcome {
+    pub fn add_file_opener(&mut self, entry: FileOpenerEntry, cx: &mut Context<Self>)
+                           -> AddOutcome {
         let outcome = self.file_openers.add(entry);
         self.file_openers.save();
         cx.emit(SettingsChanged);
@@ -855,16 +843,13 @@ impl SettingsController {
         if trimmed.is_empty() {
             return;
         }
-        let Some(app_path) = self.pending_file_opener.take() else {
+        let Some(app_path) = self.pending_file_opener.take()
+        else {
             return;
         };
-        self.add_file_opener(
-            FileOpenerEntry {
-                extension: trimmed.to_string(),
-                app_path,
-            },
-            cx,
-        );
+        self.add_file_opener(FileOpenerEntry { extension: trimmed.to_string(),
+                                               app_path },
+                             cx);
     }
 
     // ── Snapshot
@@ -873,57 +858,53 @@ impl SettingsController {
     /// Returns all data needed by the views for one render pass.
     pub fn snapshot(&self) -> SettingsSnapshot {
         let auth = match &self.auth_state {
-            AuthState::LoggedOut => AuthStateSnapshot {
-                is_logged_in: false,
-                email: None,
-                display_initial: None,
-                avatar_bytes: None,
-                api_key_hint: None,
-            },
-            AuthState::LoggedIn {
-                email,
-                avatar_bytes,
-            } => AuthStateSnapshot {
-                is_logged_in: true,
-                display_initial: email
-                    .as_deref()
-                    .and_then(|s| s.trim().chars().next())
-                    .map(|c| c.to_ascii_uppercase()),
-                email: email.clone(),
-                avatar_bytes: avatar_bytes.clone(),
-                api_key_hint: self.api_key_hint.clone(),
-            },
+            AuthState::LoggedOut => AuthStateSnapshot { is_logged_in:    false,
+                                                        email:           None,
+                                                        display_initial: None,
+                                                        avatar_bytes:    None,
+                                                        api_key_hint:    None, },
+            AuthState::LoggedIn { email,
+                                  avatar_bytes, } => {
+                AuthStateSnapshot { is_logged_in:    true,
+                                    display_initial: email.as_deref()
+                                                          .and_then(|s| s.trim().chars().next())
+                                                          .map(|c| c.to_ascii_uppercase()),
+                                    email:           email.clone(),
+                                    avatar_bytes:    avatar_bytes.clone(),
+                                    api_key_hint:    self.api_key_hint.clone(), }
+            }
         };
 
-        SettingsSnapshot {
-            is_open: self.is_open,
-            file_openers: self.file_openers.entries().to_vec(),
-            is_authenticated: self.is_authenticated,
-            storage_root_path: self.storage.root_path(),
-            storage_unavailable: self.storage_unavailable,
-            storage_path_exists: self.storage_path_exists,
-            auth,
-            email_draft: self.email_draft.clone(),
-            password_draft: self.password_draft.clone(),
-            sign_in_in_progress: self.sign_in_in_progress,
-            sign_in_error: self.sign_in_error.clone(),
-            email_input: self.email_input.clone(),
-            password_input: self.password_input.clone(),
-            storage_path_draft: self.storage_path_draft.clone(),
-            storage_path_input: self.storage_path_input.clone(),
-            pending_file_opener: self.pending_file_opener.clone(),
-            active_page_ix: self.active_page_ix,
-            cache_counts: self.cache_counts,
-            max_concurrent_downloads: self.storage.max_concurrent_downloads(),
-            max_concurrent_downloads_input: self.max_concurrent_downloads_input.clone(),
-            create_collections: self.storage.create_collections(),
-            recently_updated_window_days: self.storage.recently_updated_window_days(),
-            recently_updated_window_input: self.recently_updated_window_input.clone(),
-            body_font_select: self.body_font_select.clone(),
-            value_font_select: self.value_font_select.clone(),
-            label_font_select: self.label_font_select.clone(),
-            mono_font_select: self.mono_font_select.clone(),
-        }
+        SettingsSnapshot { is_open: self.is_open,
+                           file_openers: self.file_openers.entries().to_vec(),
+                           is_authenticated: self.is_authenticated,
+                           storage_root_path: self.storage.root_path(),
+                           storage_unavailable: self.storage_unavailable,
+                           storage_path_exists: self.storage_path_exists,
+                           auth,
+                           email_draft: self.email_draft.clone(),
+                           password_draft: self.password_draft.clone(),
+                           sign_in_in_progress: self.sign_in_in_progress,
+                           sign_in_error: self.sign_in_error.clone(),
+                           email_input: self.email_input.clone(),
+                           password_input: self.password_input.clone(),
+                           storage_path_draft: self.storage_path_draft.clone(),
+                           storage_path_input: self.storage_path_input.clone(),
+                           pending_file_opener: self.pending_file_opener.clone(),
+                           active_page_ix: self.active_page_ix,
+                           cache_counts: self.cache_counts,
+                           max_concurrent_downloads: self.storage.max_concurrent_downloads(),
+                           max_concurrent_downloads_input: self.max_concurrent_downloads_input
+                                                               .clone(),
+                           create_collections: self.storage.create_collections(),
+                           recently_updated_window_days: self.storage
+                                                             .recently_updated_window_days(),
+                           recently_updated_window_input: self.recently_updated_window_input
+                                                              .clone(),
+                           body_font_select: self.body_font_select.clone(),
+                           value_font_select: self.value_font_select.clone(),
+                           label_font_select: self.label_font_select.clone(),
+                           mono_font_select: self.mono_font_select.clone() }
     }
 }
 
@@ -941,23 +922,19 @@ impl EventEmitter<LogoutRequested> for SettingsController {}
 fn compute_cache_counts() -> CacheCounts {
     let metadata = load_cache_metadata(&cache_dir());
     let metadata_items = metadata.as_ref().map_or(0, |m| m.item_count);
-    let metadata_saved_at_secs = metadata
-        .as_ref()
-        .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
-    let last_item_check_batch_secs = metadata
-        .as_ref()
-        .and_then(|m| m.last_item_check_batch_secs)
-        .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
-    let cover_thumbnails = std::fs::read_dir(covers_dir())
-        .map(Iterator::count)
-        .unwrap_or(0);
-    CacheCounts {
-        metadata_items,
-        cover_thumbnails,
-        avatar_cached: avatar_cached(),
-        metadata_saved_at_secs,
-        last_item_check_batch_secs,
-    }
+    let metadata_saved_at_secs =
+        metadata.as_ref()
+                .map(|m| i64::try_from(m.saved_at_secs).unwrap_or(i64::MAX));
+    let last_item_check_batch_secs = metadata.as_ref()
+                                             .and_then(|m| m.last_item_check_batch_secs)
+                                             .map(|secs| i64::try_from(secs).unwrap_or(i64::MAX));
+    let cover_thumbnails = std::fs::read_dir(covers_dir()).map(Iterator::count)
+                                                          .unwrap_or(0);
+    CacheCounts { metadata_items,
+                  cover_thumbnails,
+                  avatar_cached: avatar_cached(),
+                  metadata_saved_at_secs,
+                  last_item_check_batch_secs }
 }
 
 /// Returns a masked representation of an API key: first 4 chars + bullets +
@@ -965,7 +942,8 @@ fn compute_cache_counts() -> CacheCounts {
 fn mask_api_key(key: &str) -> String {
     if key.len() > 5 {
         format!("{}••••••••{}", &key[..4], &key[key.len() - 1..])
-    } else {
+    }
+    else {
         "••••••••".to_string()
     }
 }
@@ -999,9 +977,8 @@ mod tests {
     struct UnusedLoginService;
 
     impl LoginService for UnusedLoginService {
-        fn login_with_credentials(
-            &self, _email: &str, _password: &str,
-        ) -> Result<String, LoginError> {
+        fn login_with_credentials(&self, _email: &str, _password: &str)
+                                  -> Result<String, LoginError> {
             unimplemented!("not exercised by this test")
         }
 
@@ -1015,14 +992,14 @@ mod tests {
         let ctrl = cx.new(|_| SettingsController::for_test(Arc::new(UnusedLoginService)));
 
         ctrl.update(cx, |ctrl, cx| {
-            ctrl.set_active_page_ix(4, cx);
-            ctrl.request_email_focus_on_account_tab(cx);
-        });
+                ctrl.set_active_page_ix(4, cx);
+                ctrl.request_email_focus_on_account_tab(cx);
+            });
 
         ctrl.read_with(cx, |ctrl, _| {
-            assert_eq!(ctrl.active_page_ix, 0);
-            assert!(ctrl.focus_email_pending);
-        });
+                assert_eq!(ctrl.active_page_ix, 0);
+                assert!(ctrl.focus_email_pending);
+            });
     }
 
     #[gpui::test]

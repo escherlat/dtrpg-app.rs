@@ -9,13 +9,16 @@
 fn main() {
     println!("cargo:rerun-if-changed=../../.git/HEAD");
 
-    let git_hash = std::process::Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
+    let git_hash =
+        std::process::Command::new("git").args(["rev-parse", "--short", "HEAD"])
+                                         .output()
+                                         .ok()
+                                         .filter(|output| output.status.success())
+                                         .map(|output| {
+                                             String::from_utf8_lossy(&output.stdout).trim()
+                                                                                    .to_string()
+                                         })
+                                         .unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=DTRPG_GIT_HASH={git_hash}");
 
     println!("cargo:rustc-env=DTRPG_BUILD_DATE={}", build_date_utc());
@@ -31,10 +34,10 @@ fn main() {
 /// Uses Howard Hinnant's `civil_from_days` algorithm to convert
 /// days-since-epoch to a calendar date: <https://howardhinnant.github.io/date_algorithms.html>.
 fn build_date_utc() -> String {
-    let days_since_epoch = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() / 86_400)
-        .unwrap_or(0) as i64;
+    let days_since_epoch = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                                                       .map(|d| d.as_secs() / 86_400)
+                                                       .unwrap_or(0)
+                           as i64;
 
     let z = days_since_epoch + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;

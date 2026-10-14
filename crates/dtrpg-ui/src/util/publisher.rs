@@ -10,7 +10,7 @@ use crate::data::library::LibraryItem;
 /// A publisher entry with the count of its items in the current result set.
 #[derive(Debug, Clone)]
 pub struct PublisherEntry {
-    pub name: Arc<str>,
+    pub name:  Arc<str>,
     pub count: usize,
 }
 
@@ -21,10 +21,9 @@ pub fn publisher_entries(items: &[LibraryItem]) -> Vec<PublisherEntry> {
     for item in items {
         *map.entry(Arc::clone(&item.publisher)).or_insert(0) += 1;
     }
-    let mut entries: Vec<PublisherEntry> = map
-        .into_iter()
-        .map(|(name, count)| PublisherEntry { name, count })
-        .collect();
+    let mut entries: Vec<PublisherEntry> = map.into_iter()
+                                              .map(|(name, count)| PublisherEntry { name, count })
+                                              .collect();
     entries.sort_by_key(|e| e.name.to_lowercase());
     entries
 }
@@ -36,7 +35,7 @@ pub fn publisher_entries(items: &[LibraryItem]) -> Vec<PublisherEntry> {
 #[derive(Debug, Clone)]
 pub struct PublisherGroup {
     pub publisher: Arc<str>,
-    pub items: Vec<LibraryItem>,
+    pub items:     Vec<LibraryItem>,
 }
 
 /// Partitions `items` into publisher groups in the same order as
@@ -48,18 +47,16 @@ pub fn group_by_publisher(items: Vec<LibraryItem>) -> Vec<PublisherGroup> {
         std::collections::HashMap::new();
     for item in items {
         map.entry(Arc::clone(&item.publisher))
-            .or_default()
-            .push(item);
+           .or_default()
+           .push(item);
     }
-    entries
-        .into_iter()
-        .filter_map(|e| {
-            map.remove(&e.name).map(|group_items| PublisherGroup {
-                publisher: e.name,
-                items: group_items,
-            })
-        })
-        .collect()
+    entries.into_iter()
+           .filter_map(|e| {
+               map.remove(&e.name)
+                  .map(|group_items| PublisherGroup { publisher: e.name,
+                                                      items:     group_items, })
+           })
+           .collect()
 }
 
 // ── Footer totals
@@ -71,7 +68,8 @@ pub fn format_total_size(items: &[LibraryItem]) -> String {
     let total_mb: f64 = items.iter().map(|i| i.size_mb).sum();
     if total_mb >= 1024.0 {
         format!("{:.1} GB", total_mb / 1024.0)
-    } else {
+    }
+    else {
         format!("{:.0} MB", total_mb)
     }
 }
@@ -84,22 +82,20 @@ mod tests {
     use crate::data::library::LibraryItem;
 
     fn item(publisher: &str) -> LibraryItem {
-        LibraryItem::new(
-            "id",
-            "Title",
-            publisher,
-            "",
-            "",
-            "PDF",
-            0,
-            0.0,
-            2020,
-            0,
-            crate::data::enums::ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        )
+        LibraryItem::new("id",
+                         "Title",
+                         publisher,
+                         "",
+                         "",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         crate::data::enums::ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     #[test]
@@ -112,11 +108,9 @@ mod tests {
 
     #[test]
     fn multiple_publishers_sorted_alphabetically() {
-        let items = vec![
-            item("Wizards of the Coast"),
-            item("Paizo"),
-            item("Kobold Press"),
-        ];
+        let items = vec![item("Wizards of the Coast"),
+                         item("Paizo"),
+                         item("Kobold Press"),];
         let entries = publisher_entries(&items);
         let names: Vec<&str> = entries.iter().map(|e| e.name.as_ref()).collect();
         assert_eq!(names, ["Kobold Press", "Paizo", "Wizards of the Coast"]);

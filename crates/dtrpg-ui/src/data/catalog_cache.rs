@@ -44,12 +44,12 @@ const CACHE_SCHEMA_VERSION: u32 = 3;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheMetadata {
     /// Unix timestamp (seconds since epoch) when the cache was written.
-    pub saved_at_secs: u64,
+    pub saved_at_secs:                   u64,
     /// Number of items in the cache at write time.
-    pub item_count: usize,
+    pub item_count:                      usize,
     /// Schema version the cache was written with; see [`CACHE_SCHEMA_VERSION`].
     #[serde(default)]
-    pub schema_version: u32,
+    pub schema_version:                  u32,
     /// Unix timestamp (seconds since epoch) of the last per-item availability
     /// check batch (manual or automatic), gating
     /// `ITEM_CHECK_BATCH_COOLDOWN_SECS`. `#[serde(default)]` so metadata
@@ -57,7 +57,7 @@ pub struct CacheMetadata {
     /// first post-upgrade batch is never blocked by a cooldown it has no
     /// record of.
     #[serde(default)]
-    pub last_item_check_batch_secs: Option<u64>,
+    pub last_item_check_batch_secs:      Option<u64>,
     /// Unix timestamp (seconds since epoch) of the last fresh-install
     /// catalog-initialization request (see
     /// `rust-catalog-fresh-install-initialization`), gating
@@ -75,10 +75,9 @@ impl CacheMetadata {
         if self.schema_version != CACHE_SCHEMA_VERSION {
             return true;
         }
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)
+                                   .unwrap_or(Duration::ZERO)
+                                   .as_secs();
         now.saturating_sub(self.saved_at_secs) > STALE_SECS
     }
 }
@@ -122,13 +121,11 @@ pub fn ensure_cache_metadata_exists(root: &Path) {
     if path.exists() {
         return;
     }
-    let meta = CacheMetadata {
-        saved_at_secs: 0,
-        item_count: 0,
-        schema_version: 0,
-        last_item_check_batch_secs: None,
-        last_fresh_install_request_secs: None,
-    };
+    let meta = CacheMetadata { saved_at_secs:                   0,
+                               item_count:                      0,
+                               schema_version:                  0,
+                               last_item_check_batch_secs:      None,
+                               last_fresh_install_request_secs: None, };
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -144,22 +141,18 @@ pub fn ensure_cache_metadata_exists(root: &Path) {
 /// overwritten, if any — a catalog cache write is unrelated to the per-item
 /// check-batch cooldown, so it must not reset it.
 pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), CatalogCacheError> {
-    let saved_at_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_secs();
+    let saved_at_secs = SystemTime::now().duration_since(UNIX_EPOCH)
+                                         .unwrap_or(Duration::ZERO)
+                                         .as_secs();
     let existing = load_cache_metadata(root);
     let last_item_check_batch_secs = existing.as_ref().and_then(|m| m.last_item_check_batch_secs);
-    let last_fresh_install_request_secs = existing
-        .as_ref()
-        .and_then(|m| m.last_fresh_install_request_secs);
-    let meta = CacheMetadata {
-        saved_at_secs,
-        item_count,
-        schema_version: CACHE_SCHEMA_VERSION,
-        last_item_check_batch_secs,
-        last_fresh_install_request_secs,
-    };
+    let last_fresh_install_request_secs = existing.as_ref()
+                                                  .and_then(|m| m.last_fresh_install_request_secs);
+    let meta = CacheMetadata { saved_at_secs,
+                               item_count,
+                               schema_version: CACHE_SCHEMA_VERSION,
+                               last_item_check_batch_secs,
+                               last_fresh_install_request_secs };
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
     Ok(())
@@ -170,13 +163,12 @@ pub fn save_cache_metadata(root: &Path, item_count: usize) -> Result<(), Catalog
 /// zeroed placeholders if no metadata file exists yet — a check batch can
 /// run before any catalog has ever been successfully synced).
 pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), CatalogCacheError> {
-    let mut meta = load_cache_metadata(root).unwrap_or(CacheMetadata {
-        saved_at_secs: 0,
-        item_count: 0,
-        schema_version: 0,
-        last_item_check_batch_secs: None,
-        last_fresh_install_request_secs: None,
-    });
+    let mut meta =
+        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+                                   item_count:                      0,
+                                   schema_version:                  0,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, });
     meta.last_item_check_batch_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
@@ -188,16 +180,14 @@ pub fn save_check_batch_timestamp(root: &Path, now_secs: u64) -> Result<(), Cata
 /// using zeroed placeholders if no metadata file exists yet — the
 /// fresh-install request happens before any catalog has ever been
 /// successfully synced).
-pub fn save_fresh_install_request_timestamp(
-    root: &Path, now_secs: u64,
-) -> Result<(), CatalogCacheError> {
-    let mut meta = load_cache_metadata(root).unwrap_or(CacheMetadata {
-        saved_at_secs: 0,
-        item_count: 0,
-        schema_version: 0,
-        last_item_check_batch_secs: None,
-        last_fresh_install_request_secs: None,
-    });
+pub fn save_fresh_install_request_timestamp(root: &Path, now_secs: u64)
+                                            -> Result<(), CatalogCacheError> {
+    let mut meta =
+        load_cache_metadata(root).unwrap_or(CacheMetadata { saved_at_secs:                   0,
+                                   item_count:                      0,
+                                   schema_version:                  0,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, });
     meta.last_fresh_install_request_secs = Some(now_secs);
     let json = serde_json::to_string(&meta)?;
     fs::write(root.join(CATALOG_CACHE_METADATA_FILE), &json)?;
@@ -262,15 +252,14 @@ pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
 fn dedupe_items(items: Vec<LibraryItem>) -> Vec<LibraryItem> {
     let mut seen_ids = std::collections::HashSet::new();
     let mut seen_product_ids = std::collections::HashSet::new();
-    items
-        .into_iter()
-        .filter(|item| {
-            if !seen_ids.insert(Arc::clone(&item.id)) {
-                return false;
-            }
-            item.product_id == 0 || seen_product_ids.insert(item.product_id)
-        })
-        .collect()
+    items.into_iter()
+         .filter(|item| {
+             if !seen_ids.insert(Arc::clone(&item.id)) {
+                 return false;
+             }
+             item.product_id == 0 || seen_product_ids.insert(item.product_id)
+         })
+         .collect()
 }
 
 // ── save_catalog_cache
@@ -310,22 +299,20 @@ mod tests {
     }
 
     fn make_item(id: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            "Test Title",
-            "Test Publisher",
-            "",
-            "Core",
-            "PDF",
-            100,
-            10.0,
-            2024,
-            1,
-            ItemStatus::Cloud,
-            "#1C2A44",
-            "Desc.",
-            None,
-        )
+        LibraryItem::new(id,
+                         "Test Title",
+                         "Test Publisher",
+                         "",
+                         "Core",
+                         "PDF",
+                         100,
+                         10.0,
+                         2024,
+                         1,
+                         ItemStatus::Cloud,
+                         "#1C2A44",
+                         "Desc.",
+                         None)
     }
 
     #[test]
@@ -346,28 +333,24 @@ mod tests {
 
     #[test]
     fn fresh_metadata_is_not_stale() {
-        let meta = CacheMetadata {
-            saved_at_secs: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            item_count: 10,
-            schema_version: CACHE_SCHEMA_VERSION,
-            last_item_check_batch_secs: None,
-            last_fresh_install_request_secs: None,
-        };
+        let meta = CacheMetadata { saved_at_secs:
+                                       SystemTime::now().duration_since(UNIX_EPOCH)
+                                                        .unwrap()
+                                                        .as_secs(),
+                                   item_count:                      10,
+                                   schema_version:                  CACHE_SCHEMA_VERSION,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, };
         assert!(!meta.is_stale());
     }
 
     #[test]
     fn old_metadata_is_stale() {
-        let meta = CacheMetadata {
-            saved_at_secs: 0, // epoch — very old
-            item_count: 10,
-            schema_version: CACHE_SCHEMA_VERSION,
-            last_item_check_batch_secs: None,
-            last_fresh_install_request_secs: None,
-        };
+        let meta = CacheMetadata { saved_at_secs:                   0, // epoch — very old
+                                   item_count:                      10,
+                                   schema_version:                  CACHE_SCHEMA_VERSION,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, };
         assert!(meta.is_stale());
     }
 
@@ -376,16 +359,14 @@ mod tests {
         // Regression: a cache saved before `cover_url` was populated
         // correctly must not be trusted as fresh just because it's recent —
         // it silently disabled thumbnail loading for up to 7 days otherwise.
-        let meta = CacheMetadata {
-            saved_at_secs: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            item_count: 10,
-            schema_version: CACHE_SCHEMA_VERSION - 1,
-            last_item_check_batch_secs: None,
-            last_fresh_install_request_secs: None,
-        };
+        let meta = CacheMetadata { saved_at_secs:
+                                       SystemTime::now().duration_since(UNIX_EPOCH)
+                                                        .unwrap()
+                                                        .as_secs(),
+                                   item_count:                      10,
+                                   schema_version:                  CACHE_SCHEMA_VERSION - 1,
+                                   last_item_check_batch_secs:      None,
+                                   last_fresh_install_request_secs: None, };
         assert!(meta.is_stale());
     }
 
@@ -478,32 +459,23 @@ mod tests {
         let dir = test_dir("dedupe_on_load");
         fs::create_dir_all(&dir).unwrap();
         let mut item = make_item("b1");
-        item.files = vec![
-            LibraryItemFile {
-                id: "1234".into(),
-                index: 0,
-                name: "Moria Rulebook".into(),
-                format: "PDF".into(),
-                size_mb: 1.0,
-                downloaded: false,
-            },
-            LibraryItemFile {
-                id: "1234".into(),
-                index: 0,
-                name: "Moria Rulebook".into(),
-                format: "PDF".into(),
-                size_mb: 1.0,
-                downloaded: false,
-            },
-        ];
+        item.files = vec![LibraryItemFile { id:         "1234".into(),
+                                            index:      0,
+                                            name:       "Moria Rulebook".into(),
+                                            format:     "PDF".into(),
+                                            size_mb:    1.0,
+                                            downloaded: false, },
+                          LibraryItemFile { id:         "1234".into(),
+                                            index:      0,
+                                            name:       "Moria Rulebook".into(),
+                                            format:     "PDF".into(),
+                                            size_mb:    1.0,
+                                            downloaded: false, },];
         // Bypass `save_catalog_cache` (which would go through the current,
         // already-deduped write path) to simulate JSON written by an older
         // build that had not yet deduplicated file records.
-        fs::write(
-            dir.join(CATALOG_CACHE_FILE),
-            serde_json::to_string(&vec![item]).unwrap(),
-        )
-        .unwrap();
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![item]).unwrap()).unwrap();
 
         let loaded = load_catalog_cache(&dir);
         let _ = fs::remove_dir_all(&dir);
@@ -524,11 +496,8 @@ mod tests {
         let dir = test_dir("dedupe_whole_items_on_load");
         fs::create_dir_all(&dir).unwrap();
         let item = make_item("c1");
-        fs::write(
-            dir.join(CATALOG_CACHE_FILE),
-            serde_json::to_string(&vec![item.clone(), item.clone(), item]).unwrap(),
-        )
-        .unwrap();
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![item.clone(), item.clone(), item]).unwrap()).unwrap();
 
         let loaded = load_catalog_cache(&dir);
         let _ = fs::remove_dir_all(&dir);
@@ -551,11 +520,8 @@ mod tests {
         old_item.product_id = 42;
         let mut new_item = make_item("new-id");
         new_item.product_id = 42;
-        fs::write(
-            dir.join(CATALOG_CACHE_FILE),
-            serde_json::to_string(&vec![old_item, new_item]).unwrap(),
-        )
-        .unwrap();
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![old_item, new_item]).unwrap()).unwrap();
 
         let loaded = load_catalog_cache(&dir);
         let _ = fs::remove_dir_all(&dir);
@@ -576,11 +542,8 @@ mod tests {
         let item_b = make_item("a2");
         assert_eq!(item_a.product_id, 0);
         assert_eq!(item_b.product_id, 0);
-        fs::write(
-            dir.join(CATALOG_CACHE_FILE),
-            serde_json::to_string(&vec![item_a, item_b]).unwrap(),
-        )
-        .unwrap();
+        fs::write(dir.join(CATALOG_CACHE_FILE),
+                  serde_json::to_string(&vec![item_a, item_b]).unwrap()).unwrap();
 
         let loaded = load_catalog_cache(&dir);
         let _ = fs::remove_dir_all(&dir);

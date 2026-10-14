@@ -43,7 +43,7 @@ impl EventEmitter<DownloadComplete> for ActivityController {}
 /// Emitted when a download activity item transitions to `Error`.
 pub struct DownloadError {
     /// Display label of the failed item.
-    pub title: std::sync::Arc<str>,
+    pub title:   std::sync::Arc<str>,
     /// Error message.
     pub message: String,
 }
@@ -182,7 +182,7 @@ pub struct ThumbnailRefreshCompleted {
     /// Number of covers that re-fetched successfully.
     pub succeeded: usize,
     /// Number of covers that failed to re-fetch.
-    pub failed: usize,
+    pub failed:    usize,
 }
 
 impl EventEmitter<ThumbnailRefreshCompleted> for LibraryController {}
@@ -238,7 +238,7 @@ pub struct LowDiskSpaceWarning {
     /// enqueue.
     pub needed_mb: f64,
     /// Free disk space, in megabytes, at the storage root.
-    pub free_mb: f64,
+    pub free_mb:   f64,
 }
 
 impl EventEmitter<LowDiskSpaceWarning> for LibraryController {}

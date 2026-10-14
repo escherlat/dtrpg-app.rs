@@ -34,14 +34,14 @@ impl LibraryService for StubLibraryService {
         match self.mode {
             StubMode::Seeded => Ok(stub_catalog()),
             StubMode::Empty => Ok(vec![]),
-            StubMode::NetworkError => Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::Network,
-                "stub: simulated network error",
-            )),
-            StubMode::SessionError => Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::Session,
-                "stub: simulated session error",
-            )),
+            StubMode::NetworkError => {
+                Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                             "stub: simulated network error"))
+            }
+            StubMode::SessionError => {
+                Err(LibraryServiceError::new(LibraryServiceErrorKind::Session,
+                                             "stub: simulated session error"))
+            }
         }
     }
 
@@ -65,31 +65,30 @@ impl LibraryService for StubLibraryService {
         }
     }
 
-    fn download_item(
-        &self, _order_product_id: u64, _index: u32, dest: &std::path::Path,
-        _cancel: &std::sync::atomic::AtomicBool,
-        _on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>,
-    ) -> Result<(), LibraryServiceError> {
+    fn download_item(&self, _order_product_id: u64, _index: u32, dest: &std::path::Path,
+                     _cancel: &std::sync::atomic::AtomicBool,
+                     _on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>)
+                     -> Result<(), LibraryServiceError> {
         match self.mode {
             StubMode::Seeded | StubMode::Empty => {
                 if let Some(parent) = dest.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
                 std::fs::write(dest, b"stub download content").map_err(|e| {
-                    LibraryServiceError::new(
+                                                                  LibraryServiceError::new(
                         LibraryServiceErrorKind::Network,
                         format!("stub: failed to write {}: {e}", dest.display()),
                     )
-                })
+                                                              })
             }
-            StubMode::NetworkError => Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::Network,
-                "stub: simulated network error",
-            )),
-            StubMode::SessionError => Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::Session,
-                "stub: simulated session error",
-            )),
+            StubMode::NetworkError => {
+                Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                             "stub: simulated network error"))
+            }
+            StubMode::SessionError => {
+                Err(LibraryServiceError::new(LibraryServiceErrorKind::Session,
+                                             "stub: simulated session error"))
+            }
         }
     }
 }
