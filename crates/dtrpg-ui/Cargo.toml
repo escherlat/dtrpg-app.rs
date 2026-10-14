@@ -12,6 +12,7 @@ workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
 gpui-component = { workspace = true }
+gpui-kit = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
