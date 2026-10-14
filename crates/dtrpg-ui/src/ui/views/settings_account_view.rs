@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use gpui::{
     AnyElement, Entity, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
-    ParentElement, StatefulInteractiveElement, Styled, div, px,
+    ObjectFit, ParentElement, StatefulInteractiveElement, Styled, StyledImage, div, img, px,
 };
 use gpui_kit::component::Sizable;
 use gpui_kit::component::avatar::Avatar;
@@ -172,9 +172,7 @@ fn account_info_item(
 /// Renders a 56×56 avatar circle: Gravatar image if available, initial letter
 /// otherwise.
 fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyElement {
-    let avatar = Avatar::new()
-        .with_size(gpui_kit::component::Size::Size(px(56.)))
-        .rounded_full();
+    const AVATAR_SIZE: gpui::Pixels = px(56.);
 
     if let Some(bytes) = &auth.avatar_bytes {
         let format = if bytes.starts_with(b"\x89PNG") {
@@ -183,7 +181,19 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
             ImageFormat::Jpeg
         };
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        return avatar.src(ImageSource::Image(image)).into_any_element();
+        // Avatar::src() composes the image with a percentage-sized child that
+        // squishes under gpui-kit's Img layout; size and crop it ourselves
+        // with explicit pixels instead.
+        return div()
+            .size(AVATAR_SIZE)
+            .rounded_full()
+            .overflow_hidden()
+            .child(
+                img(ImageSource::Image(image))
+                    .size(AVATAR_SIZE)
+                    .object_fit(ObjectFit::Cover),
+            )
+            .into_any_element();
     }
 
     let name = auth
@@ -192,7 +202,11 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
         .or_else(|| auth.display_initial.map(|c| c.to_string()))
         .unwrap_or_else(|| "D".to_string());
 
-    avatar.name(name).into_any_element()
+    Avatar::new()
+        .with_size(gpui_kit::component::Size::Size(AVATAR_SIZE))
+        .rounded_full()
+        .name(name)
+        .into_any_element()
 }
 
 // ── Unauthenticated state
