@@ -3,41 +3,46 @@
 CLAUDE.md already names moving from `gpui` + `gpui-component` to `gpui-kit`
 (https://github.com/longbridge/gpui-kit) as a short-term goal. Issue #233
 tracks it. See `docs/adr/0001-migrate-to-gpui-kit.md` for the full decision
-record. Summary: a `gpui_component` usage inventory (35 files, 175 usages,
-37 distinct types/traits across `crates/dtrpg-ui` and `crates/dtrpg-core`)
-was cross-checked directly against gpui-kit 0.7's own source (an earlier
-pass had relied on Fernrohr-App's call sites and significantly overstated
-the gaps — Fernrohr-App not using a widget isn't evidence gpui-kit lacks
-it). Direct source verification found a confirmed equivalent for every
-widget in the inventory except one real builder-API reshape (Popover).
-There is no custom-implementation or deferred-design-decision bucket in
-this plan.
+record, including its round-3 amendment. Summary: `gpui-kit` forks
+zed-industries/zed's `gpui` under its own package family (`gpui-pre`,
+reached transitively through `gpui-component` 0.7.3), with its own
+`Context`/`Window`/`App`/`Global`/`Entity` types. Those cannot be bridged to
+our existing `gpui` types from local code — the orphan rule blocks any
+`impl` connecting two foreign types/traits — so there is no partial,
+file-by-file, or wave-by-wave migration state that compiles. This is a
+single all-or-nothing rewrite: the app's bootstrap and every `Context`/
+`Window`/`App` parameter in `dtrpg-ui` and `dtrpg-core` switch together, in
+one unit of work. The widget-level mapping (35 files, 175 usages, confirmed
+equivalent for nearly every type except Popover's reshaped builder) still
+holds as the reference for what to port each type to.
 
 ## What Changes
 
-- Add `gpui-kit = "0.7"` alongside the existing `gpui-component` git
-  dependency; the two coexist for the duration of the migration (no "big
-  bang" cutover — risk of a single multi-thousand-line PR is unacceptable
-  given 35 files are touched).
-- Migrate `crates/dtrpg-ui` and `crates/dtrpg-core` off `gpui_component` in
-  dependency order, not file-alphabetical order: leaf UI primitives first
-  (`util`, `data`), then state-holding orchestration code
-  (`controllers`, `controllers/library`), then every remaining view
-  (`ui/views`, `ui/app`, `ui/library`) in one wave, since all of it is a
-  confirmed port rather than new code.
-- Remove the `gpui-component`/`gpui-component-assets` git dependencies and
-  the coexistence shim only once `rg -l "gpui_component" crates/` is empty.
+- Replace `gpui-component` (and effectively `gpui`/`gpui_platform`, since
+  the app's entry point and every render-tree signature move to gpui-kit's
+  fork) with `gpui-kit = "0.7"` in the same change — no coexistence period;
+  nothing compiles until the whole crate pair agrees on one set of
+  `Context`/`Window`/`App`/`Global` types.
+- Switch `dtrpg-core`'s app bootstrap from `gpui_platform::application()` to
+  `gpui_kit::application()`, and every `Context<Self>`/`&mut Window`/`App`
+  parameter across every view and controller in `dtrpg-ui` to gpui-kit's
+  types, together.
+- Add small local conversion helpers for value types that are
+  field-identical but distinct across the fork boundary (`Hsla`,
+  `SharedString`) — needed wherever a value crosses from app code into a
+  gpui-kit widget.
+- Remove the `gpui-component`/`gpui-component-assets` git dependencies once
+  `rg -l "gpui_component" crates/` returns empty.
 - No user-visible behavior change is intended; this is a dependency/API
   migration. Any visual regression surfaced during migration (e.g. a
   gpui-kit widget rendering a size/spacing differently) is a bug to fix in
-  the same PR that introduced it, not a deferred follow-up.
+  the same change, not a deferred follow-up.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `gpui-kit-migration`: Tracks the dependency swap itself — coexistence
-  period, per-subdirectory sequencing, and the removal gate. Scoped to
+- `gpui-kit-migration`: Tracks the dependency swap itself. Scoped to
   `dtrpg-app/rust`; no behavior-level spec changes (views keep their
   existing specs, which describe behavior, not the widget library that
   implements it).
@@ -45,26 +50,17 @@ this plan.
 ## Impact
 
 - `Cargo.toml` / `crates/*/Cargo.toml`: add `gpui-kit = "0.7"`; remove
-  `gpui-component` + `gpui-component-assets` git dependencies at the end.
+  `gpui-component` + `gpui-component-assets` git dependencies in the same
+  change.
+- `crates/dtrpg-core/src/app/mod.rs`: app-bootstrap entry point
+  (`gpui_platform::application()` → `gpui_kit::application()`).
 - `crates/dtrpg-core/src/app/assets.rs`: `gpui_component_assets::Assets`
-  asset loader fallback — needs a gpui-kit equivalent or an in-house
-  loader before `gpui-component-assets` can be dropped.
-- `crates/dtrpg-ui/src/controllers/**`, `crates/dtrpg-ui/src/data/**`,
-  `crates/dtrpg-ui/src/util/**`: low-risk, no UI-rendering `gpui_component`
-  types beyond `Theme`/`ActiveTheme` globals and `Column`/`ColumnSort` table
-  config — first wave.
-- `crates/dtrpg-ui/src/ui/views/*.rs` (catalog_view.rs, detail_panel_view.rs,
-  toolbar_view.rs, status_bar_view.rs, settings_*.rs, item_popover_view.rs,
-  zip_preview_popover.rs, alert_history_view.rs, bulk_action_bar_view.rs,
-  notification_banner_view.rs, sidebar_view.rs, tab_strip_view.rs,
-  root_view.rs, settings_view.rs, report_feature_bug_dialog.rs,
-  manage_collections_dialog.rs): third wave, widget-by-widget. All but one
-  (Popover, in `status_bar_view.rs`) are confirmed import swaps; Popover's
-  builder chain needs a hand rewrite (`.content(...)` →
-  `.anchor(...).open(...).on_open_change(...)`).
-- `crates/dtrpg-ui/src/ui/app/mod.rs`, `crates/dtrpg-ui/src/ui/library/**`:
-  same (third) wave — app bootstrap (`Root`/`init`) and shared library
-  widgets. No longer sequenced last: with no deferred-design-decision
-  files remaining, there's no straddle to avoid.
+  asset loader fallback — needs a gpui-kit equivalent or an in-house loader.
+- Every `.rs` file in `crates/dtrpg-ui/src/{controllers,data,ui,util}/**`
+  and `crates/dtrpg-core/src/**` that holds a `Context`/`Window`/`App`
+  parameter or a `gpui_component` type — all 35 files from the original
+  inventory, touched together rather than in sequenced waves. See
+  `tasks.md` for the per-type/per-file breakdown (still useful as a
+  checklist; no longer a sequencing plan).
 - No SDK, service, or credential-store code is touched — this is UI-layer
   only.

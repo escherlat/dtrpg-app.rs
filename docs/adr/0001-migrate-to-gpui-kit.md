@@ -1,6 +1,9 @@
 ## Status
 
-Accepted
+Accepted (amended — see "Amendment (round 3)" below; the amendment
+supersedes this record's original Decision and Consequences sections, which
+are kept for the history of how the mistake was found, not as current
+guidance)
 
 ## Context
 
@@ -141,3 +144,79 @@ substitution this decision process was designed to catch.
 - This record should be revisited if a future `gpui-kit` minor version
   changes any of the APIs enumerated above — re-verify against source again
   rather than assuming continuity, per the lesson in the Context section.
+
+## Amendment (round 3): fork incompatibility
+
+Round 2 verified field names, method signatures, and widget existence by
+reading source — and still missed the one thing that actually invalidates
+the coexistence plan: **what crate those types' *types* resolve to**, not
+just whether a same-named type exists.
+
+`gpui-component` 0.7.3 (crates.io, pulled in transitively via `gpui-kit`)
+declares, in its own `Cargo.toml`:
+
+```
+[dependencies.gpui]
+version = "=0.3.9"
+package = "gpui-pre"
+```
+
+That's a Cargo package rename. Every `use gpui::{...}` inside
+`gpui-component` 0.7.3's own source — `Hsla`, `SharedString`, `Context`,
+`Window`, `App`, the `Global` trait, everything — resolves to `gpui-pre`,
+a Longbridge-maintained fork of zed-industries/zed's `gpui`. Confirmed at
+the workspace level too: `gpui-kit`'s own top-level `Cargo.toml` renames the
+entire stack (`gpui = { package = "gpui-pre" }`, `gpui_platform = { package
+= "gpui-pre-platform" }`, etc.) and its `application()` entry point is
+`gpui-pre-platform::application()` — a full alternative app bootstrap, not
+a widget layer bolted onto zed's `gpui`.
+
+Attempting the smallest possible migration step (swapping one function's
+`Theme` parameter type, `apply_theme_colors` in `data/theme.rs`) proved this
+isn't a signature-compatibility question at all:
+
+1. `gpui_kit::component::Theme.colors.background: Hsla` is `gpui-pre`'s
+   `Hsla` — structurally identical to ours (`h`/`s`/`l`/`a: f32`,
+   `#[repr(C)]`) but a different type. Fixable with an explicit field-wise
+   conversion (no blanket `.into()` possible — the orphan rule blocks any
+   local `impl From<gpui::Hsla> for gpui_pre::Hsla`, since both types are
+   foreign).
+2. `SharedString` has the same problem, fixable via `gpui_pre::SharedString
+   ::from(our_str.as_ref())` since `From<&str>` exists.
+3. **Not fixable:** `cx.update_global::<gpui_kit::component::Theme, _>(...)`
+   fails with `the trait bound gpui_kit::gpui_component::Theme: gpui::Global
+   is not satisfied`. Our `cx: &mut Context<Self>` is zed's `gpui::Context`;
+   its `update_global`/`global` methods require `T: gpui::Global` — that
+   exact trait, from that exact crate. `gpui_kit::component::Theme`
+   implements `gpui_pre::Global`, a different trait from a different crate.
+   No local code can bridge this: both the trait and the type are foreign to
+   our crate, so the orphan rule forbids any `impl` connecting them.
+
+This generalizes past `Theme`: every gpui-kit `Entity`, every gpui-kit
+`Global`, every gpui-kit widget's `Render` implementation is expressed in
+terms of `gpui_pre::Context`/`gpui_pre::Window`/`gpui_pre::App`. None of it
+can be stored, read, updated, or rendered through code whose `cx`/`window`
+parameter is zed's `gpui::Context`/`gpui::Window` — not Theme, not a single
+widget, nothing. There is no file-local, wave-local, or type-local partial
+migration possible. The entire inventory in the Context and Decision
+sections above (the "round 2" verification) was correct about *what exists*
+in gpui-kit and wrong about the one fact that governs whether any of it is
+reachable from our code at all.
+
+**Revised decision: single all-or-nothing rewrite, not incremental
+migration.** `dtrpg-core`'s app bootstrap (`gpui_platform::application()` →
+`gpui_kit::application()`) and every `Context<Self>`/`&mut Window`/`App`
+parameter across every view and controller in `dtrpg-ui` and `dtrpg-core`
+must switch together, in one unit of work, because nothing compiles at any
+intermediate point otherwise. `gpui-kit` and `gpui-component` do not
+coexist as parallel dependencies during migration — `gpui-kit` replaces
+`gpui-component` (and effectively `gpui`/`gpui_platform` too, since the
+app's entry point and every render-tree signature move to gpui-kit's own
+fork) in the same change that introduces it. Commit structure may still
+split mechanical renames from the bootstrap swap, but the tree is only
+expected to compile at the final commit of that unit, not at each one.
+
+The widget-level findings from round 2 (confirmed equivalents for nearly
+every type, Popover's reshaped builder, unverified signature details) are
+still accurate and still the reference for *what to port each type to* —
+only the *sequencing and dependency-coexistence* premise was wrong.
