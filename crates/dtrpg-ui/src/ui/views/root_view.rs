@@ -34,7 +34,7 @@ use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
     open_settings_window, save_library_window_bounds,
 };
-use crate::ui::views::report_feature_bug_dialog::open_report_feature_bug_dialog;
+use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
 use crate::ui::views::{
     bulk_action_bar_view::render_bulk_action_bar,
     catalog_view::CatalogView,
@@ -137,6 +137,11 @@ pub struct LibraryRootView {
     /// `ShowSettings` action to bring an already-open window to front instead
     /// of opening a duplicate; `None` when no settings window is open.
     settings_window:             Option<WindowHandle<Root>>,
+    /// Handle to the currently-open "Report a Feature/Bug" window, if any.
+    /// Used by the `ReportFeatureBug` action to bring an already-open window
+    /// to front instead of opening a duplicate; `None` when no report window
+    /// is open.
+    report_feature_bug_window:   Option<WindowHandle<Root>>,
     /// Editable search input wired to the library controller's search query.
     search_input:                Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
@@ -859,6 +864,7 @@ impl LibraryRootView {
                sidebar_width,
                root_focus,
                settings_window: None,
+               report_feature_bug_window: None,
                search_input,
                collection_name_input,
                file_opener_extension_input,
@@ -889,6 +895,21 @@ impl LibraryRootView {
                                               self.file_opener_extension_input.clone(),
                                               cx);
             self.settings_window = Some(handle);
+        }
+    }
+
+    /// Opens the "Report a Feature/Bug" window, or brings an already-open
+    /// one to front.
+    pub(crate) fn show_report_feature_bug(&mut self, cx: &mut Context<Self>) {
+        let already_open = self.report_feature_bug_window
+                               .map(|handle| {
+                                   handle.update(cx, |_, window, _| window.activate_window())
+                                         .is_ok()
+                               })
+                               .unwrap_or(false);
+        if !already_open {
+            let handle = open_report_feature_bug_window(cx);
+            self.report_feature_bug_window = Some(handle);
         }
     }
 
@@ -1193,6 +1214,7 @@ impl Render for LibraryRootView {
         let this_entity_for_add = this_entity.clone();
         let this_entity_for_activity = this_entity.clone();
         let this_entity_for_alert_history = this_entity.clone();
+        let this_entity_for_report_bug = this_entity.clone();
         let controller_for_reload = self.controller.clone();
         let controller_for_refresh_thumbnails = self.controller.clone();
         let controller_for_check_availability = self.controller.clone();
@@ -1267,8 +1289,8 @@ impl Render for LibraryRootView {
                         )
                 });
             })
-            .on_action(move |_: &ReportFeatureBug, window, cx| {
-                open_report_feature_bug_dialog(window, cx);
+            .on_action(move |_: &ReportFeatureBug, _, cx| {
+                this_entity_for_report_bug.update(cx, |view, cx| view.show_report_feature_bug(cx));
             })
             .on_action(move |_: &ReloadCatalog, _, cx| {
                 controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));
