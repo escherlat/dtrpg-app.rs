@@ -704,15 +704,34 @@ fn nav_item(label: &str, count: usize, is_active: bool, filter: SidebarFilter,
             entity: Entity<LibraryController>, tabs: Entity<TabsController>)
             -> SidebarMenuItem {
     let label = label.to_string();
+    let click_filter = filter.clone();
+    let download_entity = entity.clone();
+    let download_filter = filter;
     SidebarMenuItem::new(label).active(is_active)
                                .suffix(move |_, _| div().text_xs().child(count.to_string()))
                                .on_click(move |_, _, cx| {
                                    entity.update(cx, |ctrl, cx| {
-                                             ctrl.set_filter(filter.clone(), cx)
+                                             ctrl.set_filter(click_filter.clone(), cx)
                                          });
                                    tabs.update(cx, |ctrl, cx| {
                                            ctrl.activate(TabTarget::Catalog, cx)
                                        });
+                               })
+                               .context_menu(move |menu, _, _| {
+                                   let entity = download_entity.clone();
+                                   let filter = download_filter.clone();
+                                   menu.item(PopupMenuItem::new(t!("sidebar.download_all")).on_click(
+                                       move |_, _, cx| {
+                                           entity.update(cx, |ctrl, cx| {
+                                               if let SidebarFilter::Publisher(name) = &filter {
+                                                   ctrl.request_download_all_for_publisher(name, cx);
+                                               }
+                                               else {
+                                                   ctrl.request_download_all_for_filter(filter.clone(), cx);
+                                               }
+                                           });
+                                       },
+                                   ))
                                })
 }
 

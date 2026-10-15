@@ -14,6 +14,7 @@ sidebar:
   collections_sort_descending: "Descending"
   collections_sort_tooltip: "Sort collections"
   loading: "Loading…"
+  download_all: "Download All"
 
 toolbar:
   sort_by: "Sort by"
