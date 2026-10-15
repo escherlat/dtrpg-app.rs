@@ -250,6 +250,29 @@ pub(crate) fn publisher_download_targets(catalog: &[LibraryItem], publisher: &st
            .collect()
 }
 
+/// Returns `(id, title)` for every `catalog` item matching `filter`, in
+/// catalog order — the same predicate [`LibraryController::visible_items`]
+/// uses, so "download all" for a sidebar smart filter targets exactly what
+/// that filter currently shows.
+///
+/// Used by [`LibraryController::download_all_for_filter`] to determine which
+/// items to pass to [`LibraryController::enqueue_download`]. Filter matching
+/// (not download status) is this function's only concern —
+/// already-downloaded items are filtered out downstream by
+/// [`enqueue_download`](LibraryController::enqueue_download) via
+/// [`missing_file_indices`], not here.
+pub(crate) fn filter_download_targets(catalog: &[LibraryItem], filter: &SidebarFilter,
+                                      collection_members: &HashSet<u64>, now_secs: i64,
+                                      window_days: u32)
+                                      -> Vec<(Arc<str>, Arc<str>)> {
+    catalog.iter()
+           .filter(|item| {
+               item_matches_filter(item, filter, collection_members, now_secs, window_days)
+           })
+           .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
+           .collect()
+}
+
 /// Removes the queued download for `(id, index)` from `queue`, if present.
 ///
 /// Returns `true` if an entry was removed. Only the matching `(id, index)`

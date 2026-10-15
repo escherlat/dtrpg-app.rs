@@ -85,6 +85,26 @@ impl LibraryController {
         }
     }
 
+    /// Queues a download for every not-yet-downloaded item matching `filter`
+    /// — the sidebar smart filters (All Titles, Recently Updated, On This
+    /// Device, In the Cloud) and Collection, reusing [`Self::enqueue_download`]
+    /// per matching item. Publisher rows use
+    /// [`Self::download_all_for_publisher`] directly.
+    ///
+    /// No-op if `filter` matches no catalog items. Already-downloaded,
+    /// already-queued, and already-active items/files are left untouched —
+    /// see [`Self::enqueue_download`].
+    pub fn download_all_for_filter(&mut self, filter: &SidebarFilter, cx: &mut Context<Self>) {
+        let targets = filter_download_targets(&self.catalog,
+                                              filter,
+                                              &self.collection_members,
+                                              now_secs(),
+                                              self.recently_updated_window_days);
+        for (id, title) in targets {
+            self.enqueue_download(&id, title.to_string(), cx);
+        }
+    }
+
     /// Queues a single file's download, dispatching it immediately if a
     /// concurrency slot is free.
     ///
@@ -205,6 +225,28 @@ impl LibraryController {
         self.download_all_for_publisher(publisher, cx);
     }
 
+    /// Gates [`Self::download_all_for_filter`] behind a free-disk-space
+    /// check.
+    ///
+    /// The check is evaluated once as an aggregate across every matching
+    /// item's missing files, not per item — see [`Self::request_download`].
+    pub fn request_download_all_for_filter(&mut self, filter: SidebarFilter,
+                                           cx: &mut Context<Self>) {
+        let targets = filter_download_targets(&self.catalog,
+                                              &filter,
+                                              &self.collection_members,
+                                              now_secs(),
+                                              self.recently_updated_window_days);
+        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
+                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+            self.pending_download = Some(PendingDownloadRequest::Filter { filter });
+            cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
+            return;
+        }
+        self.download_all_for_filter(&filter, cx);
+    }
+
     /// Returns `Some(free_mb)` if `needed_mb` exceeds the free space at the
     /// storage root; `None` if space is sufficient or can't be determined
     /// (fail open — see `download-disk-space-check`).
@@ -232,6 +274,9 @@ impl LibraryController {
             }
             Some(PendingDownloadRequest::Publisher { publisher }) => {
                 self.download_all_for_publisher(&publisher, cx);
+            }
+            Some(PendingDownloadRequest::Filter { filter }) => {
+                self.download_all_for_filter(&filter, cx);
             }
             None => {}
         }

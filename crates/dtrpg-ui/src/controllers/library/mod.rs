@@ -396,8 +396,8 @@ pub struct LibraryController {
 ///
 /// One variant per `request_*` gating wrapper — see `LibraryController`'s
 /// `request_download`, `request_item_download`,
-/// `request_download_all_for_collection`, and
-/// `request_download_all_for_publisher`.
+/// `request_download_all_for_collection`, `request_download_all_for_publisher`,
+/// and `request_download_all_for_filter`.
 enum PendingDownloadRequest {
     /// Stashed by [`LibraryController::request_download`].
     Item {
@@ -427,5 +427,11 @@ enum PendingDownloadRequest {
         /// Publisher name to pass to
         /// [`LibraryController::download_all_for_publisher`].
         publisher: Arc<str>,
+    },
+    /// Stashed by [`LibraryController::request_download_all_for_filter`].
+    Filter {
+        /// Sidebar filter to pass to
+        /// [`LibraryController::download_all_for_filter`].
+        filter: SidebarFilter,
     },
 }
