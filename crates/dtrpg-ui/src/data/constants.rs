@@ -186,7 +186,7 @@ pub const DEFAULT_MONO_FONT: &str = "Consolas";
 pub const DEFAULT_MONO_FONT: &str = "Liberation Mono";
 
 /// Shared UI text size, in points/pixels, that corresponds to a "Text Scale"
-/// of `1.0` — matches `gpui`'s and `gpui_component`'s own stock default so
+/// of `1.0` — matches `gpui`'s and `gpui_kit`'s own stock default so
 /// nothing visibly changes until the user adjusts it in Settings >
 /// Appearance.
 pub const DEFAULT_UI_TEXT_SIZE: f32 = 16.0;
@@ -211,7 +211,7 @@ pub const BODY_FONT_SIZE_PT: f32 = 14.0;
 /// body text by being slightly smaller rather than by a different typeface.
 pub const VALUE_FONT_SIZE_RATIO: f32 = 0.9;
 /// Rendered size, in points, of the "label" and "monospace" font roles at a
-/// "Text Scale" of `1.0` — matching `gpui_component::Theme`'s stock
+/// "Text Scale" of `1.0` — matching `gpui_kit::component::Theme`'s stock
 /// 13px-on-16px default ratio, so code-like content (e.g. the masked API key
 /// hint) stays visually smaller than body text even as the shared scale
 /// changes.
@@ -251,3 +251,12 @@ pub const NETWORK_MONITOR_CACHE_TTL_SECS: u64 = 5;
 
 /// Interval for the recurring long-running-session catalog-staleness timer.
 pub const CATALOG_REFRESH_TIMER_INTERVAL_SECS: u64 = 3600;
+
+/// Selection size above which a bulk-action button (Download, Remove
+/// Download, Fetch Thumbnail, Add/Remove Collection, Open) asks for
+/// confirmation before dispatching, per `catalog-bulk-actions`.
+///
+/// `Open` in particular can launch one external-app process per selected
+/// item; a selection in the thousands has been observed to lock up the
+/// default viewer app under that many simultaneous launches.
+pub const BULK_ACTION_CONFIRM_THRESHOLD: usize = 20;

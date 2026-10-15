@@ -2,8 +2,8 @@
 //! toolbar.
 
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
-use gpui_component::alert::Alert;
-use gpui_component::button::{Button, ButtonVariants};
+use gpui_kit::component::alert::Alert;
+use gpui_kit::component::button::{Button, ButtonVariants};
 use rust_i18n::t;
 
 use crate::controllers::auth_state::AuthStateController;

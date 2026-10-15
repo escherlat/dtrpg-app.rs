@@ -14,6 +14,7 @@ sidebar:
   collections_sort_descending: "Descending"
   collections_sort_tooltip: "Sort collections"
   loading: "Loading…"
+  download_all: "Download All"
 
 toolbar:
   sort_by: "Sort by"
@@ -36,6 +37,23 @@ toolbar:
   filter_title_publisher: "Publisher: %{name}"
   filter_title_collection: "Collection: %{name}"
   filtered_suffix: " (%{n} filtered)"
+  select_items: "Select items"
+  select_matches_placeholder: "Match pattern…"
+  select_matches_field_title: "Title"
+  select_matches_field_publisher: "Publisher"
+  select_matches_field_system: "System"
+  select_matches: "Select Matches"
+  select_all: "Select All"
+  deselect_all: "Deselect All"
+  selection_count: "%{n} selected"
+  bulk_download: "Download"
+  bulk_remove_download: "Remove Download"
+  bulk_fetch_thumbnail: "Fetch Thumbnail"
+  bulk_add_to_collection: "Add to Collection"
+  bulk_remove_from_collection: "Remove from Collection"
+  bulk_open: "Open"
+  bulk_confirm_title: "Apply to %{n} items?"
+  bulk_confirm_description: "You're about to run \"%{action}\" on a large selection. This may take a while or strain system resources."
 
 count:
   title: "title"

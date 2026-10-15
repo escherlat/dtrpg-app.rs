@@ -7,11 +7,11 @@ use gpui::{
     AnyElement, Entity, Image, ImageFormat, ImageSource, InteractiveElement, IntoElement,
     ParentElement, StatefulInteractiveElement, Styled, div, px,
 };
-use gpui_component::Sizable;
-use gpui_component::avatar::Avatar;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::description_list::{DescriptionItem, DescriptionList};
-use gpui_component::input::{Input, InputState};
+use gpui_kit::component::Sizable;
+use gpui_kit::component::avatar::Avatar;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
+use gpui_kit::component::input::{Input, InputState};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -61,17 +61,18 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                          .or_else(|| auth.api_key_hint.clone())
                          .unwrap_or_else(|| t!("settings.default_account_name").to_string());
 
-    let mut info_list = DescriptionList::horizontal().bordered(false)
-                                                      .columns(1)
-                                                      .label_width(ACCOUNT_INFO_LABEL_WIDTH)
-                                                      .child(account_info_item(
-                                                          "settings-account-email",
-                                                          t!("settings.email_label").to_string(),
-                                                          email_text.clone(),
-                                                          colors,
-                                                          label_font_family,
-                                                          mono_font_family,
-                                                      ));
+    let mut info_list = DescriptionList::horizontal()
+        .bordered(false)
+        .columns(1)
+        .label_width(ACCOUNT_INFO_LABEL_WIDTH)
+        .child(account_info_item(
+            "settings-account-email",
+            t!("settings.email_label").to_string(),
+            email_text.clone(),
+            colors,
+            label_font_family,
+            mono_font_family,
+        ));
 
     if let Some(hint) = &auth.api_key_hint {
         info_list = info_list.child(account_info_item("settings-account-api-key",
@@ -127,29 +128,32 @@ fn account_info_item(value_id: &'static str, label: String, value: String, color
                      label_font_family: &str, mono_font_family: &str)
                      -> DescriptionItem {
     DescriptionItem::new(
-        div().w_full()
-             .text_right()
-             .text_sm()
-             .font_family(label_font_family.to_string())
-             .text_color(colors.text_primary)
-             .child(small_caps_text(label))
-             .into_any_element(),
-    ).value(
-        div().pl(ACCOUNT_INFO_COLUMN_GAP)
-             .child(
-                 selectable_text(value_id, value).text_xs()
-                                                 .font_family(mono_font_family.to_string())
-                                                 .text_color(colors.text_tertiary),
-             )
-             .into_any_element(),
+        div()
+            .w_full()
+            .text_right()
+            .text_sm()
+            .font_family(label_font_family.to_string())
+            .text_color(colors.text_primary)
+            .child(small_caps_text(label))
+            .into_any_element(),
+    )
+    .value(
+        div()
+            .pl(ACCOUNT_INFO_COLUMN_GAP)
+            .child(
+                selectable_text(value_id, value)
+                    .text_xs()
+                    .font_family(mono_font_family.to_string())
+                    .text_color(colors.text_tertiary),
+            )
+            .into_any_element(),
     )
 }
 
 /// Renders a 56×56 avatar circle: Gravatar image if available, initial letter
 /// otherwise.
 fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyElement {
-    let avatar = Avatar::new().with_size(gpui_component::Size::Size(px(56.)))
-                              .rounded_full();
+    const AVATAR_SIZE: gpui::Pixels = px(56.);
 
     if let Some(bytes) = &auth.avatar_bytes {
         let format = if bytes.starts_with(b"\x89PNG") {
@@ -159,7 +163,15 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
             ImageFormat::Jpeg
         };
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        return avatar.src(ImageSource::Image(image)).into_any_element();
+        // flex_none() keeps this from being resized by an ancestor flex
+        // layout's basis/shrink computation - without it, Avatar's own
+        // explicit pixel sizing can still get squished in a tight flex
+        // context (observed in the title-bar account button).
+        return div().flex_none()
+                    .child(Avatar::new().with_size(gpui_kit::component::Size::Size(AVATAR_SIZE))
+                                        .rounded_full()
+                                        .src(ImageSource::Image(image)))
+                    .into_any_element();
     }
 
     let name = auth.email
@@ -167,7 +179,11 @@ fn render_avatar_circle(auth: &AuthStateSnapshot, _colors: &ColorTokens) -> AnyE
                    .or_else(|| auth.display_initial.map(|c| c.to_string()))
                    .unwrap_or_else(|| "D".to_string());
 
-    avatar.name(name).into_any_element()
+    div().flex_none()
+         .child(Avatar::new().with_size(gpui_kit::component::Size::Size(AVATAR_SIZE))
+                             .rounded_full()
+                             .name(name))
+         .into_any_element()
 }
 
 // ── Unauthenticated state

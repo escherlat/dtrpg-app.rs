@@ -297,9 +297,15 @@ mod file_info_cache_tests {
 
 #[cfg(test)]
 mod bulk_download_target_tests {
-    use super::super::{collection_download_targets, publisher_download_targets};
+    use std::collections::HashSet;
+    use std::sync::Arc;
+
+    use super::super::{
+        collection_download_targets, filter_download_targets, publisher_download_targets,
+    };
     use crate::data::enums::ItemStatus;
     use crate::data::library::LibraryItem;
+    use crate::util::filter::SidebarFilter;
 
     fn item(id: &str, title: &str, publisher: &str, order_product_id: u64, product_id: u64)
             -> LibraryItem {
@@ -374,5 +380,45 @@ mod bulk_download_target_tests {
         let targets = publisher_download_targets(&catalog, "Nobody");
 
         assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn filter_download_targets_all_titles_includes_every_item() {
+        let catalog = vec![item("b1", "Book One", "Acme", 1, 0),
+                           item("b2", "Book Two", "Other Co", 2, 0),];
+
+        let targets =
+            filter_download_targets(&catalog, &SidebarFilter::AllTitles, &HashSet::new(), 0, 30);
+
+        assert_eq!(targets.len(), 2);
+    }
+
+    #[test]
+    fn filter_download_targets_publisher_matches_only_that_publisher() {
+        let catalog = vec![item("b1", "Book One", "Acme", 1, 0),
+                           item("b2", "Other Publisher", "Other Co", 2, 0),];
+
+        let targets = filter_download_targets(&catalog,
+                                              &SidebarFilter::Publisher(Arc::from("Acme")),
+                                              &HashSet::new(),
+                                              0,
+                                              30);
+
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].0.as_ref(), "b1");
+    }
+
+    #[test]
+    fn filter_download_targets_on_device_matches_only_downloaded_items() {
+        let mut downloaded = item("b1", "Downloaded Book", "Acme", 1, 0);
+        downloaded.status = ItemStatus::Downloaded;
+        let cloud = item("b2", "Cloud Book", "Acme", 2, 0);
+        let catalog = vec![downloaded, cloud];
+
+        let targets =
+            filter_download_targets(&catalog, &SidebarFilter::OnDevice, &HashSet::new(), 0, 30);
+
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].0.as_ref(), "b1");
     }
 }

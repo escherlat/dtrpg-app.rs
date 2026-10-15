@@ -93,32 +93,31 @@ pub fn fetch_avatar_bytes(email: String) -> Option<Vec<u8>> {
                             "avatar fetch retrying");
         }
     };
-    let result = retry_with_backoff(config,
+    let result = retry_with_backoff(
+                                    config,
                                     &cancel,
                                     || -> Result<Vec<u8>, AvatarFetchError> {
-                                        let client =
-                                            reqwest::blocking::Client::builder()
-                                                .timeout(Duration::from_secs(5))
-                                                .build()
-                                                .map_err(|e| {
-                                                    AvatarFetchError::Transient(e.to_string())
-                                                })?;
-                                        let response = client.get(&url).send().map_err(|e| {
-                                            AvatarFetchError::Transient(e.to_string())
-                                        })?;
+                                        let client = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(5))
+                .build()
+                .map_err(|e| AvatarFetchError::Transient(e.to_string()))?;
+                                        let response = client
+                .get(&url)
+                .send()
+                .map_err(|e| AvatarFetchError::Transient(e.to_string()))?;
                                         if !response.status().is_success() {
                                             return Err(AvatarFetchError::Final);
                                         }
-                                        response.bytes()
-                                                .map(|b| b.to_vec())
-                                                .map_err(|e| {
-                                                    AvatarFetchError::Transient(e.to_string())
-                                                })
+                                        response
+                .bytes()
+                .map(|b| b.to_vec())
+                .map_err(|e| AvatarFetchError::Transient(e.to_string()))
                                     },
                                     |e| matches!(e, AvatarFetchError::Transient(_)),
                                     |_| None,
                                     || AvatarFetchError::Final,
-                                    Some(&mut on_retry));
+                                    Some(&mut on_retry),
+    );
 
     match result {
         Ok(bytes) => {

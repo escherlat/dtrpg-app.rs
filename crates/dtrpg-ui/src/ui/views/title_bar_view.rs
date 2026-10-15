@@ -9,11 +9,13 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Entity, Image, ImageFormat, ImageSource, MouseButton, ObjectFit,
-    ParentElement, Styled, div, img, px,
+    AnyElement, App, Entity, Image, ImageFormat, ImageSource, MouseButton, ParentElement, Styled,
+    div, px,
 };
-use gpui_component::button::{Button, ButtonCustomVariant, ButtonVariants};
-use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::Sizable;
+use gpui_kit::component::avatar::Avatar;
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
@@ -104,6 +106,12 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
             .rounded_full()
             .w(px(28.0))
             .h(px(28.0))
+            // Button::render() applies ~10px of its own horizontal padding
+            // whenever `.child(..)` is non-empty (its "normal button, not
+            // icon button" sizing branch) - that shrinks this 28px button's
+            // usable content width to a sliver the 28px-wide avatar then
+            // gets clipped against. Cancel it so the avatar gets the full box.
+            .p(px(0.0))
             .border_1()
             .border_color(border_strong)
             .child(inner)
@@ -134,11 +142,14 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
     let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
         let format = detect_image_format(bytes);
         let image = Arc::new(Image::from_bytes(format, bytes.as_ref().clone()));
-        img(ImageSource::Image(image)).w(px(28.0))
-                                      .h(px(28.0))
-                                      .rounded_full()
-                                      .object_fit(ObjectFit::Cover)
-                                      .into_any_element()
+        // See the .p(px(0.0)) on the enclosing Button below for the actual
+        // fix to this avatar looking squished - this flex_none() wrapper
+        // alone wasn't it.
+        div().flex_none()
+             .child(Avatar::new().with_size(gpui_kit::component::Size::Size(px(28.0)))
+                                 .rounded_full()
+                                 .src(ImageSource::Image(image)))
+             .into_any_element()
     }
     else {
         div().flex()
@@ -161,6 +172,7 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
                                         .rounded_full()
                                         .w(px(28.0))
                                         .h(px(28.0))
+                                        .p(px(0.0))
                                         .child(inner)
                                         .dropdown_menu(move |menu, _, _| {
                                             let s_logout = settings.clone();

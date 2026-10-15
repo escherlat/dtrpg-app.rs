@@ -14,6 +14,7 @@ sidebar:
   collections_sort_descending: "Ordre décroissant"
   collections_sort_tooltip: "Trier les collections"
   loading: "Chargement…"
+  download_all: "Tout télécharger"
 
 toolbar:
   sort_by: "Trier par"

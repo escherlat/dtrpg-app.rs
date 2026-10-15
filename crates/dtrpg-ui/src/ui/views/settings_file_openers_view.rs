@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, div, px};
-use gpui_component::WindowExt as _;
-use gpui_component::input::{Input, InputState};
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
@@ -328,10 +328,13 @@ fn pick_app_and_begin_add(entity: &Entity<SettingsController>,
     window.to_async(cx)
           .spawn(async move |cx| {
               let picked = rfd::AsyncFileDialog::new()
-                  .add_filter(t!("settings.file_opener_app_filter_name").to_string(), &["app"])
-                  .set_directory("/Applications")
-                  .pick_file()
-                  .await;
+                .add_filter(
+                    t!("settings.file_opener_app_filter_name").to_string(),
+                    &["app"],
+                )
+                .set_directory("/Applications")
+                .pick_file()
+                .await;
               let Some(handle) = picked
               else {
                   return;

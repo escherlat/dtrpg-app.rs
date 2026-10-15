@@ -11,16 +11,16 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, ElementId, Entity, IntoElement, SharedString, Window, div, px,
 };
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
-use gpui_component::input::{Input, InputState};
-use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
-use gpui_component::sidebar::{
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::dialog::{Dialog, DialogButtonProps, DialogHeader, DialogTitle};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenuItem};
+use gpui_kit::component::sidebar::{
     Sidebar, SidebarCollapsible, SidebarItem, SidebarMenu, SidebarMenuItem,
 };
-use gpui_component::spinner::Spinner;
-use gpui_component::{
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::{
     ActiveTheme, Collapsible, Side, Sizable as _, Size, StyledExt as _, WindowExt as _,
 };
 use rust_i18n::t;
@@ -114,7 +114,7 @@ type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 /// The Collections section, rendered as plain `div`s rather than
 /// [`SidebarMenuItem`], because `SidebarMenuItem` has no `on_drop`/
 /// `drag_over` hooks — its row is built entirely inside the vendored
-/// `gpui-component` crate with no way to wrap or extend it from here. This
+/// `gpui-kit` crate with no way to wrap or extend it from here. This
 /// is the only sidebar section that needs to be a drop target (see
 /// `catalog-drag-drop-to-collection`), so only this section forgoes
 /// `SidebarMenuItem`; smart-filter and publisher rows are unaffected.
@@ -337,7 +337,7 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
          .into_any_element()
 }
 
-/// Renders the full sidebar column using gpui-component `Sidebar`.
+/// Renders the full sidebar column using gpui-kit `Sidebar`.
 ///
 /// Library totals and the activity indicator, previously shown in the
 /// sidebar footer, now live in the status bar (see `status_bar_view.rs`),
@@ -541,9 +541,11 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                 .items_center()
                 .gap(px(4.))
                 .child(div().text_xs().child(collections_count.clone()))
-                .child(render_collection_sort_control(collection_sort,
-                                                       collection_sort_direction,
-                                                       entity_for_toggle.clone()))
+                .child(render_collection_sort_control(
+                    collection_sort,
+                    collection_sort_direction,
+                    entity_for_toggle.clone(),
+                ))
                 .child(
                     Button::new("collections-search-open")
                         .ghost()
@@ -702,15 +704,34 @@ fn nav_item(label: &str, count: usize, is_active: bool, filter: SidebarFilter,
             entity: Entity<LibraryController>, tabs: Entity<TabsController>)
             -> SidebarMenuItem {
     let label = label.to_string();
+    let click_filter = filter.clone();
+    let download_entity = entity.clone();
+    let download_filter = filter;
     SidebarMenuItem::new(label).active(is_active)
                                .suffix(move |_, _| div().text_xs().child(count.to_string()))
                                .on_click(move |_, _, cx| {
                                    entity.update(cx, |ctrl, cx| {
-                                             ctrl.set_filter(filter.clone(), cx)
+                                             ctrl.set_filter(click_filter.clone(), cx)
                                          });
                                    tabs.update(cx, |ctrl, cx| {
                                            ctrl.activate(TabTarget::Catalog, cx)
                                        });
+                               })
+                               .context_menu(move |menu, _, _| {
+                                   let entity = download_entity.clone();
+                                   let filter = download_filter.clone();
+                                   menu.item(PopupMenuItem::new(t!("sidebar.download_all")).on_click(
+                                       move |_, _, cx| {
+                                           entity.update(cx, |ctrl, cx| {
+                                               if let SidebarFilter::Publisher(name) = &filter {
+                                                   ctrl.request_download_all_for_publisher(name, cx);
+                                               }
+                                               else {
+                                                   ctrl.request_download_all_for_filter(filter.clone(), cx);
+                                               }
+                                           });
+                                       },
+                                   ))
                                })
 }
 

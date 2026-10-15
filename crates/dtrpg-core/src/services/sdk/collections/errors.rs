@@ -37,9 +37,11 @@ pub(super) fn map_client_error(error: ClientError) -> CollectionsServiceError {
                 429 => CollectionsServiceErrorKind::RateLimited,
                 _ => CollectionsServiceErrorKind::Network,
             };
-            CollectionsServiceError::new(kind,
-                                         format!("Request to {url} failed (HTTP {status}): {detail}"))
-                .with_retry_after(retry_after)
+            CollectionsServiceError::new(
+                kind,
+                format!("Request to {url} failed (HTTP {status}): {detail}"),
+            )
+            .with_retry_after(retry_after)
         }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());

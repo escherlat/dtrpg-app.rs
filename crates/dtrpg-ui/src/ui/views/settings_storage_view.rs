@@ -4,10 +4,10 @@
 use std::path::PathBuf;
 
 use gpui::{AnyElement, Element, Entity, IntoElement, ParentElement, Styled, div, px};
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::input::{Input, InputState, NumberInput};
-use gpui_component::switch::Switch;
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::input::{Input, InputState, NumberInput};
+use gpui_kit::component::switch::Switch;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
@@ -197,34 +197,40 @@ fn render_create_collections_toggle(create_collections: bool,
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
 
-    div().flex()
-         .flex_col()
-         .gap(px(6.0))
-         .child(
-             div().flex()
-                 .items_center()
-                 .justify_between()
-                 .child(
-                     div().text_sm()
-                         .font_weight(gpui::FontWeight::SEMIBOLD)
-                         .text_color(text_primary)
-                         .child(t!("settings.create_collections_title")),
-                 )
-                 .child(
-                     Switch::new("create-collections")
-                         .checked(create_collections)
-                         .tooltip(t!("settings.create_collections_tooltip").to_string())
-                         .on_click(move |checked, _window, cx| {
-                             let checked = *checked;
-                             entity.update(cx, |ctrl, cx| {
-                                       ctrl.set_create_collections(checked, cx);
-                                   });
-                         }),
-                 ),
-         )
-         .child(div().text_xs()
-                     .text_color(text_secondary)
-                     .child(create_collections_note()))
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(6.0))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(text_primary)
+                        .child(t!("settings.create_collections_title")),
+                )
+                .child(
+                    Switch::new("create-collections")
+                        .checked(create_collections)
+                        .tooltip(t!("settings.create_collections_tooltip").to_string())
+                        .on_click(move |checked, _window, cx| {
+                            let checked = *checked;
+                            entity.update(cx, |ctrl, cx| {
+                                ctrl.set_create_collections(checked, cx);
+                            });
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(text_secondary)
+                .child(create_collections_note()),
+        )
 }
 
 /// Returns the "Create collections" note text, appending the Windows

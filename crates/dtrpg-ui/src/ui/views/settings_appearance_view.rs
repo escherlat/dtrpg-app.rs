@@ -13,10 +13,10 @@ use gpui::{
     Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
 };
-use gpui_component::button::Button;
-use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_component::select::Select;
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::button::Button;
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::select::Select;
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -89,19 +89,24 @@ fn font_picker_row(title: impl Into<gpui::SharedString>, select: Option<&FontSel
         return row.child(div().text_sm().text_color(colors.text_tertiary).child("…"));
     };
 
-    row.child(div().flex_1()
-                   .child(Select::new(select).menu_width(px(280.0))
-                                             .placeholder(t!("settings.appearance_font_placeholder"))
-                                             .search_placeholder(t!(
-                                                 "settings.appearance_font_search_placeholder"
-                                             ))
-                                             .w_full()))
-       .child(div().w(px(48.0))
-                   .flex_none()
-                   .text_sm()
-                   .text_color(colors.text_tertiary)
-                   .text_align(gpui::TextAlign::Right)
-                   .child(format!("{size_pt:.0}pt")))
+    row.child(
+        div().flex_1().child(
+            Select::new(select)
+                .menu_width(px(280.0))
+                .placeholder(t!("settings.appearance_font_placeholder"))
+                .search_placeholder(t!("settings.appearance_font_search_placeholder"))
+                .w_full(),
+        ),
+    )
+    .child(
+        div()
+            .w(px(48.0))
+            .flex_none()
+            .text_sm()
+            .text_color(colors.text_tertiary)
+            .text_align(gpui::TextAlign::Right)
+            .child(format!("{size_pt:.0}pt")),
+    )
 }
 
 /// Renders the shared "Text Scale" stepper row, matching the concurrency
@@ -120,7 +125,9 @@ fn text_scale_row(scale: f32, entity: Entity<LibraryController>, colors: &ColorT
     div().flex()
          .items_center()
          .gap(px(12.0))
-         .child(row_label(t!("settings.appearance_text_size_label"), colors, label_font_family))
+         .child(row_label(t!("settings.appearance_text_size_label"),
+                          colors,
+                          label_font_family))
          .child(div().flex()
                      .items_center()
                      .gap(px(8.0))
@@ -135,16 +142,16 @@ fn text_scale_row(scale: f32, entity: Entity<LibraryController>, colors: &ColorT
                                  .justify_center()
                                  .cursor_pointer()
                                  .tooltip(|window, cx| {
-                                     Tooltip::new(t!("settings.appearance_text_size_decrement_tooltip")
-                                          .to_string()).build(window, cx)
+                                     Tooltip::new(
+                                t!("settings.appearance_text_size_decrement_tooltip").to_string(),
+                            )
+                            .build(window, cx)
                                  })
                                  .on_click(move |_, _, cx| {
                                      let next = (scale - UI_TEXT_SCALE_STEP).max(MIN_UI_TEXT_SCALE);
                                      entity_dec.update(cx, |ctrl, cx| {
-                                                   ctrl.set_ui_text_size(px(next
-                                                                            * DEFAULT_UI_TEXT_SIZE),
-                                                                         cx);
-                                               });
+                                         ctrl.set_ui_text_size(px(next * DEFAULT_UI_TEXT_SIZE), cx);
+                                     });
                                  })
                                  .child(div().text_sm()
                                              .text_color(colors.text_primary)
@@ -165,18 +172,20 @@ fn text_scale_row(scale: f32, entity: Entity<LibraryController>, colors: &ColorT
                                  .justify_center()
                                  .cursor_pointer()
                                  .tooltip(|window, cx| {
-                                     Tooltip::new(t!("settings.appearance_text_size_increment_tooltip")
-                                          .to_string()).build(window, cx)
+                                     Tooltip::new(
+                                t!("settings.appearance_text_size_increment_tooltip").to_string(),
+                            )
+                            .build(window, cx)
                                  })
                                  .on_click(move |_, _, cx| {
                                      let next = (scale + UI_TEXT_SCALE_STEP).min(MAX_UI_TEXT_SCALE);
                                      entity_inc.update(cx, |ctrl, cx| {
-                                                   ctrl.set_ui_text_size(px(next
-                                                                            * DEFAULT_UI_TEXT_SIZE),
-                                                                         cx);
-                                               });
+                                         ctrl.set_ui_text_size(px(next * DEFAULT_UI_TEXT_SIZE), cx);
+                                     });
                                  })
-                                 .child(div().text_sm().text_color(colors.text_primary).child("+"))))
+                                 .child(div().text_sm()
+                                             .text_color(colors.text_primary)
+                                             .child("+"))))
 }
 
 /// The four Appearance-page font picker states, bundled into one struct
@@ -210,21 +219,22 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
 
     let entity_theme = entity.clone();
 
-    let theme_button =
-        Button::new("appearance-theme").outline()
-                                       .label(theme_label(theme_key))
-                                       .dropdown_menu(move |menu, _, _| {
-                                           let mut m = menu;
-                                           for key in THEME_KEYS {
-                                               let e = entity_theme.clone();
-                                               m = m.item(PopupMenuItem::new(theme_label(key))
-                                                   .checked(key == theme_key)
-                                                   .on_click(move |_, _, cx| {
-                                                       e.update(cx, |ctrl, cx| ctrl.set_theme(key, cx));
-                                                   }));
-                                           }
-                                           m
-                                       });
+    let theme_button = Button::new("appearance-theme").outline()
+                                                      .label(theme_label(theme_key))
+                                                      .dropdown_menu(move |menu, _, _| {
+                                                          let mut m = menu;
+                                                          for key in THEME_KEYS {
+                                                              let e = entity_theme.clone();
+                                                              m = m.item(
+                    PopupMenuItem::new(theme_label(key))
+                        .checked(key == theme_key)
+                        .on_click(move |_, _, cx| {
+                            e.update(cx, |ctrl, cx| ctrl.set_theme(key, cx));
+                        }),
+                );
+                                                          }
+                                                          m
+                                                      });
     let theme_row = div().flex()
                          .items_center()
                          .gap(px(12.0))

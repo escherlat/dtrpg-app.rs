@@ -75,7 +75,9 @@ impl LibraryController {
                    download_activity_ids: HashMap::new(),
                    max_concurrent_downloads: storage.max_concurrent_downloads(),
                    recently_updated_window_days: storage.recently_updated_window_days(),
-                   pending_download: None };
+                   pending_download: None,
+                   bulk_selection_mode: false,
+                   bulk_selected_ids: HashSet::new() };
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);

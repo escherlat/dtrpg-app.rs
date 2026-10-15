@@ -188,7 +188,7 @@ mod tests {
         // Big (1) sorts before Small (2), even though Big's raw member count
         // is larger.
         let mut entries = vec![entry(1, "Big", 10, &[1, 2, 3]),
-                               entry(2, "Small", 20, &[4, 5])];
+                               entry(2, "Small", 20, &[4, 5]),];
         let catalog_ids: HashSet<u64> = [1u64, 4, 5].into_iter().collect();
         sort_collections(&mut entries,
                          CollectionSortMethod::ItemCount,
@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn sorts_by_item_count_descending() {
         let mut entries = vec![entry(1, "Big", 10, &[1, 2, 3]),
-                               entry(2, "Small", 20, &[4, 5])];
+                               entry(2, "Small", 20, &[4, 5]),];
         let catalog_ids: HashSet<u64> = [1u64, 2, 3, 4, 5].into_iter().collect();
         sort_collections(&mut entries,
                          CollectionSortMethod::ItemCount,

@@ -3,7 +3,7 @@
 //! detail tab's item tier (see `zip-content-preview`).
 //!
 //! Mirrors `item_popover_view`'s anchored/deferred pattern rather than
-//! `gpui-component::Popover`, since it needs hover-to-open and click-to-pin
+//! `gpui-kit::Popover`, since it needs hover-to-open and click-to-pin
 //! as distinct behaviors tied to controller state.
 
 use std::path::Path;
@@ -13,9 +13,9 @@ use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, Hsla, IntoElement, Pixels, Point, Styled, anchored, deferred, div, px,
 };
-use gpui_component::IconName;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::scroll::ScrollableElement as _;
+use gpui_kit::component::IconName;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::scroll::ScrollableElement as _;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -72,9 +72,8 @@ pub fn render_zip_preview_popover(entry_id: Arc<str>, path: &Path, position: Poi
                                                                 .icon(IconName::Close)
                                                                 .on_click(move |_, _, cx| {
                                                                     entity.update(cx, |ctrl, cx| {
-                                                                 ctrl.close_zip_preview(&entry_id,
-                                                                                        cx);
-                                                             });
+                                                          ctrl.close_zip_preview(&entry_id, cx);
+                                                      });
                                                                 })))
              .child(body);
 
@@ -109,19 +108,19 @@ fn render_entry_list(entries: &[ZipEntry], text_primary: Hsla, text_secondary: H
                      .gap(px(4.0))
                      .children(entries.iter().map(|entry| {
                                                  div().flex()
-                                          .items_center()
-                                          .justify_between()
-                                          .gap(px(8.0))
-                                          .child(div().flex_1()
-                                                      .min_w_0()
-                                                      .text_sm()
-                                                      .text_color(text_primary)
-                                                      .truncate()
-                                                      .child(entry.name.clone()))
-                                          .child(div().flex_none()
-                                                      .text_xs()
-                                                      .text_color(text_secondary)
-                                                      .child(format_bytes(entry.size_bytes)))
+                              .items_center()
+                              .justify_between()
+                              .gap(px(8.0))
+                              .child(div().flex_1()
+                                          .min_w_0()
+                                          .text_sm()
+                                          .text_color(text_primary)
+                                          .truncate()
+                                          .child(entry.name.clone()))
+                              .child(div().flex_none()
+                                          .text_xs()
+                                          .text_color(text_secondary)
+                                          .child(format_bytes(entry.size_bytes)))
                                              })))
          .into_any_element()
 }

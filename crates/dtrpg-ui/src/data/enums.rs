@@ -19,3 +19,13 @@ pub enum CatalogPresentation {
     #[default]
     Grid,
 }
+
+/// Which `LibraryItem` field a bulk-selection pattern match is applied
+/// against (see `LibraryController::select_by_pattern`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectionField {
+    Title,
+    Publisher,
+    /// Game line / series (`LibraryItem::line`).
+    System,
+}

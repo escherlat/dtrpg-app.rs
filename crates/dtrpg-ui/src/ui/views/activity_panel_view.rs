@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px, relative};
-use gpui_component::scroll::ScrollableElement;
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::scroll::ScrollableElement;
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -30,7 +30,7 @@ pub fn render_activity_panel(snap: &ActivitySnapshot, entity: Entity<ActivityCon
 
     // No bg/border/shadow/rounding here — the enclosing `Popover` content
     // wrapper already supplies that framing (see `popover_style` in
-    // `gpui-component`); adding our own on top produced a nested double frame.
+    // `gpui-kit`); adding our own on top produced a nested double frame.
     div().w(px(340.0))
          .flex()
          .flex_col()
@@ -59,29 +59,42 @@ pub fn render_activity_panel(snap: &ActivitySnapshot, entity: Entity<ActivityCon
                     render_empty(text_primary, text_tertiary)
                 }
                 else {
-                    div().flex()
-                         .flex_col()
-                         .max_h(px(400.0))
-                         .overflow_y_scrollbar()
-                         .children(snap.items.iter().map(|item| {
-                                                        let is_in_progress = matches!(item.status,
-                                                                     ActivityStatus::InProgress);
-                                                        render_item_row(item.id,
-                                                                        item.label.as_ref(),
-                                                                        &item.status,
-                                                                        selected_id,
-                                                                        entity.clone(),
-                                                                        item.started_at,
-                                                                        item.elapsed_secs,
-                                                                        item.progress,
-                                                                        is_in_progress
-                                                                        && item.cancel_fn.is_some(),
-                                                                        text_secondary,
-                                                                        text_tertiary,
-                                                                        accent,
-                                                                        border)
-                                                    }))
-                         .into_any_element()
+                    // `overflow_y_scrollbar()` wraps its element in
+                    // `Scrollable`, whose `render` only
+                    // copies the `size` style field onto its
+                    // own outer wrapper — `max_h` sets `max_size` and would be
+                    // silently dropped if placed on the scrollable div itself.
+                    // The height cap lives on this plain outer div instead; the
+                    // inner div just fills it via `size_full()`, which
+                    // `Scrollable` already applies on its own.
+                    div()
+                .max_h(px(400.0))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .size_full()
+                        .overflow_y_scrollbar()
+                        .children(snap.items.iter().map(|item| {
+                            let is_in_progress = matches!(item.status, ActivityStatus::InProgress);
+                            render_item_row(
+                                item.id,
+                                item.label.as_ref(),
+                                &item.status,
+                                selected_id,
+                                entity.clone(),
+                                item.started_at,
+                                item.elapsed_secs,
+                                item.progress,
+                                is_in_progress && item.cancel_fn.is_some(),
+                                text_secondary,
+                                text_tertiary,
+                                accent,
+                                border,
+                            )
+                        })),
+                )
+                .into_any_element()
                 })
          .into_any_element()
 }

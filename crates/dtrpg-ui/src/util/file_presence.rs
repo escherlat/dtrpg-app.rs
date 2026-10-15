@@ -140,7 +140,7 @@ mod tests {
         let storage = storage_at(&dir);
         let mut it = make_item("verify-4", "Presence Publisher");
         it.files = vec![make_file("f1", "Present.pdf", false),
-                        make_file("f2", "Missing.pdf", true)];
+                        make_file("f2", "Missing.pdf", true),];
 
         let dest_dir = storage.path_for_publisher(&it.publisher);
         std::fs::create_dir_all(&dest_dir).unwrap();

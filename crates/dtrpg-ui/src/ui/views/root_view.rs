@@ -1,21 +1,26 @@
 //! Root view: composes sidebar, toolbar, catalog, and detail panel.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
     InteractiveElement, IntoElement, ParentElement, Pixels, Render, SharedString, Styled,
     WindowHandle, div, px,
 };
-use gpui_component::Root;
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle};
-use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::notification::{Notification, NotificationType};
-use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
-use gpui_component::searchable_list::SearchableListDelegate as _;
-use gpui_component::select::{SelectEvent, SelectState};
-use gpui_component::{IconName, Sizable as _};
+use gpui_kit::component::Root;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::dialog::{
+    DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle,
+};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::notification::{Notification, NotificationType};
+use gpui_kit::component::resizable::{ResizableState, h_resizable, resizable_panel};
+use gpui_kit::component::searchable_list::SearchableListDelegate as _;
+use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::{IconName, Sizable as _};
 use rust_i18n::t;
 
 use crate::ui::actions::{
@@ -29,8 +34,9 @@ use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
     open_settings_window, save_library_window_bounds,
 };
-use crate::ui::views::report_feature_bug_dialog::open_report_feature_bug_dialog;
+use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
 use crate::ui::views::{
+    bulk_action_bar_view::render_bulk_action_bar,
     catalog_view::CatalogView,
     detail_panel_view::render_detail_tab_content,
     notification_banner_view::render_notification_banner,
@@ -52,7 +58,7 @@ use crate::{
     data::{
         auth_state::AuthState,
         constants::{KEYRING_API_KEY, KEYRING_SERVICE},
-        enums::CatalogPresentation,
+        enums::{CatalogPresentation, SelectionField},
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
@@ -131,6 +137,11 @@ pub struct LibraryRootView {
     /// `ShowSettings` action to bring an already-open window to front instead
     /// of opening a duplicate; `None` when no settings window is open.
     settings_window:             Option<WindowHandle<Root>>,
+    /// Handle to the currently-open "Report a Feature/Bug" window, if any.
+    /// Used by the `ReportFeatureBug` action to bring an already-open window
+    /// to front instead of opening a duplicate; `None` when no report window
+    /// is open.
+    report_feature_bug_window:   Option<WindowHandle<Root>>,
     /// Editable search input wired to the library controller's search query.
     search_input:                Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
@@ -143,6 +154,12 @@ pub struct LibraryRootView {
     /// File Openers settings list (inline, not a modal — see the subscription
     /// wired up in `new()` for the Enter/Blur commit behavior).
     file_opener_extension_input: Entity<InputState>,
+    /// Pattern text input for the bulk-selection bar's "Select Matches"
+    /// control.
+    bulk_pattern_input:          Entity<InputState>,
+    /// Field the bulk-selection pattern match is applied against, selected
+    /// via the bulk-action bar's field dropdown.
+    bulk_pattern_field:          Rc<Cell<SelectionField>>,
     /// Last `ViewMenuState` passed to `cx.set_menus`.
     ///
     /// `cx.set_menus` replaces the whole native menu bar and, on macOS, tears
@@ -353,11 +370,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_body_font.update(cx, |ctrl, cx| {
-                                                     ctrl.set_body_font(SharedString::from(
-                                                              name.clone(),
-                                                          ),
-                                                                         cx);
-                                                 });
+                             ctrl.set_body_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_body_font_select(body_font_select));
@@ -377,11 +391,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_value_font.update(cx, |ctrl, cx| {
-                                                      ctrl.set_value_font(SharedString::from(
-                                                               name.clone(),
-                                                           ),
-                                                                           cx);
-                                                  });
+                             ctrl.set_value_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| {
@@ -403,11 +414,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_label_font.update(cx, |ctrl, cx| {
-                                                      ctrl.set_label_font(SharedString::from(
-                                                               name.clone(),
-                                                           ),
-                                                                           cx);
-                                                  });
+                             ctrl.set_label_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| {
@@ -427,11 +435,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_mono_font.update(cx, |ctrl, cx| {
-                                                     ctrl.set_mono_font(SharedString::from(
-                                                              name.clone(),
-                                                          ),
-                                                                         cx);
-                                                 });
+                             ctrl.set_mono_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_mono_font_select(mono_font_select));
@@ -463,6 +468,12 @@ impl LibraryRootView {
                          }
                      })
           .detach();
+
+        let bulk_pattern_input = cx.new(|cx| {
+                                       InputState::new(window, cx)
+                .placeholder(t!("toolbar.select_matches_placeholder").to_string())
+                                   });
+        let bulk_pattern_field = Rc::new(Cell::new(SelectionField::Title));
 
         let collection_name_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder(t!("collections.name_placeholder").to_string())
@@ -607,25 +618,24 @@ impl LibraryRootView {
                                       let confirm_entity = confirm_entity.clone();
                                       let cancel_entity = cancel_entity.clone();
                                       alert
-                                    .confirm()
-                                    .title(t!("catalog.low_disk_space_confirm_title").to_string())
-                                    .description(
-                                        t!("catalog.low_disk_space_confirm_description",
-                                           needed = needed.clone(),
-                                           free = free.clone()).to_string(),
-                                    )
-                                    .on_ok(move |_, _window, cx| {
-                                        confirm_entity.update(cx, |ctrl, cx| {
-                                                          ctrl.confirm_pending_download(cx)
-                                                      });
-                                        true
-                                    })
-                                    .on_cancel(move |_, _window, cx| {
-                                        cancel_entity.update(cx, |ctrl, cx| {
-                                                         ctrl.cancel_pending_download(cx)
-                                                     });
-                                        true
-                                    })
+                        .confirm()
+                        .title(t!("catalog.low_disk_space_confirm_title").to_string())
+                        .description(
+                            t!(
+                                "catalog.low_disk_space_confirm_description",
+                                needed = needed.clone(),
+                                free = free.clone()
+                            )
+                            .to_string(),
+                        )
+                        .on_ok(move |_, _window, cx| {
+                            confirm_entity.update(cx, |ctrl, cx| ctrl.confirm_pending_download(cx));
+                            true
+                        })
+                        .on_cancel(move |_, _window, cx| {
+                            cancel_entity.update(cx, |ctrl, cx| ctrl.cancel_pending_download(cx));
+                            true
+                        })
                                   });
                         })
           .detach();
@@ -854,11 +864,14 @@ impl LibraryRootView {
                sidebar_width,
                root_focus,
                settings_window: None,
+               report_feature_bug_window: None,
                search_input,
                collection_name_input,
                file_opener_extension_input,
                publisher_search_input,
                collection_search_input,
+               bulk_pattern_input,
+               bulk_pattern_field,
                last_menu_state: None }
     }
 
@@ -882,6 +895,21 @@ impl LibraryRootView {
                                               self.file_opener_extension_input.clone(),
                                               cx);
             self.settings_window = Some(handle);
+        }
+    }
+
+    /// Opens the "Report a Feature/Bug" window, or brings an already-open
+    /// one to front.
+    pub(crate) fn show_report_feature_bug(&mut self, cx: &mut Context<Self>) {
+        let already_open = self.report_feature_bug_window
+                               .map(|handle| {
+                                   handle.update(cx, |_, window, _| window.activate_window())
+                                         .is_ok()
+                               })
+                               .unwrap_or(false);
+        if !already_open {
+            let handle = open_report_feature_bug_window(cx);
+            self.report_feature_bug_window = Some(handle);
         }
     }
 
@@ -978,15 +1006,10 @@ impl Focusable for LibraryRootView {
 
 impl Render for LibraryRootView {
     fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // `Root` (gpui-component) tracks open dialogs/sheets/notifications as
-        // state but does not render them itself — the top-level app
-        // view must compose these layers explicitly, or
-        // `window.open_dialog()` / `open_alert_dialog()`
-        // / `push_notification()` calls silently have no visible effect. See
-        // gpui-component's `StoryRoot` example.
-        let sheet_layer = Root::render_sheet_layer(window, cx);
-        let dialog_layer = Root::render_dialog_layer(window, cx);
-        let notification_layer = Root::render_notification_layer(window, cx);
+        // `Root` (gpui-kit, wrapping this view — see `gpui_kit::open_window`
+        // in `ui/app/mod.rs`) renders its own dialog/sheet/notification
+        // layers automatically via its own `Render` impl; this view does
+        // not need to compose them.
 
         // Adjusting the shared rem size scales every `rems(...)`-based size
         // utility (`.text_sm()`, `.text_xs()`, etc.) in this window, like
@@ -1014,22 +1037,30 @@ impl Render for LibraryRootView {
              collection_sort,
              collection_sort_direction,
              grouped,
-             presentation) = (snap.filter,
-                              snap.counts,
-                              snap.publishers,
-                              snap.collections,
-                              snap.collections_loaded,
-                              snap.catalog_loading,
-                              snap.catalog_ids,
-                              snap.total_count,
-                              snap.total_mb,
-                              snap.matched_count,
-                              snap.sort,
-                              snap.sort_direction,
-                              snap.collection_sort,
-                              snap.collection_sort_direction,
-                              snap.grouped,
-                              snap.presentation);
+             presentation,
+             bulk_selection_mode,
+             bulk_selected_ids,
+             bulk_selection_count,
+             bulk_items) = (snap.filter,
+                            snap.counts,
+                            snap.publishers,
+                            snap.collections,
+                            snap.collections_loaded,
+                            snap.catalog_loading,
+                            snap.catalog_ids,
+                            snap.total_count,
+                            snap.total_mb,
+                            snap.matched_count,
+                            snap.sort,
+                            snap.sort_direction,
+                            snap.collection_sort,
+                            snap.collection_sort_direction,
+                            snap.grouped,
+                            snap.presentation,
+                            snap.bulk_selection_mode,
+                            snap.bulk_selected_ids,
+                            snap.bulk_selection_count,
+                            snap.items);
 
         let settings_snap = self.settings.read(cx).snapshot();
         let activity_snap = self.activity.read(cx).snapshot();
@@ -1042,6 +1073,18 @@ impl Render for LibraryRootView {
 
         let theme = cx.global::<LibriTheme>().clone();
         let colors = &theme.colors;
+
+        let bulk_action_bar =
+            bulk_selection_mode.then(|| {
+                                   render_bulk_action_bar(bulk_selection_count,
+                                                          &bulk_selected_ids,
+                                                          &bulk_items,
+                                                          &collections,
+                                                          lib_entity.clone(),
+                                                          self.bulk_pattern_input.clone(),
+                                                          self.bulk_pattern_field.clone(),
+                                                          colors)
+                               });
 
         let publisher_search =
             crate::ui::views::sidebar_view::SidebarSectionSearch { open:
@@ -1083,6 +1126,7 @@ impl Render for LibraryRootView {
                                      sort_direction,
                                      grouped,
                                      presentation,
+                                     bulk_selection_mode,
                                      lib_entity.clone(),
                                      colors);
         let title_bar = render_title_bar(&settings_snap.auth, settings_entity.clone(), colors, cx);
@@ -1123,6 +1167,7 @@ impl Render for LibraryRootView {
                                        .flex()
                                        .flex_col()
                                        .child(toolbar)
+                                       .children(bulk_action_bar)
                                        .child(banner)
                                        .child(self.catalog_view.clone())
                                        .into_any_element(),
@@ -1169,6 +1214,7 @@ impl Render for LibraryRootView {
         let this_entity_for_add = this_entity.clone();
         let this_entity_for_activity = this_entity.clone();
         let this_entity_for_alert_history = this_entity.clone();
+        let this_entity_for_report_bug = this_entity.clone();
         let controller_for_reload = self.controller.clone();
         let controller_for_refresh_thumbnails = self.controller.clone();
         let controller_for_check_availability = self.controller.clone();
@@ -1243,8 +1289,8 @@ impl Render for LibraryRootView {
                         )
                 });
             })
-            .on_action(move |_: &ReportFeatureBug, window, cx| {
-                open_report_feature_bug_dialog(window, cx);
+            .on_action(move |_: &ReportFeatureBug, _, cx| {
+                this_entity_for_report_bug.update(cx, |view, cx| view.show_report_feature_bug(cx));
             })
             .on_action(move |_: &ReloadCatalog, _, cx| {
                 controller_for_reload.update(cx, |ctrl, cx| ctrl.reload_catalog(cx));
@@ -1413,8 +1459,5 @@ impl Render for LibraryRootView {
                     )
                     .child(status_bar),
             )
-            .children(sheet_layer)
-            .children(dialog_layer)
-            .children(notification_layer)
     }
 }
