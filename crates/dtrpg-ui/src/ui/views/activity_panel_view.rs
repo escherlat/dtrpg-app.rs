@@ -59,29 +59,42 @@ pub fn render_activity_panel(snap: &ActivitySnapshot, entity: Entity<ActivityCon
                     render_empty(text_primary, text_tertiary)
                 }
                 else {
-                    div().flex()
-                         .flex_col()
-                         .max_h(px(400.0))
-                         .overflow_y_scrollbar()
-                         .children(snap.items.iter().map(|item| {
-                                                        let is_in_progress = matches!(item.status,
-                                                                     ActivityStatus::InProgress);
-                                                        render_item_row(item.id,
-                                                                        item.label.as_ref(),
-                                                                        &item.status,
-                                                                        selected_id,
-                                                                        entity.clone(),
-                                                                        item.started_at,
-                                                                        item.elapsed_secs,
-                                                                        item.progress,
-                                                                        is_in_progress
-                                                                        && item.cancel_fn.is_some(),
-                                                                        text_secondary,
-                                                                        text_tertiary,
-                                                                        accent,
-                                                                        border)
-                                                    }))
-                         .into_any_element()
+                    // `overflow_y_scrollbar()` wraps its element in
+                    // `Scrollable`, whose `render` only
+                    // copies the `size` style field onto its
+                    // own outer wrapper — `max_h` sets `max_size` and would be
+                    // silently dropped if placed on the scrollable div itself.
+                    // The height cap lives on this plain outer div instead; the
+                    // inner div just fills it via `size_full()`, which
+                    // `Scrollable` already applies on its own.
+                    div()
+                .max_h(px(400.0))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .size_full()
+                        .overflow_y_scrollbar()
+                        .children(snap.items.iter().map(|item| {
+                            let is_in_progress = matches!(item.status, ActivityStatus::InProgress);
+                            render_item_row(
+                                item.id,
+                                item.label.as_ref(),
+                                &item.status,
+                                selected_id,
+                                entity.clone(),
+                                item.started_at,
+                                item.elapsed_secs,
+                                item.progress,
+                                is_in_progress && item.cancel_fn.is_some(),
+                                text_secondary,
+                                text_tertiary,
+                                accent,
+                                border,
+                            )
+                        })),
+                )
+                .into_any_element()
                 })
          .into_any_element()
 }
