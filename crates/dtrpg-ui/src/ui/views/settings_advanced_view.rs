@@ -10,11 +10,11 @@ use gpui::{
     AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
     StatefulInteractiveElement, Styled, div, px,
 };
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::description_list::{DescriptionItem, DescriptionList};
-use gpui_component::input::{InputState, NumberInput};
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
+use gpui_kit::component::input::{InputState, NumberInput};
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::build_info;
@@ -279,11 +279,18 @@ pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts:
                 .child(t!("settings.advanced_title")),
         )
         .child(div().h(px(1.0)).bg(border))
-        .child(render_recently_updated_window_row(recently_updated_window_days,
-                                                  recently_updated_window_input,
-                                                  colors))
+        .child(render_recently_updated_window_row(
+            recently_updated_window_days,
+            recently_updated_window_input,
+            colors,
+        ))
         .child(div().h(px(1.0)).bg(border))
-        .child(render_cache_details(cache_counts, colors, label_font_family, value_font_family))
+        .child(render_cache_details(
+            cache_counts,
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
         .child(
             Button::new("open-cache-folder-btn")
                 .outline()
@@ -337,13 +344,22 @@ pub fn render_about_section(colors: &ColorTokens) -> impl IntoElement + 'static 
     let build_info_list = DescriptionList::horizontal()
         .columns(1)
         .bordered(false)
-        .child(about_info_item(t!("about.version_label").to_string(),
-                               env!("CARGO_PKG_VERSION").to_string()))
-        .child(about_info_item(t!("about.commit_label").to_string(),
-                               build_info::GIT_HASH.to_string()))
-        .child(about_info_item(t!("about.build_date_label").to_string(),
-                               build_info::BUILD_DATE.to_string()))
-        .child(about_info_item(t!("about.target_label").to_string(), build_info::TARGET.to_string()));
+        .child(about_info_item(
+            t!("about.version_label").to_string(),
+            env!("CARGO_PKG_VERSION").to_string(),
+        ))
+        .child(about_info_item(
+            t!("about.commit_label").to_string(),
+            build_info::GIT_HASH.to_string(),
+        ))
+        .child(about_info_item(
+            t!("about.build_date_label").to_string(),
+            build_info::BUILD_DATE.to_string(),
+        ))
+        .child(about_info_item(
+            t!("about.target_label").to_string(),
+            build_info::TARGET.to_string(),
+        ));
 
     div().flex()
          .flex_col()

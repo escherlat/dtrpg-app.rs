@@ -168,7 +168,7 @@ impl ThemeKey {
 /// control changes it.
 #[derive(Debug, Clone)]
 pub struct FontSelections {
-    /// Active body-font family; also applied to `gpui_component::Theme`'s
+    /// Active body-font family; also applied to `gpui_kit::component::Theme`'s
     /// `font_family` by whichever call site changes it (see
     /// `LibraryController::set_body_font`).
     pub body_font:    SharedString,
@@ -238,29 +238,29 @@ impl LibriTheme {
     }
 }
 
-// ── gpui-component theme color sync
+// ── gpui-kit theme color sync
 // ─────────────────────────────────────────────
 
-/// Overrides `gpui_component::Theme`'s semantic colors to match `colors`.
+/// Overrides `gpui_kit::component::Theme`'s semantic colors to match `colors`.
 ///
-/// `gpui-component` widgets (`Button`, `Input`, `Popover`/`PopupMenu`,
+/// `gpui-kit` widgets (`Button`, `Input`, `Popover`/`PopupMenu`,
 /// tooltips, scrollbars, `Sidebar`, `DataTable`/`Table`, `TabBar`/`Tab`
 /// (including the catalog view-mode selector and tab strip), `StatusBar`,
 /// `TitleBar`, etc.) read their colors from `cx.theme()`
-/// (`gpui_component::Theme`), which is a separate
+/// (`gpui_kit::component::Theme`), which is a separate
 /// global from [`LibriTheme`] and is never otherwise synced with the active
-/// Libri palette — so those widgets rendered with `gpui-component`'s default
+/// Libri palette — so those widgets rendered with `gpui-kit`'s default
 /// light/dark colors (whatever `Theme::apply_config` computed for the
 /// ambient system mode) regardless of which Libri theme was active.
 ///
 /// Call this whenever [`LibriTheme`] changes, updating both `colors` (read
 /// directly by most components) and `tokens` (read by `DataTable` and other
 /// newer widgets) so the two stay in sync. `ColorTokens` has a smaller set of
-/// semantic roles than `gpui_component::Theme` — where there's no dedicated
-/// Libri token for a field (e.g. a distinct "info" or "success" hue), the
-/// semantically closest token is reused rather than leaving the field on its
-/// light/dark default.
-pub fn apply_theme_colors(theme: &mut gpui_component::Theme, colors: &ColorTokens) {
+/// semantic roles than `gpui_kit::component::Theme` — where there's no
+/// dedicated Libri token for a field (e.g. a distinct "info" or "success" hue),
+/// the semantically closest token is reused rather than leaving the field on
+/// its light/dark default.
+pub fn apply_theme_colors(theme: &mut gpui_kit::component::Theme, colors: &ColorTokens) {
     // Base semantic fields.
     theme.colors.background = colors.surface;
     theme.colors.foreground = colors.text_primary;
@@ -340,6 +340,57 @@ pub fn apply_theme_colors(theme: &mut gpui_component::Theme, colors: &ColorToken
     theme.tokens.success_foreground = colors.accent_on.into();
     theme.tokens.success_hover = colors.accent.into();
     theme.tokens.list_active = colors.accent_soft.into();
+
+    // `accent`/`accent_foreground` and the list/group-box/switch/slider/link
+    // family below were missing from this mapping even though gpui-kit's
+    // `ThemeColor` carries them: anything that falls back to them (most
+    // non-button interactive hover states - list rows, menu items, switches,
+    // sliders) was keeping gpui-kit's light-theme default instead of this
+    // theme's colors, which is why hovering most controls under a dark theme
+    // like Ink showed a glaring light/white background.
+    theme.colors.accent = colors.accent;
+    theme.colors.accent_foreground = colors.accent_on;
+    theme.colors.list = colors.surface;
+    theme.colors.list_even = colors.surface_alt;
+    theme.colors.list_head = colors.surface_alt;
+    theme.colors.list_hover = colors.hover;
+    theme.colors.list_active_border = colors.accent;
+    theme.colors.group_box = colors.surface_alt;
+    theme.colors.group_box_foreground = colors.text_secondary;
+    theme.colors.overlay = colors.scrim;
+    theme.colors.window_border = colors.border_strong;
+    theme.colors.skeleton = colors.surface_alt;
+    theme.colors.switch = colors.surface_alt;
+    theme.colors.switch_thumb = colors.accent_on;
+    theme.colors.slider_bar = colors.accent;
+    theme.colors.slider_thumb = colors.accent_on;
+    theme.colors.link = colors.accent;
+    theme.colors.link_active = colors.accent_soft;
+    theme.colors.link_hover = colors.accent;
+    theme.colors.accordion = colors.surface_alt;
+    theme.colors.progress_bar = colors.accent;
+
+    theme.tokens.accent = colors.accent.into();
+    theme.tokens.accent_foreground = colors.accent_on.into();
+    theme.tokens.list = colors.surface.into();
+    theme.tokens.list_even = colors.surface_alt.into();
+    theme.tokens.list_head = colors.surface_alt.into();
+    theme.tokens.list_hover = colors.hover.into();
+    theme.tokens.list_active_border = colors.accent.into();
+    theme.tokens.group_box = colors.surface_alt.into();
+    theme.tokens.group_box_foreground = colors.text_secondary.into();
+    theme.tokens.overlay = colors.scrim.into();
+    theme.tokens.window_border = colors.border_strong.into();
+    theme.tokens.skeleton = colors.surface_alt.into();
+    theme.tokens.switch = colors.surface_alt.into();
+    theme.tokens.switch_thumb = colors.accent_on.into();
+    theme.tokens.slider_bar = colors.accent.into();
+    theme.tokens.slider_thumb = colors.accent_on.into();
+    theme.tokens.link = colors.accent.into();
+    theme.tokens.link_active = colors.accent_soft.into();
+    theme.tokens.link_hover = colors.accent.into();
+    theme.tokens.accordion = colors.surface_alt.into();
+    theme.tokens.progress_bar = colors.accent.into();
 
     // Buttons.
     theme.colors.button = colors.surface_alt;

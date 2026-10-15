@@ -33,9 +33,11 @@ pub(super) fn map_client_error(error: ClientError) -> LibraryServiceError {
                 _ => LibraryServiceErrorKind::Network,
             };
             let detail = message.unwrap_or(payload);
-            LibraryServiceError::new(kind,
-                                     format!("Request to {url} failed (HTTP {status}): {detail}"))
-                .with_retry_after(retry_after)
+            LibraryServiceError::new(
+                kind,
+                format!("Request to {url} failed (HTTP {status}): {detail}"),
+            )
+            .with_retry_after(retry_after)
         }
         ClientError::Http(error) => {
             let status = error.status().map(|s| s.as_u16());

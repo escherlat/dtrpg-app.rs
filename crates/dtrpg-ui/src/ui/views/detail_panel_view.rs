@@ -10,22 +10,22 @@ use gpui::{
     MouseMoveEvent, ObjectFit, ParentElement, Pixels, SharedString, StatefulInteractiveElement,
     Styled, StyledImage, Window, div, img, px,
 };
-use gpui_component::Disableable;
-use gpui_component::ElementExt as _;
-use gpui_component::Icon;
-use gpui_component::IconName;
-use gpui_component::Sizable;
-use gpui_component::Size;
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::clipboard::Clipboard;
-use gpui_component::collapsible::Collapsible;
-use gpui_component::description_list::{DescriptionItem, DescriptionList};
-use gpui_component::scroll::ScrollableElement as _;
-use gpui_component::spinner::Spinner;
-use gpui_component::table::{Column, DataTable, TableDelegate, TableState};
-use gpui_component::text::Text;
-use gpui_component::tooltip::Tooltip;
+use gpui_kit::component::Disableable;
+use gpui_kit::component::ElementExt as _;
+use gpui_kit::component::Icon;
+use gpui_kit::component::IconName;
+use gpui_kit::component::Sizable;
+use gpui_kit::component::Size;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::clipboard::Clipboard;
+use gpui_kit::component::collapsible::Collapsible;
+use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
+use gpui_kit::component::scroll::ScrollableElement as _;
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
+use gpui_kit::component::text::Text;
+use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -374,7 +374,7 @@ pub(crate) struct ItemListDelegate {
     pub(crate) entry_dir:   PathBuf,
     /// Current rendered width of the item list table, captured by
     /// `render_item_tier`'s `on_prepaint` hook. Drives the Name column's
-    /// fill-remaining-width sizing in [`Self::column`] — `gpui-component`'s
+    /// fill-remaining-width sizing in [`Self::column`] — `gpui-kit`'s
     /// `Column` has no built-in flex/stretch behavior, so Name's width is
     /// recomputed each time this changes rather than left fixed.
     pub(crate) table_width: Option<Pixels>,
@@ -459,37 +459,37 @@ impl TableDelegate for ItemListDelegate {
                 name_cell
                     .id(SharedString::from(format!("item-row-{row_ix}-zip-name")))
                     .cursor_pointer()
-                    .child(div().flex_none()
-                               .child(Icon::new(IconName::FolderOpen)
-                                          .text_color(colors.text_tertiary)))
+                    .child(
+                        div().flex_none().child(
+                            Icon::new(IconName::FolderOpen).text_color(colors.text_tertiary),
+                        ),
+                    )
                     .on_mouse_move(move |event: &MouseMoveEvent, _window, cx| {
                         controller_move.update(cx, |ctrl, cx| {
-                                            ctrl.hover_zip_preview(Arc::clone(&entry_id_move),
-                                                                   row_ix,
-                                                                   event.position,
-                                                                   cx);
-                                        });
+                            ctrl.hover_zip_preview(
+                                Arc::clone(&entry_id_move),
+                                row_ix,
+                                event.position,
+                                cx,
+                            );
+                        });
                     })
                     .on_hover(move |hovered: &bool, _window, cx| {
                         if !hovered {
                             controller_hover_end.update(cx, |ctrl, cx| {
-                                                     ctrl.clear_hover_zip_preview(
-                                                         &entry_id_hover_end,
-                                                         row_ix,
-                                                         cx,
-                                                     );
-                                                 });
+                                ctrl.clear_hover_zip_preview(&entry_id_hover_end, row_ix, cx);
+                            });
                         }
                     })
                     .on_click(move |event: &ClickEvent, _window, cx| {
                         controller_click.update(cx, |ctrl, cx| {
-                                             ctrl.toggle_zip_preview_pin(Arc::clone(
-                                                                             &entry_id_click,
-                                                                         ),
-                                                                         row_ix,
-                                                                         event.position(),
-                                                                         cx);
-                                         });
+                            ctrl.toggle_zip_preview_pin(
+                                Arc::clone(&entry_id_click),
+                                row_ix,
+                                event.position(),
+                                cx,
+                            );
+                        });
                     })
                     .into_any_element()
             }
@@ -879,24 +879,28 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
         .columns(2)
         .bordered(false)
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_file_id").to_string(),
-                                              &label_font_family))
-                .value(copyable_value(
-                    SharedString::from(format!("file-id-{toggle_key}")),
-                    file.id.to_string(),
-                    &value_font_family,
-                ))
-                .span(2),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_file_id").to_string(),
+                &label_font_family,
+            ))
+            .value(copyable_value(
+                SharedString::from(format!("file-id-{toggle_key}")),
+                file.id.to_string(),
+                &value_font_family,
+            ))
+            .span(2),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_download_location").to_string(),
-                                              &label_font_family))
-                .value(copyable_value(
-                    SharedString::from(format!("file-path-{toggle_key}")),
-                    path_value,
-                    &value_font_family,
-                ))
-                .span(2),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_download_location").to_string(),
+                &label_font_family,
+            ))
+            .value(copyable_value(
+                SharedString::from(format!("file-path-{toggle_key}")),
+                path_value,
+                &value_font_family,
+            ))
+            .span(2),
         );
 
     Collapsible::new().gap(px(8.0))
@@ -949,63 +953,78 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
         .columns(2)
         .bordered(false)
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_stable_id").to_string(),
-                                              &label_font_family))
-                .value(copyable_value(
-                    SharedString::from("other-details-stable-id"),
-                    item.id.to_string(),
-                    &value_font_family,
-                )),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_stable_id").to_string(),
+                &label_font_family,
+            ))
+            .value(copyable_value(
+                SharedString::from("other-details-stable-id"),
+                item.id.to_string(),
+                &value_font_family,
+            )),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_numeric_id").to_string(),
-                                              &label_font_family))
-                .value(copyable_value(
-                    SharedString::from("other-details-numeric-id"),
-                    item.numeric_id.to_string(),
-                    &value_font_family,
-                )),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_numeric_id").to_string(),
+                &label_font_family,
+            ))
+            .value(copyable_value(
+                SharedString::from("other-details-numeric-id"),
+                item.numeric_id.to_string(),
+                &value_font_family,
+            )),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_order_product_id").to_string(),
-                                              &label_font_family))
-                .value(copyable_value(
-                    SharedString::from("other-details-order-product-id"),
-                    item.order_product_id.to_string(),
-                    &value_font_family,
-                )),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_order_product_id").to_string(),
+                &label_font_family,
+            ))
+            .value(copyable_value(
+                SharedString::from("other-details-order-product-id"),
+                item.order_product_id.to_string(),
+                &value_font_family,
+            )),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_product_id").to_string(),
-                                              &label_font_family))
-                .value(copyable_value(
-                    SharedString::from("other-details-product-id"),
-                    item.product_id.to_string(),
-                    &value_font_family,
-                )),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_product_id").to_string(),
+                &label_font_family,
+            ))
+            .value(copyable_value(
+                SharedString::from("other-details-product-id"),
+                item.product_id.to_string(),
+                &value_font_family,
+            )),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_added_order").to_string(),
-                                              &label_font_family))
-                .value(styled_value(item.added_order.to_string(), &value_font_family)),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_added_order").to_string(),
+                &label_font_family,
+            ))
+            .value(styled_value(
+                item.added_order.to_string(),
+                &value_font_family,
+            )),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_cover_color").to_string(),
-                                              &label_font_family))
-                .value(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(px(6.0))
-                        .child(div().size(px(12.0)).rounded_full().bg(swatch_color))
-                        .child(copyable_value(
-                            SharedString::from("other-details-cover-color"),
-                            item.color.to_string(),
-                            &value_font_family,
-                        ))
-                        .into_any_element(),
-                )
-                .span(2),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_cover_color").to_string(),
+                &label_font_family,
+            ))
+            .value(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.0))
+                    .child(div().size(px(12.0)).rounded_full().bg(swatch_color))
+                    .child(copyable_value(
+                        SharedString::from("other-details-cover-color"),
+                        item.color.to_string(),
+                        &value_font_family,
+                    ))
+                    .into_any_element(),
+            )
+            .span(2),
         );
 
     Collapsible::new().gap(px(8.0))
@@ -1104,8 +1123,11 @@ fn copyable_value(field_id: SharedString, value: impl Into<SharedString>,
         .items_center()
         .gap(px(6.0))
         .child(
-            selectable_text(SharedString::from(format!("{field_id}-text")), value.clone())
-                .font_family(value_font_family.to_string()),
+            selectable_text(
+                SharedString::from(format!("{field_id}-text")),
+                value.clone(),
+            )
+            .font_family(value_font_family.to_string()),
         )
         .child(
             div()
@@ -1244,51 +1266,68 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
         .columns(2)
         .bordered(false)
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_system").to_string(), label_font_family))
-                .value(Text::from(selectable_text(
-                    "detail-field-system",
-                    value_or_dash(&item.line),
-                ).font_family(value_font_family.to_string()))),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_system").to_string(),
+                label_font_family,
+            ))
+            .value(Text::from(
+                selectable_text("detail-field-system", value_or_dash(&item.line))
+                    .font_family(value_font_family.to_string()),
+            )),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_released").to_string(), label_font_family))
-                .value(Text::from(selectable_text(
-                    "detail-field-released",
-                    item.year.to_string(),
-                ).font_family(value_font_family.to_string()))),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_released").to_string(),
+                label_font_family,
+            ))
+            .value(Text::from(
+                selectable_text("detail-field-released", item.year.to_string())
+                    .font_family(value_font_family.to_string()),
+            )),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_format").to_string(), label_font_family)).value(
-                Text::from(selectable_text("detail-field-format", item.format.to_string())
-                    .font_family(value_font_family.to_string())),
-            ),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_format").to_string(),
+                label_font_family,
+            ))
+            .value(Text::from(
+                selectable_text("detail-field-format", item.format.to_string())
+                    .font_family(value_font_family.to_string()),
+            )),
         )
         .child(
             DescriptionItem::new(styled_label(file_size_label, label_font_family)).value(
-                Text::from(selectable_text("detail-field-file-size", file_size_value)
-                    .font_family(value_font_family.to_string())),
+                Text::from(
+                    selectable_text("detail-field-file-size", file_size_value)
+                        .font_family(value_font_family.to_string()),
+                ),
             ),
         )
         .child(
-            DescriptionItem::new(styled_label(t!("detail.field_category").to_string(),
-                                              label_font_family))
-                .value(Text::from(selectable_text(
-                    "detail-field-kind",
-                    item.kind.to_string(),
-                ).font_family(value_font_family.to_string())))
-                .span(2),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_category").to_string(),
+                label_font_family,
+            ))
+            .value(Text::from(
+                selectable_text("detail-field-kind", item.kind.to_string())
+                    .font_family(value_font_family.to_string()),
+            ))
+            .span(2),
         );
 
     // The DriveThruRPG order-product API does not always report a page count;
     // omit the row entirely rather than showing a misleading "0".
     if item.pages > 0 {
         list = list.child(
-            DescriptionItem::new(styled_label(t!("detail.field_pages").to_string(), label_font_family))
-                .value(Text::from(selectable_text(
-                    "detail-field-pages",
-                    item.pages.to_string(),
-                ).font_family(value_font_family.to_string())))
-                .span(2),
+            DescriptionItem::new(styled_label(
+                t!("detail.field_pages").to_string(),
+                label_font_family,
+            ))
+            .value(Text::from(
+                selectable_text("detail-field-pages", item.pages.to_string())
+                    .font_family(value_font_family.to_string()),
+            ))
+            .span(2),
         );
     }
 

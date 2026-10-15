@@ -216,7 +216,8 @@ fn sentry_layer<S>(_active: bool) -> Option<NoopLayer<S>>
 /// takes effect regardless of whether `RUST_LOG` is set.
 fn build_filter() -> EnvFilter {
     let base = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
-    EnvFilter::try_new(format!("{base},gpui=info")).unwrap_or_else(|_| EnvFilter::new("warn,gpui=info"))
+    EnvFilter::try_new(format!("{base},gpui=info"))
+        .unwrap_or_else(|_| EnvFilter::new("warn,gpui=info"))
 }
 
 fn platform_log_dir() -> PathBuf {

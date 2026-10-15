@@ -7,10 +7,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use gpui::{App, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::input::{Input, InputState};
-use gpui_component::menu::{DropdownMenu, PopupMenuItem};
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -196,11 +196,15 @@ fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<
                 .label(t!("toolbar.bulk_download"))
                 .on_click(move |_, window, cx| {
                     let e = e_download.clone();
-                    confirm_and_dispatch(window, cx, bulk_selection_count,
-                                        t!("toolbar.bulk_download").to_string().into(),
-                                        move |cx| {
-                                            e.update(cx, |ctrl, cx| ctrl.bulk_download(cx));
-                                        });
+                    confirm_and_dispatch(
+                        window,
+                        cx,
+                        bulk_selection_count,
+                        t!("toolbar.bulk_download").to_string().into(),
+                        move |cx| {
+                            e.update(cx, |ctrl, cx| ctrl.bulk_download(cx));
+                        },
+                    );
                 }),
         )
         .child(
@@ -209,11 +213,15 @@ fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<
                 .label(t!("toolbar.bulk_remove_download"))
                 .on_click(move |_, window, cx| {
                     let e = e_remove_download.clone();
-                    confirm_and_dispatch(window, cx, bulk_selection_count,
-                                        t!("toolbar.bulk_remove_download").to_string().into(),
-                                        move |cx| {
-                                            e.update(cx, |ctrl, cx| ctrl.bulk_remove_download(cx));
-                                        });
+                    confirm_and_dispatch(
+                        window,
+                        cx,
+                        bulk_selection_count,
+                        t!("toolbar.bulk_remove_download").to_string().into(),
+                        move |cx| {
+                            e.update(cx, |ctrl, cx| ctrl.bulk_remove_download(cx));
+                        },
+                    );
                 }),
         )
         .child(
@@ -222,11 +230,15 @@ fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<
                 .label(t!("toolbar.bulk_fetch_thumbnail"))
                 .on_click(move |_, window, cx| {
                     let e = e_thumbnail.clone();
-                    confirm_and_dispatch(window, cx, bulk_selection_count,
-                                        t!("toolbar.bulk_fetch_thumbnail").to_string().into(),
-                                        move |cx| {
-                                            e.update(cx, |ctrl, cx| ctrl.bulk_fetch_thumbnail(cx));
-                                        });
+                    confirm_and_dispatch(
+                        window,
+                        cx,
+                        bulk_selection_count,
+                        t!("toolbar.bulk_fetch_thumbnail").to_string().into(),
+                        move |cx| {
+                            e.update(cx, |ctrl, cx| ctrl.bulk_fetch_thumbnail(cx));
+                        },
+                    );
                 }),
         )
         .child(
@@ -241,15 +253,17 @@ fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<
                         menu = menu.item(PopupMenuItem::new(collection.name.to_string()).on_click(
                             move |_, window, cx| {
                                 let e = e.clone();
-                                confirm_and_dispatch(window, cx, bulk_selection_count,
-                                                    t!("toolbar.bulk_add_to_collection")
-                                                        .to_string()
-                                                        .into(),
-                                                    move |cx| {
-                                                        e.update(cx, |ctrl, cx| {
-                                                            ctrl.bulk_add_to_collection(id, cx)
-                                                        });
-                                                    });
+                                confirm_and_dispatch(
+                                    window,
+                                    cx,
+                                    bulk_selection_count,
+                                    t!("toolbar.bulk_add_to_collection").to_string().into(),
+                                    move |cx| {
+                                        e.update(cx, |ctrl, cx| {
+                                            ctrl.bulk_add_to_collection(id, cx)
+                                        });
+                                    },
+                                );
                             },
                         ));
                     }
@@ -268,15 +282,17 @@ fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<
                         menu = menu.item(PopupMenuItem::new(collection.name.to_string()).on_click(
                             move |_, window, cx| {
                                 let e = e.clone();
-                                confirm_and_dispatch(window, cx, bulk_selection_count,
-                                                    t!("toolbar.bulk_remove_from_collection")
-                                                        .to_string()
-                                                        .into(),
-                                                    move |cx| {
-                                                        e.update(cx, |ctrl, cx| {
-                                                            ctrl.bulk_remove_from_collection(id, cx)
-                                                        });
-                                                    });
+                                confirm_and_dispatch(
+                                    window,
+                                    cx,
+                                    bulk_selection_count,
+                                    t!("toolbar.bulk_remove_from_collection").to_string().into(),
+                                    move |cx| {
+                                        e.update(cx, |ctrl, cx| {
+                                            ctrl.bulk_remove_from_collection(id, cx)
+                                        });
+                                    },
+                                );
                             },
                         ));
                     }
@@ -289,11 +305,15 @@ fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<
                 .label(t!("toolbar.bulk_open"))
                 .on_click(move |_, window, cx| {
                     let e = e_open.clone();
-                    confirm_and_dispatch(window, cx, bulk_selection_count,
-                                        t!("toolbar.bulk_open").to_string().into(),
-                                        move |cx| {
-                                            e.update(cx, |ctrl, cx| ctrl.bulk_open(cx));
-                                        });
+                    confirm_and_dispatch(
+                        window,
+                        cx,
+                        bulk_selection_count,
+                        t!("toolbar.bulk_open").to_string().into(),
+                        move |cx| {
+                            e.update(cx, |ctrl, cx| ctrl.bulk_open(cx));
+                        },
+                    );
                 }),
         )
 }

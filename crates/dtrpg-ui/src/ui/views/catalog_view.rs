@@ -11,17 +11,19 @@ use gpui::{
     Styled, StyledImage, TextRun, UniformListScrollHandle, Window, div, img, px, rems,
     uniform_list,
 };
-use gpui_component::ElementExt;
-use gpui_component::WindowExt as _;
-use gpui_component::badge::Badge;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::checkbox::Checkbox;
-use gpui_component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
-use gpui_component::scroll::ScrollableElement;
-use gpui_component::spinner::Spinner;
-use gpui_component::table::{Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState};
-use gpui_component::tooltip::Tooltip;
-use gpui_component::{Sizable, Size};
+use gpui_kit::component::ElementExt;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::badge::Badge;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
+use gpui_kit::component::scroll::ScrollableElement;
+use gpui_kit::component::spinner::Spinner;
+use gpui_kit::component::table::{
+    Column, ColumnSort, DataTable, TableDelegate, TableEvent, TableState,
+};
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{Sizable, Size};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
@@ -51,7 +53,7 @@ enum EmptyReason {
 /// Builds a catalog item's `on_click` handler: a single click opens the item
 /// popover; a double click additionally opens (or activates) an expanded
 /// detail tab and dismisses the popover. Mirrors the click-count escalation
-/// pattern `gpui-component`'s own `TableState::on_row_left_click` uses.
+/// pattern `gpui-kit`'s own `TableState::on_row_left_click` uses.
 fn item_click_handler(id: Arc<str>, title: String, entity: Entity<LibraryController>,
                       tabs: Entity<TabsController>)
                       -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
@@ -324,19 +326,12 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                 Some(Checkbox::new(checkbox_elem_id).checked(selected)
                                                     .on_click(move |new_checked, _window, cx| {
                                                         checkbox_entity.update(cx, |ctrl, cx| {
-                                                            if *new_checked {
-                                                                ctrl.bulk_select_item(
-                                                                    Arc::clone(&checkbox_id),
-                                                                    cx,
-                                                                );
-                                                            }
-                                                            else {
-                                                                ctrl.bulk_deselect_item(
-                                                                    &checkbox_id,
-                                                                    cx,
-                                                                );
-                                                            }
-                                                        });
+                                if *new_checked {
+                                    ctrl.bulk_select_item(Arc::clone(&checkbox_id), cx);
+                                } else {
+                                    ctrl.bulk_deselect_item(&checkbox_id, cx);
+                                }
+                            });
                                                     })
                                                     .into_any_element())
             }
@@ -606,15 +601,21 @@ impl TableDelegate for CatalogListDelegate {
                                 let remove_id = Arc::clone(&remove_id);
                                 alert
                                     .confirm()
-                                    .title(t!("catalog.remove_download_confirm_title",
-                                               title = title_for_remove.clone())
-                                        .to_string())
-                                    .description(t!("catalog.remove_download_confirm_description")
-                                        .to_string())
+                                    .title(
+                                        t!(
+                                            "catalog.remove_download_confirm_title",
+                                            title = title_for_remove.clone()
+                                        )
+                                        .to_string(),
+                                    )
+                                    .description(
+                                        t!("catalog.remove_download_confirm_description")
+                                            .to_string(),
+                                    )
                                     .on_ok(move |_, _window, cx| {
                                         entity_remove.update(cx, |ctrl, cx| {
-                                                          ctrl.remove_download(&remove_id, cx)
-                                                      });
+                                            ctrl.remove_download(&remove_id, cx)
+                                        });
                                         true
                                     })
                             });
@@ -665,7 +666,7 @@ impl TableDelegate for CatalogListDelegate {
     fn render_th(&mut self, col_ix: usize, _window: &mut Window,
                  cx: &mut Context<TableState<Self>>)
                  -> impl IntoElement {
-        // `gpui-component`'s default `render_th` renders the column name in a
+        // `gpui-kit`'s default `render_th` renders the column name in a
         // plain non-flex `div`, so the text sits at the top of the
         // header cell instead of vertically centered like every
         // `render_td` cell. Match the cell style here.
@@ -809,15 +810,21 @@ impl TableDelegate for GroupedCatalogListDelegate {
                                 let remove_id = Arc::clone(&remove_id);
                                 alert
                                     .confirm()
-                                    .title(t!("catalog.remove_download_confirm_title",
-                                               title = title_for_remove.clone())
-                                        .to_string())
-                                    .description(t!("catalog.remove_download_confirm_description")
-                                        .to_string())
+                                    .title(
+                                        t!(
+                                            "catalog.remove_download_confirm_title",
+                                            title = title_for_remove.clone()
+                                        )
+                                        .to_string(),
+                                    )
+                                    .description(
+                                        t!("catalog.remove_download_confirm_description")
+                                            .to_string(),
+                                    )
                                     .on_ok(move |_, _window, cx| {
                                         entity_remove.update(cx, |ctrl, cx| {
-                                                          ctrl.remove_download(&remove_id, cx)
-                                                      });
+                                            ctrl.remove_download(&remove_id, cx)
+                                        });
                                         true
                                     })
                             });
@@ -1032,11 +1039,8 @@ impl CatalogView {
                                                           &widths);
                                   });
                              this.catalog_grouped_list_table.update(cx, |state, _cx| {
-                                                                apply_column_widths(
-                                &mut state.delegate_mut().user_widths,
-                                &widths,
-                            );
-                                                            });
+                        apply_column_widths(&mut state.delegate_mut().user_widths, &widths);
+                    });
                          }
                          _ => {}
                      })
@@ -1087,11 +1091,8 @@ impl CatalogView {
                                                           &widths);
                                   });
                              this.catalog_list_table.update(cx, |state, _cx| {
-                                                        apply_column_widths(
-                                &mut state.delegate_mut().user_widths,
-                                &widths,
-                            );
-                                                    });
+                        apply_column_widths(&mut state.delegate_mut().user_widths, &widths);
+                    });
                          }
                          _ => {}
                      })
@@ -1237,12 +1238,11 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let content: AnyElement =
-            match (snap.presentation, snap.grouped) {
-                // ── List, ungrouped — DataTable (handles header/row alignment) ──
-                (CatalogPresentation::List, false) => {
-                    use gpui_component::Size;
-                    root.px(pad_side)
+        let content: AnyElement = match (snap.presentation, snap.grouped) {
+            // ── List, ungrouped — DataTable (handles header/row alignment) ──
+            (CatalogPresentation::List, false) => {
+                use gpui_kit::component::Size;
+                root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1250,15 +1250,15 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-                }
+            }
 
-                // ── List, grouped — DataTable over a flattened header/item row
-                // list, so it gets the same virtualization as the ungrouped
-                // branch instead of hand-rolled, fully-materialized rows ──
-                (CatalogPresentation::List, true) => {
-                    use gpui_component::Size;
-                    self.grouped_items(cx);
-                    root.px(pad_side)
+            // ── List, grouped — DataTable over a flattened header/item row
+            // list, so it gets the same virtualization as the ungrouped
+            // branch instead of hand-rolled, fully-materialized rows ──
+            (CatalogPresentation::List, true) => {
+                use gpui_kit::component::Size;
+                self.grouped_items(cx);
+                root.px(pad_side)
                     .child(
                         DataTable::new(&self.catalog_grouped_list_table)
                             .with_size(Size::Size(density.row_text_height))
@@ -1266,77 +1266,76 @@ impl Render for CatalogView {
                             .scrollbar_visible(true, false),
                     )
                     .into_any_element()
-                }
+            }
 
-                // ── Thumbs, ungrouped — virtualized ───────────────────────────
-                (CatalogPresentation::Thumbs, false) => {
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let s = storage_root.clone();
-                    let t = tabs_entity.clone();
-                    let selection_mode = snap.bulk_selection_mode;
-                    let selected_ids = snap.bulk_selected_ids.clone();
-                    root.px(pad_side)
-                        .child(
-                               div().relative()
-                                    .flex_1()
-                                    .min_h_0()
-                                    .child(
-                        uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
-                            let items = ctrl.read(cx).visible_items_slice(range);
-                            let covers: Vec<Option<Arc<Image>>> = {
-                                let cache = cx.global::<CoverCache>();
-                                items.iter().map(|item| cache.get(&item.id)).collect()
-                            };
-                            let checking: Vec<(bool, bool)> = {
-                                let ctrl_ref = ctrl.read(cx);
-                                items.iter()
-                                     .map(|item| {
-                                         (ctrl_ref.is_checking(&item.id),
-                                          ctrl_ref.is_verifying_downloads(&item.id))
-                                     })
-                                     .collect()
-                            };
+            // ── Thumbs, ungrouped — virtualized ───────────────────────────
+            (CatalogPresentation::Thumbs, false) => {
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                let t = tabs_entity.clone();
+                let selection_mode = snap.bulk_selection_mode;
+                let selected_ids = snap.bulk_selected_ids.clone();
+                root.px(pad_side)
+                    .child(
+                           div().relative()
+                                .flex_1()
+                                .min_h_0()
+                                .child(
+                    uniform_list("catalog-thumbs", item_count, move |range, window, cx| {
+                        let items = ctrl.read(cx).visible_items_slice(range);
+                        let covers: Vec<Option<Arc<Image>>> = {
+                            let cache = cx.global::<CoverCache>();
+                            items.iter().map(|item| cache.get(&item.id)).collect()
+                        };
+                        let checking: Vec<(bool, bool)> = {
+                            let ctrl_ref = ctrl.read(cx);
                             items.iter()
-                                 .zip(covers)
-                                 .zip(checking)
-                                 .map(|((item, cover), (is_checking, is_verifying))| {
-                                     let is_selected = selected_ids.contains(&item.id);
-                                     render_thumb_row(item,
-                                                      cover,
-                                                      &c,
-                                                      &d,
-                                                      ctrl.clone(),
-                                                      t.clone(),
-                                                      s.clone(),
-                                                      window,
-                                                      is_checking,
-                                                      is_verifying,
-                                                      selection_mode,
-                                                      is_selected).into_any_element()
+                                 .map(|item| {
+                                     (ctrl_ref.is_checking(&item.id),
+                                      ctrl_ref.is_verifying_downloads(&item.id))
                                  })
                                  .collect()
-                        }).track_scroll(&scroll_handle)
-                          .size_full(),
-                    )
-                                    .vertical_scrollbar(&scroll_handle),
-                    )
-                        .into_any_element()
-                }
+                        };
+                        items.iter()
+                             .zip(covers)
+                             .zip(checking)
+                             .map(|((item, cover), (is_checking, is_verifying))| {
+                                 let is_selected = selected_ids.contains(&item.id);
+                                 render_thumb_row(item,
+                                                  cover,
+                                                  &c,
+                                                  &d,
+                                                  ctrl.clone(),
+                                                  t.clone(),
+                                                  s.clone(),
+                                                  window,
+                                                  is_checking,
+                                                  is_verifying,
+                                                  selection_mode,
+                                                  is_selected).into_any_element()
+                             })
+                             .collect()
+                    }).track_scroll(&scroll_handle)
+                      .size_full(),
+                )
+                                .vertical_scrollbar(&scroll_handle),
+                )
+                    .into_any_element()
+            }
 
-                // ── Thumbs, grouped — non-virtualized ─────────────────────────
-                (CatalogPresentation::Thumbs, true) => {
-                    let groups = self.grouped_items(cx);
-                    let cover_cache = {
-                        let cache = cx.global::<CoverCache>();
-                        cache.images.clone()
-                    };
-                    let checking_items = self.controller.read(cx).checking_items_snapshot();
-                    let verifying_downloads =
-                        self.controller.read(cx).verifying_downloads_snapshot();
-                    let selection_mode = snap.bulk_selection_mode;
-                    let selected_ids = snap.bulk_selected_ids.clone();
-                    root.overflow_y_scrollbar()
+            // ── Thumbs, grouped — non-virtualized ─────────────────────────
+            (CatalogPresentation::Thumbs, true) => {
+                let groups = self.grouped_items(cx);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
+                let checking_items = self.controller.read(cx).checking_items_snapshot();
+                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
+                let selection_mode = snap.bulk_selection_mode;
+                let selected_ids = snap.bulk_selected_ids.clone();
+                root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                         let c = colors.clone();
@@ -1352,43 +1351,47 @@ impl Render for CatalogView {
                         // `move` closure can capture it on every
                         // outer iteration without moving `window`.
                         let window: &Window = &*window;
-                        div().child(render_group_header(&g.publisher, g.items.len(), &c,
-                                                        e.clone()))
-                             .children(g.items.into_iter().map(move |item| {
-                                                              let cover = cc.get(&item.id).cloned();
-                                                              let is_checking =
-                                                                  checking_items.contains(&item.id);
-                                                              let is_verifying = verifying_downloads
-                                                                  .contains(&item.id);
-                                                              let is_selected =
-                                                                  selected_ids.contains(&item.id);
-                                                              render_thumb_row(&item,
-                                                                               cover,
-                                                                               &c,
-                                                                               &d,
-                                                                               e.clone(),
-                                                                               t.clone(),
-                                                                               s.clone(),
-                                                                               window,
-                                                                               is_checking,
-                                                                               is_verifying,
-                                                                               selection_mode,
-                                                                               is_selected)
-                                                          }))
+                        div()
+                            .child(render_group_header(
+                                &g.publisher,
+                                g.items.len(),
+                                &c,
+                                e.clone(),
+                            ))
+                            .children(g.items.into_iter().map(move |item| {
+                                let cover = cc.get(&item.id).cloned();
+                                let is_checking = checking_items.contains(&item.id);
+                                let is_verifying = verifying_downloads.contains(&item.id);
+                                let is_selected = selected_ids.contains(&item.id);
+                                render_thumb_row(
+                                    &item,
+                                    cover,
+                                    &c,
+                                    &d,
+                                    e.clone(),
+                                    t.clone(),
+                                    s.clone(),
+                                    window,
+                                    is_checking,
+                                    is_verifying,
+                                    selection_mode,
+                                    is_selected,
+                                )
+                            }))
                     }))
                     .into_any_element()
-                }
+            }
 
-                // ── Grid, ungrouped — row-virtualized ─────────────────────────
-                (CatalogPresentation::Grid, false) => {
-                    let row_count = item_count.div_ceil(items_per_row);
-                    let c = colors.clone();
-                    let d = density.clone();
-                    let s = storage_root.clone();
-                    let t = tabs_entity.clone();
-                    let selection_mode = snap.bulk_selection_mode;
-                    let selected_ids = snap.bulk_selected_ids.clone();
-                    root.px(pad_side)
+            // ── Grid, ungrouped — row-virtualized ─────────────────────────
+            (CatalogPresentation::Grid, false) => {
+                let row_count = item_count.div_ceil(items_per_row);
+                let c = colors.clone();
+                let d = density.clone();
+                let s = storage_root.clone();
+                let t = tabs_entity.clone();
+                let selection_mode = snap.bulk_selection_mode;
+                let selected_ids = snap.bulk_selected_ids.clone();
+                root.px(pad_side)
                     .child(
                            div().relative()
                                 .flex_1()
@@ -1460,21 +1463,20 @@ impl Render for CatalogView {
                                 .vertical_scrollbar(&scroll_handle),
                 )
                     .into_any_element()
-                }
+            }
 
-                // ── Grid, grouped — non-virtualized ───────────────────────────
-                (CatalogPresentation::Grid, true) => {
-                    let groups = self.grouped_items(cx);
-                    let cover_cache = {
-                        let cache = cx.global::<CoverCache>();
-                        cache.images.clone()
-                    };
-                    let checking_items = self.controller.read(cx).checking_items_snapshot();
-                    let verifying_downloads =
-                        self.controller.read(cx).verifying_downloads_snapshot();
-                    let selection_mode = snap.bulk_selection_mode;
-                    let selected_ids = snap.bulk_selected_ids.clone();
-                    root.overflow_y_scrollbar()
+            // ── Grid, grouped — non-virtualized ───────────────────────────
+            (CatalogPresentation::Grid, true) => {
+                let groups = self.grouped_items(cx);
+                let cover_cache = {
+                    let cache = cx.global::<CoverCache>();
+                    cache.images.clone()
+                };
+                let checking_items = self.controller.read(cx).checking_items_snapshot();
+                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
+                let selection_mode = snap.bulk_selection_mode;
+                let selected_ids = snap.bulk_selected_ids.clone();
+                root.overflow_y_scrollbar()
                     .px(pad_side)
                     .children(groups.into_iter().map(|g| {
                                                     let c = colors.clone();
@@ -1490,14 +1492,22 @@ impl Render for CatalogView {
                                                                                     g.items.len(),
                                                                                     &c,
                                                                                     e.clone()))
-                                                         .child(render_grid(g.items, cc, ci, vd,
-                                                                            c, d, e, t, s,
+                                                         .child(render_grid(g.items,
+                                                                            cc,
+                                                                            ci,
+                                                                            vd,
+                                                                            c,
+                                                                            d,
+                                                                            e,
+                                                                            t,
+                                                                            s,
                                                                             &*window,
-                                                                            selection_mode, sel))
+                                                                            selection_mode,
+                                                                            sel))
                                                 }))
                     .into_any_element()
-                }
-            };
+            }
+        };
 
         let mut result =
             outer.relative()
@@ -1595,12 +1605,15 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
          .context_menu(move |menu, _, _| {
              let entity = entity.clone();
              let publisher = menu_publisher.clone();
-             menu.item(PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
-                 move |_, _, cx| {
-                     entity.update(cx,
-                                   |ctrl, cx| ctrl.request_download_all_for_publisher(&publisher, cx));
-                 },
-             ))
+             menu.item(
+                PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
+                    move |_, _, cx| {
+                        entity.update(cx, |ctrl, cx| {
+                            ctrl.request_download_all_for_publisher(&publisher, cx)
+                        });
+                    },
+                ),
+            )
          })
 }
 
@@ -1765,21 +1778,19 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                              .child(cover);
         if selection_mode {
             let checkbox_elem_id: Arc<str> = Arc::from(format!("thumb-select-{}", &*checkbox_id));
-            inner = inner.child(
-                div().absolute().top(px(2.0)).left(px(2.0)).child(
-                    Checkbox::new(checkbox_elem_id)
-                        .checked(selected)
-                        .on_click(move |new_checked, _window, cx| {
-                            checkbox_entity.update(cx, |ctrl, cx| {
-                                if *new_checked {
-                                    ctrl.bulk_select_item(Arc::clone(&checkbox_id), cx);
-                                } else {
-                                    ctrl.bulk_deselect_item(&checkbox_id, cx);
-                                }
-                            });
-                        }),
+            inner = inner.child(div().absolute().top(px(2.0)).left(px(2.0)).child(
+                Checkbox::new(checkbox_elem_id).checked(selected).on_click(
+                    move |new_checked, _window, cx| {
+                        checkbox_entity.update(cx, |ctrl, cx| {
+                            if *new_checked {
+                                ctrl.bulk_select_item(Arc::clone(&checkbox_id), cx);
+                            } else {
+                                ctrl.bulk_deselect_item(&checkbox_id, cx);
+                            }
+                        });
+                    },
                 ),
-            );
+            ));
         }
         if let Some(badge) = render_item_count_badge(item, &colors) {
             inner = inner.child(div().absolute().bottom(px(2.0)).right(px(2.0)).child(badge));
@@ -1903,17 +1914,21 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                     let remove_id = Arc::clone(&remove_id);
                                     alert
                                         .confirm()
-                                        .title(t!("catalog.remove_download_confirm_title",
-                                                   title = remove_title.clone())
-                                            .to_string())
+                                        .title(
+                                            t!(
+                                                "catalog.remove_download_confirm_title",
+                                                title = remove_title.clone()
+                                            )
+                                            .to_string(),
+                                        )
                                         .description(
                                             t!("catalog.remove_download_confirm_description")
                                                 .to_string(),
                                         )
                                         .on_ok(move |_, _window, cx| {
                                             entity_remove.update(cx, |ctrl, cx| {
-                                                              ctrl.remove_download(&remove_id, cx)
-                                                          });
+                                                ctrl.remove_download(&remove_id, cx)
+                                            });
                                             true
                                         })
                                 });
@@ -2102,21 +2117,19 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
         }
         if selection_mode {
             let checkbox_elem_id: Arc<str> = Arc::from(format!("grid-select-{}", &*checkbox_id));
-            inner = inner.child(
-                div().absolute().bottom(px(2.0)).left(px(2.0)).child(
-                    Checkbox::new(checkbox_elem_id)
-                        .checked(selected)
-                        .on_click(move |new_checked, _window, cx| {
-                            checkbox_entity.update(cx, |ctrl, cx| {
-                                if *new_checked {
-                                    ctrl.bulk_select_item(Arc::clone(&checkbox_id), cx);
-                                } else {
-                                    ctrl.bulk_deselect_item(&checkbox_id, cx);
-                                }
-                            });
-                        }),
+            inner = inner.child(div().absolute().bottom(px(2.0)).left(px(2.0)).child(
+                Checkbox::new(checkbox_elem_id).checked(selected).on_click(
+                    move |new_checked, _window, cx| {
+                        checkbox_entity.update(cx, |ctrl, cx| {
+                            if *new_checked {
+                                ctrl.bulk_select_item(Arc::clone(&checkbox_id), cx);
+                            } else {
+                                ctrl.bulk_deselect_item(&checkbox_id, cx);
+                            }
+                        });
+                    },
                 ),
-            );
+            ));
         }
         if status == ItemStatus::Downloaded {
             Badge::new().dot()
@@ -2229,17 +2242,21 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                     let remove_id = Arc::clone(&remove_id);
                                     alert
                                         .confirm()
-                                        .title(t!("catalog.remove_download_confirm_title",
-                                                   title = remove_title.clone())
-                                            .to_string())
+                                        .title(
+                                            t!(
+                                                "catalog.remove_download_confirm_title",
+                                                title = remove_title.clone()
+                                            )
+                                            .to_string(),
+                                        )
                                         .description(
                                             t!("catalog.remove_download_confirm_description")
                                                 .to_string(),
                                         )
                                         .on_ok(move |_, _window, cx| {
                                             entity_remove.update(cx, |ctrl, cx| {
-                                                              ctrl.remove_download(&remove_id, cx)
-                                                          });
+                                                ctrl.remove_download(&remove_id, cx)
+                                            });
                                             true
                                         })
                                 });

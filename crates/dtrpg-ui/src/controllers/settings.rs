@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use gpui::{Context, Entity, EventEmitter};
-use gpui_component::input::InputState;
-use gpui_component::select::SelectState;
+use gpui_kit::component::input::InputState;
+use gpui_kit::component::select::SelectState;
 use rust_i18n::t;
 
 use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
@@ -185,7 +185,7 @@ pub struct SettingsController {
     ///
     /// Persisted to [`crate::data::ui_state::UiState`] so the settings window
     /// reopens on the same page it was closed on, rather than always
-    /// resetting to the first page — gpui-component's `Settings` widget
+    /// resetting to the first page — gpui-kit's `Settings` widget
     /// tracks page selection in its own per-window state with no way to read
     /// it back, so this is tracked here instead and used to drive our own
     /// page navigation in `render_settings_panel`.

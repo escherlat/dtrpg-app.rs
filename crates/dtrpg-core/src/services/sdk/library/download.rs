@@ -143,11 +143,11 @@ fn stream_to_file(url: &str, part_path: &Path, cancel: &AtomicBool)
                                   .and_then(|v| v.to_str().ok())
                                   .and_then(|v| v.trim().parse::<u64>().ok())
                                   .map(Duration::from_secs);
-        return Err(
-            LibraryServiceError::new(LibraryServiceErrorKind::RateLimited,
-                                     "download rate limited: HTTP 429")
-                .with_retry_after(retry_after),
-        );
+        return Err(LibraryServiceError::new(
+            LibraryServiceErrorKind::RateLimited,
+            "download rate limited: HTTP 429",
+        )
+        .with_retry_after(retry_after));
     }
     if !response.status().is_success() {
         return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
@@ -327,7 +327,7 @@ mod tests {
     fn download_item_succeeds_after_retryable_failures() {
         let (url, server) = spawn_mock_server(vec![MockResponse::ConnectionReset,
                                                    MockResponse::ServerError,
-                                                   MockResponse::Success(b"file contents")]);
+                                                   MockResponse::Success(b"file contents"),]);
         let gateway = CountingGateway { url,
                                         calls: AtomicU32::new(0) };
         let dest = temp_dest("succeeds-after-retries");
@@ -348,7 +348,7 @@ mod tests {
     fn download_item_fails_after_exhausting_all_retryable_attempts() {
         let (url, server) = spawn_mock_server(vec![MockResponse::ConnectionReset,
                                                    MockResponse::ConnectionReset,
-                                                   MockResponse::ConnectionReset]);
+                                                   MockResponse::ConnectionReset,]);
         let gateway = CountingGateway { url,
                                         calls: AtomicU32::new(0) };
         let dest = temp_dest("exhausts-retries");
@@ -405,7 +405,7 @@ mod tests {
         // for a short-lived test binary, and not joined here.
         let (url, _server) =
             spawn_mock_server(vec![MockResponse::ConnectionReset,
-                                   MockResponse::Success(b"should never be fetched")]);
+                                   MockResponse::Success(b"should never be fetched"),]);
         let gateway = CountingGateway { url,
                                         calls: AtomicU32::new(0) };
         let dest = temp_dest("cancel-during-backoff");
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn download_item_retries_a_rate_limited_response_like_a_network_failure() {
         let (url, server) = spawn_mock_server(vec![MockResponse::RateLimited(0),
-                                                   MockResponse::Success(b"file contents")]);
+                                                   MockResponse::Success(b"file contents"),]);
         let gateway = CountingGateway { url,
                                         calls: AtomicU32::new(0) };
         let dest = temp_dest("rate-limited-then-succeeds");

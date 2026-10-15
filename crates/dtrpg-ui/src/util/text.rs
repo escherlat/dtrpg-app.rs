@@ -4,7 +4,7 @@
 /// characters rather than Markdown syntax.
 ///
 /// Used before handing raw catalog/account data (titles, descriptions, IDs)
-/// to `gpui-component`'s `TextView`, which parses its input as Markdown —
+/// to `gpui-kit`'s `TextView`, which parses its input as Markdown —
 /// without escaping, a title like `*Iron Kingdoms*` would render italicized
 /// instead of showing its literal asterisks.
 ///

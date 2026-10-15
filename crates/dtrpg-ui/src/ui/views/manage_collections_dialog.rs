@@ -11,11 +11,11 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{App, Entity, Window, div, px};
-use gpui_component::button::Button;
-use gpui_component::checkbox::Checkbox;
-use gpui_component::dialog::{DialogContent, DialogHeader, DialogTitle};
-use gpui_component::input::{Input, InputState};
-use gpui_component::{WindowExt as _, v_flex};
+use gpui_kit::component::button::Button;
+use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::dialog::{DialogContent, DialogHeader, DialogTitle};
+use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::{WindowExt as _, v_flex};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;

@@ -1,6 +1,6 @@
 use gpui::*;
-use gpui_component::input::InputState;
-use gpui_component::{Root, init};
+use gpui_kit::component::input::InputState;
+use gpui_kit::component::{Root, init};
 use rust_i18n::t;
 use tracing::{debug, warn};
 
@@ -97,41 +97,44 @@ impl Global for LibraryWindowHandle {}
 pub fn open_library_window(startup_api_key: Option<String>, cx: &mut App) {
     let service = (cx.global::<ServiceFactory>().0)(None);
     let collections_service = (cx.global::<CollectionsServiceFactory>().0)(None);
-    let mut library_view = None;
     let window_bounds = restore_library_window_bounds(cx);
     debug!(?window_bounds, "opening library window");
-    let window = cx
-        .open_window(
-            WindowOptions {
-                titlebar: Some(TitlebarOptions {
-                    title: Some(t!("sidebar.app_name").to_string().into()),
-                    appears_transparent: true,
-                    // Vertically centers the traffic lights within
-                    // `title_bar_view::render_title_bar`'s 44px-tall custom
-                    // row — macOS's own default position assumes the
-                    // standard ~28px system title bar, which sits the
-                    // buttons noticeably above center in our taller row.
-                    traffic_light_position: Some(point(px(12.0), px(14.0))),
-                }),
-                window_bounds,
-                ..Default::default()
-            },
-            |window, cx| {
-                window.on_window_should_close(cx, move |window, _cx| {
-                    save_library_window_bounds(window);
-                    true
-                });
-                let view = cx.new(|cx| {
-                    LibraryRootView::new(window, cx, service, collections_service, startup_api_key)
-                });
-                library_view = Some(view.clone());
-                cx.new(|cx| Root::new(view, window, cx).bordered(false))
-            },
-        )
-        .expect("failed to open library window");
-    if let Some(view) = library_view {
-        cx.set_global(LibraryWindowHandle { view, window });
-    }
+    let (window, view) = gpui_kit::open_window(
+        WindowOptions {
+            titlebar: Some(TitlebarOptions {
+                title: Some(t!("sidebar.app_name").to_string().into()),
+                appears_transparent: true,
+                // Vertically centers the traffic lights within
+                // `title_bar_view::render_title_bar`'s 44px-tall custom
+                // row — macOS's own default position assumes the
+                // standard ~28px system title bar, which sits the
+                // buttons noticeably above center in our taller row.
+                traffic_light_position: Some(point(px(12.0), px(14.0))),
+            }),
+            window_bounds,
+            ..Default::default()
+        },
+        cx,
+        |window, cx| {
+            window.on_window_should_close(cx, move |window, _cx| {
+                save_library_window_bounds(window);
+                true
+            });
+            cx.new(|cx| {
+                LibraryRootView::new(window, cx, service, collections_service, startup_api_key)
+            })
+        },
+    )
+    .expect("failed to open library window");
+    // `gpui_kit::open_window` wraps `view` in a `Root` internally (see
+    // `ui/views/root_view.rs`'s `Render` impl: `Root` composes the
+    // dialog/sheet/notification layers on top of our view automatically),
+    // so the window's actual root entity type is `Root`, not
+    // `LibraryRootView` — downcast to recover a typed handle for
+    // `AddCollection`'s dialog-opening path below.
+    let window = window.downcast::<Root>()
+                       .expect("open_window's root entity is always Root");
+    cx.set_global(LibraryWindowHandle { view, window });
 }
 
 /// Resolves the library window's persisted position/size into a
@@ -194,52 +197,56 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
     let settings_for_close = settings.clone();
     let window_size = Size { width:  px(720.),
                              height: px(520.), };
-    cx.open_window(WindowOptions { // `appears_transparent: true` hides the native opaque title
-                                   // bar and title text (same
-                                   // pattern as the main library window's
-                                   // `title_bar_view.rs`) while keeping the macOS traffic-light
-                                   // window controls, which `titlebar: None` removes entirely on
-                                   // this platform (there is no dedicated close-only chrome
-                                   // option
-                                   // in gpui). `is_minimizable: false` and `is_resizable: false`
-                                   // disable the minimize and zoom buttons, leaving only close —
-                                   // resizing is no longer needed now that the panel content
-                                   // scrolls (see `settings_view::render_settings_panel`).
-                                   titlebar: Some(TitlebarOptions { appears_transparent:
-                                                                        true,
-                                                                    // Vertically centers the
-                                                                    // traffic lights within
-                                                                    // `settings_view.rs`'s
-                                                                    // 28px-tall `settings-drag-region`
-                                                                    // —
-                                                                    // see the main window's
-                                                                    // equivalent comment in
-                                                                    // `open_library_window`
-                                                                    // for the (28 - 16) / 2
-                                                                    // math.
-                                                                    traffic_light_position:
-                                                                        Some(point(px(12.0),
-                                                                                   px(6.0))),
-                                                                    ..Default::default() }),
-                                   window_bounds: Some(WindowBounds::centered(window_size, cx)),
-                                   is_resizable: false,
-                                   is_minimizable: false,
-                                   ..Default::default() },
-                   move |window, cx| {
-                       window.on_window_should_close(cx, move |_window, cx| {
-                                 settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
-                                 true
-                             });
-                       let view = cx.new(|cx| {
-                                        SettingsWindowView::new(window,
-                                                                cx,
-                                                                settings,
-                                                                library,
-                                                                file_opener_extension_input)
-                                    });
-                       cx.new(|cx| Root::new(view, window, cx).bordered(false))
-                   })
-      .expect("failed to open settings window")
+    let (window, _view) = gpui_kit::open_window(
+        WindowOptions {
+            // `appears_transparent: true` hides the native opaque title
+            // bar and title text (same
+            // pattern as the main library window's
+            // `title_bar_view.rs`) while keeping the macOS traffic-light
+            // window controls, which `titlebar: None` removes entirely on
+            // this platform (there is no dedicated close-only chrome
+            // option
+            // in gpui). `is_minimizable: false` and `is_resizable: false`
+            // disable the minimize and zoom buttons, leaving only close —
+            // resizing is no longer needed now that the panel content
+            // scrolls (see `settings_view::render_settings_panel`).
+            titlebar: Some(TitlebarOptions {
+                appears_transparent: true,
+                // Vertically centers the
+                // traffic lights within
+                // `settings_view.rs`'s
+                // 28px-tall `settings-drag-region`
+                // —
+                // see the main window's
+                // equivalent comment in
+                // `open_library_window`
+                // for the (28 - 16) / 2
+                // math.
+                traffic_light_position: Some(point(px(12.0), px(6.0))),
+                ..Default::default()
+            }),
+            window_bounds: Some(WindowBounds::centered(window_size, cx)),
+            is_resizable: false,
+            is_minimizable: false,
+            ..Default::default()
+        },
+        cx,
+        move |window, cx| {
+            window.on_window_should_close(cx, move |_window, cx| {
+                settings_for_close.update(cx, |ctrl, cx| ctrl.close(cx));
+                true
+            });
+            cx.new(|cx| {
+                SettingsWindowView::new(window, cx, settings, library, file_opener_extension_input)
+            })
+        },
+    )
+    .expect("failed to open settings window");
+    // See `open_library_window`'s matching comment: `gpui_kit::open_window`
+    // wraps the view in a `Root`, so the window's root entity type is
+    // always `Root`.
+    window.downcast::<Root>()
+          .expect("open_window's root entity is always Root")
 }
 
 /// Initializes the GPUI application and routes to the login or library window.
@@ -250,13 +257,13 @@ pub fn setup(cx: &mut App) {
     init(cx);
     init_globals(cx);
 
-    // Apply the persisted (or default) body font and sync gpui-component's
+    // Apply the persisted (or default) body font and sync gpui-kit's
     // theme colors with the active Libri theme; otherwise buttons, inputs,
     // popovers, scrollbars, the sidebar, and the catalog table all render
-    // with gpui-component's default light colors regardless of which Libri
+    // with gpui-kit's default light colors regardless of which Libri
     // theme is active.
     let initial_theme = cx.global::<crate::data::theme::LibriTheme>().clone();
-    cx.update_global::<gpui_component::Theme, _>(|theme, _cx| {
+    cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
           theme.font_family = initial_theme.fonts.body_font.clone();
           crate::data::theme::apply_theme_colors(theme, &initial_theme.colors);
       });

@@ -11,7 +11,7 @@ workspace = true
 [dependencies]
 gpui.workspace = true
 gpui_platform.workspace = true
-gpui-component = { workspace = true }
+gpui-kit = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -56,10 +56,7 @@ foreign-types = "0.5"
 # mach2.workspace = true
 #TODO: replace with "objc2"
 metal.workspace = true
-gpui-component-assets.workspace = true
 # Used for OS-locale-aware absolute timestamp formatting (NSDateFormatter)
-# in `util::datetime::format_absolute` — already present in the dependency
-# tree at this exact version via `gpui-component`, so this adds no new
-# duplicate resolution.
+# in `util::datetime::format_absolute`.
 objc2 = "0.6"
 objc2-foundation = "0.3"

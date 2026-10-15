@@ -9,16 +9,18 @@ use gpui::{
     InteractiveElement, IntoElement, ParentElement, Pixels, Render, SharedString, Styled,
     WindowHandle, div, px,
 };
-use gpui_component::Root;
-use gpui_component::WindowExt as _;
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::dialog::{DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle};
-use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::notification::{Notification, NotificationType};
-use gpui_component::resizable::{ResizableState, h_resizable, resizable_panel};
-use gpui_component::searchable_list::SearchableListDelegate as _;
-use gpui_component::select::{SelectEvent, SelectState};
-use gpui_component::{IconName, Sizable as _};
+use gpui_kit::component::Root;
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::button::{Button, ButtonVariants};
+use gpui_kit::component::dialog::{
+    DialogAction, DialogClose, DialogFooter, DialogHeader, DialogTitle,
+};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::notification::{Notification, NotificationType};
+use gpui_kit::component::resizable::{ResizableState, h_resizable, resizable_panel};
+use gpui_kit::component::searchable_list::SearchableListDelegate as _;
+use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::{IconName, Sizable as _};
 use rust_i18n::t;
 
 use crate::ui::actions::{
@@ -363,11 +365,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_body_font.update(cx, |ctrl, cx| {
-                                                     ctrl.set_body_font(SharedString::from(
-                                                              name.clone(),
-                                                          ),
-                                                                         cx);
-                                                 });
+                             ctrl.set_body_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_body_font_select(body_font_select));
@@ -387,11 +386,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_value_font.update(cx, |ctrl, cx| {
-                                                      ctrl.set_value_font(SharedString::from(
-                                                               name.clone(),
-                                                           ),
-                                                                           cx);
-                                                  });
+                             ctrl.set_value_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| {
@@ -413,11 +409,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_label_font.update(cx, |ctrl, cx| {
-                                                      ctrl.set_label_font(SharedString::from(
-                                                               name.clone(),
-                                                           ),
-                                                                           cx);
-                                                  });
+                             ctrl.set_label_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| {
@@ -437,11 +430,8 @@ impl LibraryRootView {
                              return;
                          };
                          controller_for_mono_font.update(cx, |ctrl, cx| {
-                                                     ctrl.set_mono_font(SharedString::from(
-                                                              name.clone(),
-                                                          ),
-                                                                         cx);
-                                                 });
+                             ctrl.set_mono_font(SharedString::from(name.clone()), cx);
+                         });
                      })
           .detach();
         settings.update(cx, |ctrl, _cx| ctrl.set_mono_font_select(mono_font_select));
@@ -475,9 +465,9 @@ impl LibraryRootView {
           .detach();
 
         let bulk_pattern_input = cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t!("toolbar.select_matches_placeholder")
-                                                                                              .to_string())
-        });
+                                       InputState::new(window, cx)
+                .placeholder(t!("toolbar.select_matches_placeholder").to_string())
+                                   });
         let bulk_pattern_field = Rc::new(Cell::new(SelectionField::Title));
 
         let collection_name_input = cx.new(|cx| {
@@ -623,25 +613,24 @@ impl LibraryRootView {
                                       let confirm_entity = confirm_entity.clone();
                                       let cancel_entity = cancel_entity.clone();
                                       alert
-                                    .confirm()
-                                    .title(t!("catalog.low_disk_space_confirm_title").to_string())
-                                    .description(
-                                        t!("catalog.low_disk_space_confirm_description",
-                                           needed = needed.clone(),
-                                           free = free.clone()).to_string(),
-                                    )
-                                    .on_ok(move |_, _window, cx| {
-                                        confirm_entity.update(cx, |ctrl, cx| {
-                                                          ctrl.confirm_pending_download(cx)
-                                                      });
-                                        true
-                                    })
-                                    .on_cancel(move |_, _window, cx| {
-                                        cancel_entity.update(cx, |ctrl, cx| {
-                                                         ctrl.cancel_pending_download(cx)
-                                                     });
-                                        true
-                                    })
+                        .confirm()
+                        .title(t!("catalog.low_disk_space_confirm_title").to_string())
+                        .description(
+                            t!(
+                                "catalog.low_disk_space_confirm_description",
+                                needed = needed.clone(),
+                                free = free.clone()
+                            )
+                            .to_string(),
+                        )
+                        .on_ok(move |_, _window, cx| {
+                            confirm_entity.update(cx, |ctrl, cx| ctrl.confirm_pending_download(cx));
+                            true
+                        })
+                        .on_cancel(move |_, _window, cx| {
+                            cancel_entity.update(cx, |ctrl, cx| ctrl.cancel_pending_download(cx));
+                            true
+                        })
                                   });
                         })
           .detach();
@@ -996,15 +985,10 @@ impl Focusable for LibraryRootView {
 
 impl Render for LibraryRootView {
     fn render(&mut self, window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // `Root` (gpui-component) tracks open dialogs/sheets/notifications as
-        // state but does not render them itself — the top-level app
-        // view must compose these layers explicitly, or
-        // `window.open_dialog()` / `open_alert_dialog()`
-        // / `push_notification()` calls silently have no visible effect. See
-        // gpui-component's `StoryRoot` example.
-        let sheet_layer = Root::render_sheet_layer(window, cx);
-        let dialog_layer = Root::render_dialog_layer(window, cx);
-        let notification_layer = Root::render_notification_layer(window, cx);
+        // `Root` (gpui-kit, wrapping this view — see `gpui_kit::open_window`
+        // in `ui/app/mod.rs`) renders its own dialog/sheet/notification
+        // layers automatically via its own `Render` impl; this view does
+        // not need to compose them.
 
         // Adjusting the shared rem size scales every `rems(...)`-based size
         // utility (`.text_sm()`, `.text_xs()`, etc.) in this window, like
@@ -1453,8 +1437,5 @@ impl Render for LibraryRootView {
                     )
                     .child(status_bar),
             )
-            .children(sheet_layer)
-            .children(dialog_layer)
-            .children(notification_layer)
     }
 }

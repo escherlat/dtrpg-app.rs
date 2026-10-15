@@ -18,11 +18,11 @@ use std::rc::Rc;
 
 use gpui::prelude::*;
 use gpui::{App, Entity, Window, div, px};
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::dialog::{DialogContent, DialogHeader, DialogTitle};
-use gpui_component::input::{Input, InputState};
-use gpui_component::radio::Radio;
-use gpui_component::{Disableable as _, WindowExt as _};
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::dialog::{DialogContent, DialogHeader, DialogTitle};
+use gpui_kit::component::input::{Input, InputState, Textarea, TextareaState};
+use gpui_kit::component::radio::Radio;
+use gpui_kit::component::{Disableable as _, WindowExt as _};
 use rust_i18n::t;
 
 use crate::build_info;
@@ -62,9 +62,9 @@ pub fn open_report_feature_bug_dialog(window: &mut Window, cx: &mut App) {
               InputState::new(window, cx).placeholder(t!("report.subject_placeholder").to_string())
           });
     let description = cx.new(|cx| {
-                            InputState::new(window, cx).multi_line(true)
-                                   .rows(6)
-                                   .placeholder(t!("report.description_placeholder").to_string())
+                            TextareaState::new(window, cx)
+            .rows(6)
+            .placeholder(t!("report.description_placeholder").to_string())
                         });
 
     window.open_dialog(cx, move |dialog, _window, _cx| {
@@ -87,7 +87,7 @@ fn fields_filled(subject: &str, description: &str) -> bool {
 
 fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                   kind: &Rc<RefCell<ReportKind>>, subject: &Entity<InputState>,
-                  description: &Entity<InputState>)
+                  description: &Entity<TextareaState>)
                   -> DialogContent {
     let colors = cx.global::<LibriTheme>().colors.clone();
     let current_kind = *kind.borrow();
@@ -119,19 +119,31 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                                                      }))
     };
 
-    let diagnostics = div().flex()
-                           .flex_col()
-                           .gap_1()
-                           .p_2()
-                           .rounded(px(6.0))
-                           .bg(colors.surface_alt)
-                           .child(label(t!("report.diagnostics_version",
-                                           version = env!("CARGO_PKG_VERSION")).to_string()))
-                           .child(label(t!("report.diagnostics_build",
-                                           date = build_info::BUILD_DATE,
-                                           commit = build_info::GIT_HASH).to_string()))
-                           .child(label(t!("report.diagnostics_platform",
-                                           target = build_info::TARGET).to_string()));
+    let diagnostics = div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .p_2()
+        .rounded(px(6.0))
+        .bg(colors.surface_alt)
+        .child(label(
+            t!(
+                "report.diagnostics_version",
+                version = env!("CARGO_PKG_VERSION")
+            )
+            .to_string(),
+        ))
+        .child(label(
+            t!(
+                "report.diagnostics_build",
+                date = build_info::BUILD_DATE,
+                commit = build_info::GIT_HASH
+            )
+            .to_string(),
+        ))
+        .child(label(
+            t!("report.diagnostics_platform", target = build_info::TARGET).to_string(),
+        ));
 
     let buttons = {
         let subject = subject.clone();
@@ -177,7 +189,7 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                        .child(label(t!("report.subject_label").to_string()))
                        .child(Input::new(subject).w_full())
                        .child(label(t!("report.description_label").to_string()))
-                       .child(Input::new(description).w_full().h(px(120.0)))
+                       .child(Textarea::new(description).w_full().h(px(120.0)))
                        .child(diagnostics))
            .child(div().px_4().pb_4().child(buttons))
 }
