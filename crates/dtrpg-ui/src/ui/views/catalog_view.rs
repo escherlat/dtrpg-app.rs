@@ -288,7 +288,7 @@ fn apply_column_widths(user_widths: &mut [Option<Pixels>], widths: &[Pixels]) {
 fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens,
                          storage_root: &Path, controller: &Entity<LibraryController>,
                          tabs: &Entity<TabsController>, column_width: Pixels, window: &Window,
-                         is_checking: bool, is_verifying: bool, selection_mode: bool,
+                         is_checking: bool, activity: ItemActivity, selection_mode: bool,
                          selected: bool)
                          -> AnyElement {
     match col_ix {
@@ -401,7 +401,7 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                   .flex()
                   .items_center()
                   .justify_center()
-                  .child(render_status(&item.id, item.status, is_verifying, colors))
+                  .child(render_status(&item.id, item.status, activity, colors))
                   .into_any_element(),
 
         7 => {
@@ -632,7 +632,7 @@ impl TableDelegate for CatalogListDelegate {
         let column_width = self.column(col_ix, cx).width;
         let ctrl_ref = self.controller.read(cx);
         let is_checking = ctrl_ref.is_checking(&item.id);
-        let is_verifying = ctrl_ref.is_verifying_downloads(&item.id);
+        let activity = ctrl_ref.item_activity(&item.id);
         let selection_mode = ctrl_ref.bulk_selection_mode();
         let selected = ctrl_ref.is_bulk_selected(&item.id);
         render_list_item_cell(&item,
@@ -644,7 +644,7 @@ impl TableDelegate for CatalogListDelegate {
                               column_width,
                               window,
                               is_checking,
-                              is_verifying,
+                              activity,
                               selection_mode,
                               selected)
     }
@@ -863,7 +863,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
             Some(GroupedRow::Item(item)) => {
                 let column_width = self.column(col_ix, cx).width;
                 let is_checking = self.controller.read(cx).is_checking(&item.id);
-                let is_verifying = self.controller.read(cx).is_verifying_downloads(&item.id);
+                let activity = self.controller.read(cx).item_activity(&item.id);
                 render_list_item_cell(item,
                                       col_ix,
                                       &colors,
@@ -873,7 +873,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                                       column_width,
                                       window,
                                       is_checking,
-                                      is_verifying,
+                                      activity,
                                       false,
                                       false)
             }
@@ -1274,19 +1274,18 @@ impl Render for CatalogView {
                             let cache = cx.global::<CoverCache>();
                             items.iter().map(|item| cache.get(&item.id)).collect()
                         };
-                        let checking: Vec<(bool, bool)> = {
+                        let checking: Vec<(bool, ItemActivity)> = {
                             let ctrl_ref = ctrl.read(cx);
                             items.iter()
                                  .map(|item| {
-                                     (ctrl_ref.is_checking(&item.id),
-                                      ctrl_ref.is_verifying_downloads(&item.id))
+                                     (ctrl_ref.is_checking(&item.id), ctrl_ref.item_activity(&item.id))
                                  })
                                  .collect()
                         };
                         items.iter()
                              .zip(covers)
                              .zip(checking)
-                             .map(|((item, cover), (is_checking, is_verifying))| {
+                             .map(|((item, cover), (is_checking, activity))| {
                                  let is_selected = selected_ids.contains(&item.id);
                                  render_thumb_row(item,
                                                   cover,
@@ -1297,7 +1296,7 @@ impl Render for CatalogView {
                                                   s.clone(),
                                                   window,
                                                   is_checking,
-                                                  is_verifying,
+                                                  activity,
                                                   selection_mode,
                                                   is_selected).into_any_element()
                              })
@@ -1318,7 +1317,7 @@ impl Render for CatalogView {
                     cache.images.clone()
                 };
                 let checking_items = self.controller.read(cx).checking_items_snapshot();
-                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
+                let item_activity = self.controller.read(cx).item_activity_snapshot();
                 let selection_mode = snap.bulk_selection_mode;
                 let selected_ids = snap.bulk_selected_ids.clone();
                 root.overflow_y_scrollbar()
@@ -1331,7 +1330,7 @@ impl Render for CatalogView {
                         let s = storage_root.clone();
                         let cc = cover_cache.clone();
                         let checking_items = checking_items.clone();
-                        let verifying_downloads = verifying_downloads.clone();
+                        let item_activity = item_activity.clone();
                         let selected_ids = selected_ids.clone();
                         // Reborrow as `&Window` (Copy) so the nested
                         // `move` closure can capture it on every
@@ -1347,7 +1346,7 @@ impl Render for CatalogView {
                             .children(g.items.into_iter().map(move |item| {
                                 let cover = cc.get(&item.id).cloned();
                                 let is_checking = checking_items.contains(&item.id);
-                                let is_verifying = verifying_downloads.contains(&item.id);
+                                let activity = item_activity.get(&item.id).copied().unwrap_or_default();
                                 let is_selected = selected_ids.contains(&item.id);
                                 render_thumb_row(
                                     &item,
@@ -1359,7 +1358,7 @@ impl Render for CatalogView {
                                     s.clone(),
                                     window,
                                     is_checking,
-                                    is_verifying,
+                                    activity,
                                     selection_mode,
                                     is_selected,
                                 )
@@ -1392,12 +1391,11 @@ impl Render for CatalogView {
                             let cache = cx.global::<CoverCache>();
                             items.iter().map(|item| cache.get(&item.id)).collect()
                         };
-                        let checking: Vec<(bool, bool)> = {
+                        let checking: Vec<(bool, ItemActivity)> = {
                             let ctrl_ref = ctrl.read(cx);
                             items.iter()
                                  .map(|item| {
-                                     (ctrl_ref.is_checking(&item.id),
-                                      ctrl_ref.is_verifying_downloads(&item.id))
+                                     (ctrl_ref.is_checking(&item.id), ctrl_ref.item_activity(&item.id))
                                  })
                                  .collect()
                         };
@@ -1419,7 +1417,7 @@ impl Render for CatalogView {
                                                             .map(
                                                                 |(
                                                                     (item, cover),
-                                                                    &(is_checking, is_verifying),
+                                                                    &(is_checking, activity),
                                                                 )| {
                                                                     let is_selected = selected_ids
                                                                         .contains(&item.id);
@@ -1433,7 +1431,7 @@ impl Render for CatalogView {
                                                                         s.clone(),
                                                                         window,
                                                                         is_checking,
-                                                                        is_verifying,
+                                                                        activity,
                                                                         selection_mode,
                                                                         is_selected,
                                                                     )
@@ -1459,7 +1457,7 @@ impl Render for CatalogView {
                     cache.images.clone()
                 };
                 let checking_items = self.controller.read(cx).checking_items_snapshot();
-                let verifying_downloads = self.controller.read(cx).verifying_downloads_snapshot();
+                let item_activity = self.controller.read(cx).item_activity_snapshot();
                 let selection_mode = snap.bulk_selection_mode;
                 let selected_ids = snap.bulk_selected_ids.clone();
                 root.overflow_y_scrollbar()
@@ -1472,7 +1470,7 @@ impl Render for CatalogView {
                                                     let s = storage_root.clone();
                                                     let cc = cover_cache.clone();
                                                     let ci = checking_items.clone();
-                                                    let vd = verifying_downloads.clone();
+                                                    let vd = item_activity.clone();
                                                     let sel = selected_ids.clone();
                                                     div().child(render_group_header(&g.publisher,
                                                                                     g.items.len(),
@@ -1606,15 +1604,24 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
 // ── Status glyph
 // ──────────────────────────────────────────────────────────────
 
-/// Renders the download-status glyph for `id`. While `is_verifying` is true
-/// (a file-presence check per `verify-downloaded-status-against-disk` is in
-/// flight for this item), the glyph is replaced by a tinted spinner with its
-/// own tooltip rather than showing a downloaded/cloud state that may be
-/// stale.
-fn render_status(id: &Arc<str>, status: ItemStatus, is_verifying: bool, colors: &ColorTokens)
+/// Renders the download-status glyph for `id`.
+///
+/// While `activity` is not idle the glyph is replaced by a spinner with its
+/// own tooltip rather than showing a downloaded/cloud state that is about to
+/// change or may be stale: [`ItemActivity::Downloading`] when one of the
+/// entry's files is queued or downloading, [`ItemActivity::Verifying`] while
+/// a file-presence check (`verify-downloaded-status-against-disk`) is in
+/// flight for it.
+fn render_status(id: &Arc<str>, status: ItemStatus, activity: ItemActivity, colors: &ColorTokens)
                  -> AnyElement {
-    if is_verifying {
-        return render_verifying_indicator(id, colors).into_any_element();
+    match activity {
+        ItemActivity::Downloading => {
+            return render_downloading_indicator(id, colors).into_any_element();
+        }
+        ItemActivity::Verifying => {
+            return render_verifying_indicator(id, colors).into_any_element();
+        }
+        ItemActivity::Idle => {}
     }
     let accent = colors.accent;
     let text_tertiary = colors.text_tertiary;
@@ -1630,6 +1637,21 @@ fn render_status(id: &Arc<str>, status: ItemStatus, is_verifying: bool, colors: 
                                   .child("☁")
                                   .into_any_element(),
     }
+}
+
+/// Renders an accent-colored spinner with a "Downloading…" tooltip for a
+/// catalog entry with a file queued or downloading (see
+/// `LibraryController::is_downloading`). Accent-colored, unlike the muted
+/// verifying spinner, so a download in progress stands out in the catalog.
+fn render_downloading_indicator(id: &Arc<str>, colors: &ColorTokens)
+                                -> impl IntoElement + 'static + use<> {
+    let elem_id: Arc<str> = Arc::from(format!("downloading-{id}"));
+    div().id(elem_id)
+         .flex_none()
+         .child(Spinner::new().with_size(Size::XSmall).color(colors.accent))
+         .tooltip(|window, cx| {
+             Tooltip::new(t!("detail.item_status_downloading").to_string()).build(window, cx)
+         })
 }
 
 /// Renders a small tinted spinner with a "checking download status" tooltip
@@ -1692,7 +1714,8 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     density: &DensityConstants, entity: Entity<LibraryController>,
                     tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
-                    is_checking: bool, is_verifying: bool, selection_mode: bool, selected: bool)
+                    is_checking: bool, activity: ItemActivity, selection_mode: bool,
+                    selected: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -1840,7 +1863,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                               .children(render_unavailable_badge(item, &colors))
                               .children(render_checking_indicator(is_checking)))
          })
-         .child(render_status(&id, status, is_verifying, &colors))
+         .child(render_status(&id, status, activity, &colors))
          .context_menu(move |menu, window, cx| {
              let menu = match status {
                  ItemStatus::Downloaded => {
@@ -1969,11 +1992,11 @@ fn append_common_menu_items(menu: PopupMenu, item: &LibraryItem,
 // delegates' own parameter lists.
 #[allow(clippy::too_many_arguments)]
 fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image>>,
-               checking_items: HashSet<Arc<str>>, verifying_downloads: HashSet<Arc<str>>,
-               colors: ColorTokens, density: DensityConstants,
-               entity: Entity<LibraryController>, tabs: Entity<TabsController>,
-               storage_root_path: PathBuf, window: &Window, selection_mode: bool,
-               selected_ids: HashSet<Arc<str>>)
+               checking_items: HashSet<Arc<str>>,
+               item_activity: HashMap<Arc<str>, ItemActivity>, colors: ColorTokens,
+               density: DensityConstants, entity: Entity<LibraryController>,
+               tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
+               selection_mode: bool, selected_ids: HashSet<Arc<str>>)
                -> impl IntoElement + 'static {
     let gap_x = density.card_gap_x;
     let gap_y = density.card_gap_y;
@@ -1986,7 +2009,9 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
          .children(items.into_iter().map(|item| {
                                         let cover = cover_cache.get(&item.id).cloned();
                                         let is_checking = checking_items.contains(&item.id);
-                                        let is_verifying = verifying_downloads.contains(&item.id);
+                                        let activity = item_activity.get(&item.id)
+                                                                    .copied()
+                                                                    .unwrap_or_default();
                                         let is_selected = selected_ids.contains(&item.id);
                                         render_grid_card(&item,
                                                          cover,
@@ -1997,7 +2022,7 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
                                                          storage_root_path.clone(),
                                                          window,
                                                          is_checking,
-                                                         is_verifying,
+                                                         activity,
                                                          selection_mode,
                                                          is_selected)
                                     }))
@@ -2009,7 +2034,8 @@ fn render_grid(items: Vec<LibraryItem>, cover_cache: HashMap<Arc<str>, Arc<Image
 fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors: &ColorTokens,
                     card_w: f32, entity: Entity<LibraryController>,
                     tabs: Entity<TabsController>, storage_root_path: PathBuf, window: &Window,
-                    is_checking: bool, is_verifying: bool, selection_mode: bool, selected: bool)
+                    is_checking: bool, activity: ItemActivity, selection_mode: bool,
+                    selected: bool)
                     -> impl IntoElement + 'static + use<> {
     let id = Arc::clone(&item.id);
     let title = item.title.to_string();
@@ -2136,7 +2162,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                              .text_color(colors.text_tertiary)
                                              .truncate()
                                              .child(publisher))
-                                 .child(render_status(&id, status, is_verifying, &colors))))
+                                 .child(render_status(&id, status, activity, &colors))))
          .context_menu(move |menu, window, cx| {
              let menu = match status {
                  ItemStatus::Downloaded => {

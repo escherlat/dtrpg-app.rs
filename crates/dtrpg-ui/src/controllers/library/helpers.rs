@@ -488,3 +488,19 @@ pub(crate) fn partial_fetch_since(catalog: &[LibraryItem]) -> Option<String> {
 pub(crate) fn should_attempt_partial_fetch(remote_count: usize, cached_count: usize) -> bool {
     remote_count > cached_count
 }
+
+/// Builds the map of every catalog entry that is not idle, from the ids being
+/// verified against disk and the ids with a file queued or downloading. An id
+/// in both is downloading (see [`ItemActivity::of`]).
+pub(crate) fn item_activity_map<'a>(verifying: &HashSet<Arc<str>>,
+                                    downloading: impl Iterator<Item = &'a Arc<str>>)
+                                    -> HashMap<Arc<str>, ItemActivity> {
+    let mut activity: HashMap<Arc<str>, ItemActivity> =
+        verifying.iter()
+                 .map(|id| (Arc::clone(id), ItemActivity::Verifying))
+                 .collect();
+    for id in downloading {
+        activity.insert(Arc::clone(id), ItemActivity::Downloading);
+    }
+    activity
+}
