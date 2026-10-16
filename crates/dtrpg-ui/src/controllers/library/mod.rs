@@ -32,7 +32,9 @@ use crate::services::network_monitor::NetworkMonitor;
 use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use crate::util::datetime::now_secs;
-use crate::util::file_presence::{resolved_file_path, verify_item_downloads};
+use crate::util::file_presence::{
+    ItemVerification, apply_presence_changes, find_presence_changes, resolved_file_path,
+};
 use crate::util::filter::*;
 use crate::util::matching::*;
 use crate::util::publisher::*;

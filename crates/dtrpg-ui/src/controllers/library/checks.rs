@@ -13,7 +13,7 @@ impl LibraryController {
     /// the item, and a local `Path::exists()` call per file is cheap enough
     /// that gating it adds complexity without a real cost problem to solve.
     pub(super) fn verify_selected_item_download(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(mut item) = self.item_by_id(&id).cloned()
+        let Some(item) = self.item_by_id(&id).cloned()
         else {
             return;
         };
@@ -21,31 +21,48 @@ impl LibraryController {
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
-              let (item, changed) = async_cx.background_executor()
-                                            .spawn(async move {
-                                                let storage = StorageConfig::load();
-                                                let changed =
-                                                    verify_item_downloads(&mut item, &storage);
-                                                (item, changed)
-                                            })
-                                            .await;
+              let verification = async_cx.background_executor()
+                                         .spawn(async move {
+                                             find_presence_changes(&item, &StorageConfig::load())
+                                         })
+                                         .await;
 
               this.update(async_cx, |ctrl, cx| {
                       ctrl.verifying_downloads.remove(&id);
-                      if changed
-                         && let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == item.id)
-                      {
-                          *existing = item;
-                          ctrl.section_counts = section_counts(&ctrl.catalog,
-                                                               now_secs(),
-                                                               ctrl.recently_updated_window_days);
-                          ctrl.invalidate_cache();
+                      if let Some(verification) = verification {
+                          ctrl.apply_verifications(&[verification]);
                       }
                       cx.emit(LibraryChanged);
                   })
                   .ok();
           })
           .detach();
+    }
+
+    /// Applies disk-check results to the live catalog and, if any file flag
+    /// or entry status changed, refreshes the section counts and the visible
+    /// list. Returns whether anything changed.
+    ///
+    /// Each result carries only the files that differed when the check read
+    /// the disk. Applying that, rather than swapping in the checked copy of
+    /// the entry, leaves everything else about the live entry as it is now,
+    /// so a download that completed after the check started is not undone.
+    pub(super) fn apply_verifications(&mut self, verifications: &[ItemVerification]) -> bool {
+        let mut changed = false;
+        for verification in verifications {
+            if let Some(item) = self.catalog
+                                    .iter_mut()
+                                    .find(|i| i.id == verification.item_id)
+            {
+                changed |= apply_presence_changes(item, &verification.changes);
+            }
+        }
+        if changed {
+            self.section_counts =
+                section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
+            self.invalidate_cache();
+        }
+        changed
     }
 
     /// Returns `true` if `id`'s files are currently being verified against
