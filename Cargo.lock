@@ -1647,9 +1647,9 @@ dependencies = [
 
 [[package]]
 name = "dtrpg-sdk"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10131dcef74312ab5b55dcfcc3385e6164dd536b4cd9c459f42295552b8efba4"
+checksum = "45c57131df00a7461e3821b4e6aa754c015d91a69e89645d06ec41f366fe2ff8"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
