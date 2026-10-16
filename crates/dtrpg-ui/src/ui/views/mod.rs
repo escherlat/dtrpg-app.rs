@@ -1,3 +1,4 @@
+pub mod about_window_view;
 pub mod activity_panel_view;
 pub mod alert_history_view;
 pub mod bulk_action_bar_view;

@@ -12,6 +12,7 @@ use crate::data::enums::CatalogPresentation;
 use crate::data::ui_state::{UiState, WindowBoundsPref};
 use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
+use crate::ui::views::about_window_view::AboutWindowView;
 use crate::ui::views::root_view::LibraryRootView;
 use crate::ui::views::settings_window_view::SettingsWindowView;
 use crate::util::init::init_globals;
@@ -245,6 +246,42 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
     // See `open_library_window`'s matching comment: `gpui_kit::open_window`
     // wraps the view in a `Root`, so the window's root entity type is
     // always `Root`.
+    window.downcast::<Root>()
+          .expect("open_window's root entity is always Root")
+}
+
+/// Opens the About window as a separate, non-modal window (matching Knot's
+/// and Fernrohr's About window) rather than a dialog overlaid on the main
+/// library window.
+///
+/// # Panics
+///
+/// Panics if the window cannot be opened.
+#[allow(clippy::expect_used)]
+pub fn open_about_window(cx: &mut App) -> WindowHandle<Root> {
+    let window_size = Size { width:  px(320.),
+                             height: px(260.), };
+    let (window, _view) = gpui_kit::open_window(
+        WindowOptions {
+            // Same chrome pattern as `open_settings_window`: hide the native
+            // title text but keep the macOS traffic lights, and disable
+            // minimize/resize since the content is fixed and doesn't scroll.
+            titlebar: Some(TitlebarOptions {
+                appears_transparent: true,
+                ..Default::default()
+            }),
+            window_bounds: Some(WindowBounds::centered(window_size, cx)),
+            is_resizable: false,
+            is_minimizable: false,
+            ..Default::default()
+        },
+        cx,
+        move |window, cx| cx.new(|cx| AboutWindowView::new(window, cx)),
+    )
+    .expect("failed to open about window");
+    // See `open_library_window`'s matching comment: `gpui_kit::open_window`
+    // wraps the view in a `Root`, so the window's root entity type is always
+    // `Root`.
     window.downcast::<Root>()
           .expect("open_window's root entity is always Root")
 }
