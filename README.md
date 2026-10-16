@@ -1,6 +1,6 @@
 # Libri.app (Rust)
 
-[![Build Status](https://github.com/pilgrimagesoftware/dtrpg-app.rs/actions/workflows/ci.yaml/badge.svg)](https://github.com/pilgrimagesoftware/dtrpg-app.rs/actions/workflows/ci.yaml)
+[![CI](https://github.com/pilgrimagesoftware/dtrpg-app.rs/actions/workflows/ci.yml/badge.svg)](https://github.com/pilgrimagesoftware/dtrpg-app.rs/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
 DriveThruRPG desktop frontend in Rust, built with [gpui-kit](https://gpui-kit.com).
