@@ -133,6 +133,7 @@ impl LibraryController {
         self.download_queue
             .push_back((item_id, index, title.into()));
         self.drain_download_queue(cx);
+        cx.emit(LibraryChanged);
     }
 
     /// Gates [`Self::enqueue_download`] behind a free-disk-space check.
@@ -302,6 +303,7 @@ impl LibraryController {
     /// No-op if `(id, index)` is not queued or in flight.
     pub fn cancel_download(&mut self, id: &str, index: u32, cx: &mut Context<Self>) {
         if dequeue_file(&mut self.download_queue, id, index) {
+            cx.emit(LibraryChanged);
             return;
         }
 
@@ -315,6 +317,19 @@ impl LibraryController {
             self.activity
                 .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
         }
+        cx.emit(LibraryChanged);
+    }
+
+    /// Returns `true` if any file of catalog entry `id` is currently queued or
+    /// actively downloading.
+    #[must_use]
+    pub fn is_downloading(&self, id: &str) -> bool {
+        self.download_queue
+            .iter()
+            .any(|(qid, ..)| qid.as_ref() == id)
+        || self.download_activity_ids
+               .keys()
+               .any(|(aid, _)| aid.as_ref() == id)
     }
 
     /// Returns `true` if the file at `(id, index)` is currently queued or

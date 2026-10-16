@@ -339,3 +339,42 @@ mod check_batch_tests {
         assert_eq!(batch.len(), 3);
     }
 }
+
+#[cfg(test)]
+mod item_activity_tests {
+    use std::collections::HashSet;
+    use std::sync::Arc;
+
+    use super::super::item_activity_map;
+    use crate::data::enums::ItemActivity;
+
+    fn ids(names: &[&str]) -> Vec<Arc<str>> {
+        names.iter().map(|n| Arc::<str>::from(*n)).collect()
+    }
+
+    #[test]
+    fn activity_is_idle_unless_something_is_in_progress() {
+        assert_eq!(ItemActivity::of(false, false), ItemActivity::Idle);
+        assert_eq!(ItemActivity::of(false, true), ItemActivity::Verifying);
+        assert_eq!(ItemActivity::of(true, false), ItemActivity::Downloading);
+    }
+
+    #[test]
+    fn a_download_wins_over_a_disk_check() {
+        assert_eq!(ItemActivity::of(true, true), ItemActivity::Downloading);
+    }
+
+    #[test]
+    fn map_lists_only_non_idle_items_with_downloads_winning() {
+        let verifying: HashSet<Arc<str>> = ids(&["checking", "both"]).into_iter().collect();
+        let downloading = ids(&["both", "fetching"]);
+
+        let map = item_activity_map(&verifying, downloading.iter());
+
+        assert_eq!(map.len(), 3);
+        assert_eq!(map["checking"], ItemActivity::Verifying);
+        assert_eq!(map["both"], ItemActivity::Downloading);
+        assert_eq!(map["fetching"], ItemActivity::Downloading);
+        assert_eq!(map.get("untouched"), None);
+    }
+}

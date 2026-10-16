@@ -56,12 +56,22 @@ impl LibraryController {
         self.verifying_downloads.contains(id)
     }
 
-    /// Returns a snapshot of every item id currently undergoing file-presence
-    /// verification, mirroring [`Self::checking_items_snapshot`]'s role for
-    /// non-virtualized render paths.
+    /// Returns what the app is busy doing with catalog item `id` right now.
     #[must_use]
-    pub fn verifying_downloads_snapshot(&self) -> HashSet<Arc<str>> {
-        self.verifying_downloads.clone()
+    pub fn item_activity(&self, id: &str) -> ItemActivity {
+        ItemActivity::of(self.is_downloading(id), self.is_verifying_downloads(id))
+    }
+
+    /// Returns [`Self::item_activity`] for every item that is not idle,
+    /// mirroring [`Self::checking_items_snapshot`]'s role for non-virtualized
+    /// render paths. Items missing from the map are idle.
+    #[must_use]
+    pub fn item_activity_snapshot(&self) -> HashMap<Arc<str>, ItemActivity> {
+        let downloading = self.download_queue
+                              .iter()
+                              .map(|(id, ..)| id)
+                              .chain(self.download_activity_ids.keys().map(|(id, _)| id));
+        item_activity_map(&self.verifying_downloads, downloading)
     }
 
     // ── Item-level availability checks

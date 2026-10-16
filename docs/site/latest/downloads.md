@@ -9,6 +9,16 @@ slug: downloads
 Queue a catalog item's files for download from its item popover or detail
 tab.
 
+## Following a download in the catalog
+
+An item with a file queued or downloading shows a small spinner in the
+catalog's status column (list view) or next to its publisher (grid and
+thumbnail views), in place of the usual cloud or downloaded marker.
+Hovering it shows "Downloading…". It switches to the downloaded marker when
+the last file lands, or back to the cloud marker if you cancel. A muted
+spinner means something different: Libri is checking the item's files
+against what is on disk.
+
 ## Where files go
 
 Downloads save to the folder set in Settings > Downloads' Download
