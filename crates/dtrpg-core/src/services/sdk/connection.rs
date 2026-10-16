@@ -29,64 +29,90 @@ use crate::constants::{
     REFRESH_TOKEN_TTL_ENV,
 };
 
-/// An SDK client plus the runtime that drives it.
+/// An SDK session plus the runtime that drives it.
 ///
 /// When a request fails with HTTP 401 (expired access token), the connection
-/// exchanges the stored application key for a fresh token and retries the
-/// request once, so callers never see an expiry that can be repaired
-/// silently. The application key itself is never regenerated.
+/// renews the session and retries the request once, so callers never see an
+/// expiry that can be repaired silently. It first spends the session's refresh
+/// token; if the API rejects that too, it exchanges the stored application key
+/// for a new session. The application key itself is never regenerated.
 pub(super) struct SdkConnection {
-    config:          Config,
     application_key: String,
-    client:          Mutex<Arc<SdkLibraryClient>>,
+    session:         Mutex<Session>,
     runtime:         Runtime,
 }
 
+/// The SDK's auth state and the client built from its current access token.
+struct Session {
+    sdk:    DriveThruRpgSdk,
+    client: Arc<SdkLibraryClient>,
+}
+
 impl SdkConnection {
-    /// Runs `operation` against the current client, refreshing the access
-    /// token and retrying once if the server rejects it as unauthorized.
+    /// Runs `operation` against the current client, renewing the session and
+    /// retrying once if the server rejects the access token as unauthorized.
     ///
     /// # Errors
     ///
-    /// Returns the operation's error, or the token exchange's error when the
-    /// refresh itself fails.
+    /// Returns the operation's error, or the renewal's error when the session
+    /// cannot be renewed.
     pub(super) fn run<T, F, Fut>(&self, operation: F) -> Result<T, ClientError>
         where F: Fn(Arc<SdkLibraryClient>) -> Fut,
               Fut: Future<Output = Result<T, ClientError>> {
         let client = self.current_client();
         match self.runtime.block_on(operation(Arc::clone(&client))) {
             Err(error) if is_unauthorized(&error) => {
-                tracing::info!("access token rejected; refreshing it and retrying once");
-                let refreshed = self.refresh_client(&client)?;
-                self.runtime.block_on(operation(refreshed))
+                tracing::info!("access token rejected; renewing the session and retrying once");
+                let renewed = self.renew_client(&client)?;
+                self.runtime.block_on(operation(renewed))
             }
             result => result,
         }
     }
 
     fn current_client(&self) -> Arc<SdkLibraryClient> {
-        Arc::clone(&self.client.lock().unwrap_or_else(PoisonError::into_inner))
+        Arc::clone(&self.lock_session().client)
     }
 
-    /// Replaces `stale` with a client holding a freshly exchanged token.
+    fn lock_session(&self) -> std::sync::MutexGuard<'_, Session> {
+        self.session.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Replaces `stale` with a client holding a renewed access token.
     ///
-    /// The lock is held across the exchange so concurrent callers that hit
-    /// the same expiry perform one exchange, not one each: whoever arrives
-    /// second finds the client already replaced and reuses it.
-    fn refresh_client(&self, stale: &Arc<SdkLibraryClient>)
-                      -> Result<Arc<SdkLibraryClient>, ClientError> {
-        let mut current = self.client.lock().unwrap_or_else(PoisonError::into_inner);
-        if !Arc::ptr_eq(&current, stale) {
-            return Ok(Arc::clone(&current));
+    /// The lock is held across the renewal so concurrent callers that hit the
+    /// same expiry renew once, not once each: whoever arrives second finds the
+    /// client already replaced and reuses it.
+    fn renew_client(&self, stale: &Arc<SdkLibraryClient>)
+                    -> Result<Arc<SdkLibraryClient>, ClientError> {
+        let mut session = self.lock_session();
+        if !Arc::ptr_eq(&session.client, stale) {
+            return Ok(Arc::clone(&session.client));
         }
 
-        let tokens =
-            self.runtime
-                .block_on(key_exchange::authenticate(&self.application_key, &self.config))?;
-        let fresh = Arc::new(SdkLibraryClient::new(self.config.clone(), tokens.token));
-        *current = Arc::clone(&fresh);
-        Ok(fresh)
+        self.runtime
+            .block_on(renew_session(&mut session.sdk, &self.application_key))?;
+        let renewed = Arc::new(session.sdk.library_client()?);
+        session.client = Arc::clone(&renewed);
+        Ok(renewed)
     }
+}
+
+/// Renews `sdk`'s session with its refresh token, falling back to an
+/// application-key exchange when the refresh token is rejected or unusable
+/// (expired, revoked, or absent).
+async fn renew_session(sdk: &mut DriveThruRpgSdk, application_key: &str)
+                       -> Result<(), ClientError> {
+    let Err(error) = sdk.refresh_session().await
+    else {
+        return Ok(());
+    };
+
+    tracing::info!(?error,
+                   "refresh token not accepted; exchanging the application key instead");
+    let tokens = key_exchange::authenticate(application_key, sdk.require_config()?).await?;
+    sdk.apply_auth_response(tokens)?;
+    Ok(())
 }
 
 /// Whether the server rejected the request's credentials (HTTP 401).
@@ -163,7 +189,7 @@ fn build_connection(application_key: String, access_token: String, refresh_token
         Err(_) => Config::new(application_key.clone()),
     };
 
-    let mut sdk = DriveThruRpgSdk::with_config(config.clone());
+    let mut sdk = DriveThruRpgSdk::with_config(config);
     sdk.apply_auth_response(AuthTokenResponse::new(access_token, refresh_token, refresh_token_ttl))
        .map_err(ConnectionError::Sdk)?;
 
@@ -172,9 +198,11 @@ fn build_connection(application_key: String, access_token: String, refresh_token
                                              .build()
                                              .map_err(ConnectionError::RuntimeInit)?;
 
-    Ok(SdkConnection { config,
-                       application_key,
-                       client: Mutex::new(Arc::new(client)),
+    let session = Session { sdk,
+                            client: Arc::new(client) };
+
+    Ok(SdkConnection { application_key,
+                       session: Mutex::new(session),
                        runtime })
 }
 
@@ -200,31 +228,42 @@ mod tests {
                                 retry_after: None }
     }
 
+    type RequestPaths = Arc<Mutex<Vec<String>>>;
+
     /// Serves `responses` (status line + JSON body) one per connection and
-    /// returns the base URL.
-    fn serve_auth_responses(responses: Vec<(&'static str, &'static str)>) -> String {
+    /// returns the base URL plus the request paths seen so far.
+    fn serve_auth_responses(responses: Vec<(&'static str, &'static str)>)
+                            -> (String, RequestPaths) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let paths = RequestPaths::default();
+        let recorded = Arc::clone(&paths);
         std::thread::spawn(move || {
             for (status, body) in responses {
                 let (mut stream, _) = listener.accept().unwrap();
                 let mut buf = [0u8; 4096];
-                let _ = stream.read(&mut buf);
+                let read = stream.read(&mut buf).unwrap();
+                let request = String::from_utf8_lossy(&buf[..read]);
+                let path = request.split_whitespace().nth(1).unwrap_or_default();
+                recorded.lock().unwrap().push(path.to_string());
                 let reply = format!("HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                                     body.len());
                 stream.write_all(reply.as_bytes()).unwrap();
             }
         });
-        base_url
+        (base_url, paths)
     }
 
     fn connection_for(base_url: String) -> SdkConnection {
-        let config = Config::with_base_url("app-key", base_url);
-        let client = SdkLibraryClient::new(config.clone(), "stale-token".to_string());
-        SdkConnection { config,
-                        application_key: "app-key".to_string(),
-                        client: Mutex::new(Arc::new(client)),
-                        runtime: Builder::new_multi_thread().enable_all().build().unwrap() }
+        let mut sdk = DriveThruRpgSdk::with_config(Config::with_base_url("app-key", base_url));
+        sdk.apply_auth_response(AuthTokenResponse::new("stale-token",
+                                                       "stale-refresh",
+                                                       1_000_000_000))
+           .unwrap();
+        let client = Arc::new(sdk.library_client().unwrap());
+        SdkConnection { application_key: "app-key".to_string(),
+                        session:         Mutex::new(Session { sdk, client }),
+                        runtime:         Builder::new_multi_thread().enable_all().build().unwrap(), }
     }
 
     #[test]
@@ -235,8 +274,9 @@ mod tests {
     }
 
     #[test]
-    fn run_refreshes_token_and_retries_once_on_401() {
-        let connection = connection_for(serve_auth_responses(vec![("200 OK", TOKEN_BODY)]));
+    fn run_renews_with_the_refresh_token_and_retries_once_on_401() {
+        let (base_url, paths) = serve_auth_responses(vec![("200 OK", TOKEN_BODY)]);
+        let connection = connection_for(base_url);
         let calls = AtomicU32::new(0);
 
         let result = connection.run(|_client| async {
@@ -250,6 +290,39 @@ mod tests {
 
         assert_eq!(result.unwrap(), "done");
         assert_eq!(calls.load(Ordering::SeqCst), 2);
+        let paths = paths.lock().unwrap();
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].ends_with("/auth/refresh"),
+                "unexpected path {}",
+                paths[0]);
+    }
+
+    #[test]
+    fn run_falls_back_to_the_application_key_when_the_refresh_token_is_rejected() {
+        let (base_url, paths) = serve_auth_responses(vec![("401 Unauthorized",
+                                                           r#"{"errorCode":"refresh_expired"}"#),
+                                                          ("200 OK", TOKEN_BODY)]);
+        let connection = connection_for(base_url);
+        let calls = AtomicU32::new(0);
+
+        let result = connection.run(|_client| async {
+                                   if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                                       Err(api_error(401))
+                                   }
+                                   else {
+                                       Ok("done")
+                                   }
+                               });
+
+        assert_eq!(result.unwrap(), "done");
+        let paths = paths.lock().unwrap();
+        assert_eq!(paths.len(), 2);
+        assert!(paths[0].ends_with("/auth/refresh"),
+                "unexpected path {}",
+                paths[0]);
+        assert!(paths[1].contains("/auth_key"),
+                "unexpected path {}",
+                paths[1]);
     }
 
     #[test]
@@ -269,9 +342,10 @@ mod tests {
     }
 
     #[test]
-    fn run_surfaces_the_refresh_failure_without_retrying() {
-        let connection = connection_for(serve_auth_responses(vec![("401 Unauthorized",
-                                                                   r#"{"error":"bad key"}"#)]));
+    fn run_surfaces_the_renewal_failure_without_retrying() {
+        let rejection = ("401 Unauthorized", r#"{"error":"rejected"}"#);
+        let (base_url, _paths) = serve_auth_responses(vec![rejection, rejection]);
+        let connection = connection_for(base_url);
         let calls = AtomicU32::new(0);
 
         let result: Result<(), ClientError> = connection.run(|_client| async {
@@ -279,20 +353,20 @@ mod tests {
                                                             Err(api_error(401))
                                                         });
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(ClientError::DecodeFailed { status: 401, .. })));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]
-    fn refresh_client_reuses_a_client_another_caller_already_replaced() {
+    fn renew_client_reuses_a_client_another_caller_already_replaced() {
         let connection = connection_for("http://127.0.0.1:1".to_string());
         let stale = connection.current_client();
-        let replacement = Arc::new(SdkLibraryClient::new(connection.config.clone(),
+        let replacement = Arc::new(SdkLibraryClient::new(Config::new("app-key"),
                                                          "other-thread-token".to_string()));
-        *connection.client.lock().unwrap() = Arc::clone(&replacement);
+        connection.lock_session().client = Arc::clone(&replacement);
 
-        let refreshed = connection.refresh_client(&stale).unwrap();
+        let renewed = connection.renew_client(&stale).unwrap();
 
-        assert!(Arc::ptr_eq(&refreshed, &replacement));
+        assert!(Arc::ptr_eq(&renewed, &replacement));
     }
 }
