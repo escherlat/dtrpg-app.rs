@@ -19,8 +19,12 @@ use dtrpg_sdk::{
 };
 use dtrpg_ui::{
     credentials::{CredentialStore, KeyringCredentialStore},
-    data::constants::{KEYRING_API_KEY, KEYRING_SERVICE},
+    data::{
+        constants::{KEYRING_API_KEY, KEYRING_SERVICE},
+        token_status::{TokenStatus, TokenStatusHandle},
+    },
     services::LoginTokens,
+    util::datetime::now_secs,
 };
 use tokio::runtime::{Builder, Runtime};
 
@@ -36,9 +40,13 @@ use crate::constants::{
 /// expiry that can be repaired silently. It first spends the session's refresh
 /// token; if the API rejects that too, it exchanges the stored application key
 /// for a new session. The application key itself is never regenerated.
+///
+/// Every new access token's timing is published to `token_status` so the
+/// Settings window can show when the current token was acquired and expires.
 pub(super) struct SdkConnection {
     application_key: String,
     session:         Mutex<Session>,
+    token_status:    TokenStatusHandle,
     runtime:         Runtime,
 }
 
@@ -93,6 +101,9 @@ impl SdkConnection {
         self.runtime
             .block_on(renew_session(&mut session.sdk, &self.application_key))?;
         let renewed = Arc::new(session.sdk.library_client()?);
+        self.token_status
+            .set(TokenStatus::from_access_token(session.sdk.require_session()?.token(),
+                                                now_secs()));
         session.client = Arc::clone(&renewed);
         Ok(renewed)
     }
@@ -143,18 +154,21 @@ pub(super) enum ConnectionError {
 
 /// Builds a connection using only the keyring for the API key and the given
 /// in-memory `tokens` obtained at startup or login.
-pub(super) fn connect_from_keyring_with_tokens(tokens: LoginTokens)
+pub(super) fn connect_from_keyring_with_tokens(tokens: LoginTokens,
+                                               token_status: TokenStatusHandle)
                                                -> Result<SdkConnection, ConnectionError> {
     let application_key = resolve_keyring_api_key()?;
     build_connection(application_key,
                      tokens.access_token,
                      tokens.refresh_token,
-                     tokens.refresh_token_ttl)
+                     tokens.refresh_token_ttl,
+                     token_status)
 }
 
 /// Builds a connection reading every credential from environment variables.
 #[allow(dead_code)]
-pub(super) fn connect_from_environment() -> Result<SdkConnection, ConnectionError> {
+pub(super) fn connect_from_environment(token_status: TokenStatusHandle)
+                                       -> Result<SdkConnection, ConnectionError> {
     let application_key =
         std::env::var(APPLICATION_KEY_ENV).map_err(|_| ConnectionError::MissingApplicationKeyEnv)?;
     let access_token =
@@ -168,7 +182,8 @@ pub(super) fn connect_from_environment() -> Result<SdkConnection, ConnectionErro
     build_connection(application_key,
                      access_token,
                      refresh_token,
-                     refresh_token_ttl)
+                     refresh_token_ttl,
+                     token_status)
 }
 
 fn resolve_keyring_api_key() -> Result<String, ConnectionError> {
@@ -182,12 +197,14 @@ fn resolve_keyring_api_key() -> Result<String, ConnectionError> {
 }
 
 fn build_connection(application_key: String, access_token: String, refresh_token: String,
-                    refresh_token_ttl: u64)
+                    refresh_token_ttl: u64, token_status: TokenStatusHandle)
                     -> Result<SdkConnection, ConnectionError> {
     let config = match std::env::var(API_BASE_URL_ENV) {
         Ok(base_url) => Config::with_base_url(application_key.clone(), base_url),
         Err(_) => Config::new(application_key.clone()),
     };
+
+    token_status.set(TokenStatus::from_access_token(&access_token, now_secs()));
 
     let mut sdk = DriveThruRpgSdk::with_config(config);
     sdk.apply_auth_response(AuthTokenResponse::new(access_token, refresh_token, refresh_token_ttl))
@@ -203,6 +220,7 @@ fn build_connection(application_key: String, access_token: String, refresh_token
 
     Ok(SdkConnection { application_key,
                        session: Mutex::new(session),
+                       token_status,
                        runtime })
 }
 
@@ -263,6 +281,7 @@ mod tests {
         let client = Arc::new(sdk.library_client().unwrap());
         SdkConnection { application_key: "app-key".to_string(),
                         session:         Mutex::new(Session { sdk, client }),
+                        token_status:    TokenStatusHandle::default(),
                         runtime:         Builder::new_multi_thread().enable_all().build().unwrap(), }
     }
 
@@ -368,5 +387,30 @@ mod tests {
         let renewed = connection.renew_client(&stale).unwrap();
 
         assert!(Arc::ptr_eq(&renewed, &replacement));
+    }
+
+    #[test]
+    fn run_publishes_the_renewed_tokens_timing() {
+        let (base_url, _paths) = serve_auth_responses(vec![("200 OK", TOKEN_BODY)]);
+        let connection = connection_for(base_url);
+        assert_eq!(connection.token_status.get(), None);
+        let before = now_secs();
+        let calls = AtomicU32::new(0);
+
+        connection.run(|_client| async {
+                      if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                          Err(api_error(401))
+                      }
+                      else {
+                          Ok(())
+                      }
+                  })
+                  .unwrap();
+
+        // The stub's token is not a JWT, so the acquisition time falls back to
+        // when the renewal happened.
+        let status = connection.token_status.get().unwrap();
+        assert!(status.acquired_at >= before);
+        assert_eq!(status.expires_at, None);
     }
 }

@@ -163,6 +163,8 @@ settings:
   default_account_name: "DriveThruRPG-Konto"
   email_label: "Email"
   api_key_label: "API-Schlüssel"
+  token_acquired_label: "Erhalten"
+  token_expires_label: "Läuft ab"
   password_placeholder: "Passwort"
   email_placeholder: "E-Mail-Adresse"
   sign_out_tooltip: "Abmelden"
@@ -180,7 +182,6 @@ settings:
   create_collections_tooltip: "Nach Sammlung verknüpfen"
   file_opener_extension_placeholder: "Dateiendung (z. B. pdf)"
   advanced_title: "Erweitert"
-  about_title: "Über"
   clear_cache_description: "Entfernt zwischengespeicherte Katalogdaten und das zwischengespeicherte Avatarbild. Heruntergeladene Inhalte und Ihr Konto sind davon nicht betroffen."
   clear_cache_button: "Cache leeren"
   clear_cache_confirm_title: "Cache leeren?"
@@ -281,10 +282,6 @@ about:
   version: "Version %{version}"
   description: "Ein nativer Bibliotheksmanager für Ihre DriveThruRPG-Sammlung."
   ok: "OK"
-  version_label: "Version"
-  commit_label: "Commit"
-  build_date_label: "Build-Datum"
-  target_label: "Zielplattform"
 
 menu:
   app_about: "Über Libri"

@@ -15,6 +15,12 @@ Sign in with your DriveThruRPG email and password, see who you're signed in
 as, and log out. Signing in is what populates your catalog in the first
 place.
 
+While signed in, the page also shows when your current access token was
+acquired and when it expires. The app renews an expired token on its own the
+next time it talks to DriveThruRPG, so the expiry time can be in the past
+without anything being wrong; the acquired time then moves forward after the
+renewal. You never need to sign out just to refresh a token.
+
 ## Appearance
 
 Pick one of six color themes, a comfortable or compact density, and a font
@@ -40,5 +46,7 @@ overrides here.
 ## Advanced
 
 Cache details (size and location on disk) and maintenance actions:
-opening the cache folder directly, or clearing it. This section also hosts
-the About page - app name, version, and description.
+opening the cache folder directly, or clearing it.
+
+The app name, version, and build details are in the About window (the app
+menu's "About Libri"), not in Settings.

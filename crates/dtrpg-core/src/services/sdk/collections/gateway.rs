@@ -4,9 +4,12 @@
 use dtrpg_sdk::{
     PageParams, ProductListCollectionResponse, ProductListItem, ProductListItemsResponse,
 };
-use dtrpg_ui::services::{
-    LoginTokens,
-    collections::{CollectionsServiceError, CollectionsServiceErrorKind},
+use dtrpg_ui::{
+    data::token_status::TokenStatusHandle,
+    services::{
+        LoginTokens,
+        collections::{CollectionsServiceError, CollectionsServiceErrorKind},
+    },
 };
 
 use super::super::connection::{self, SdkConnection};
@@ -73,16 +76,17 @@ pub(super) struct HttpSdkCollectionsGateway {
 }
 
 impl HttpSdkCollectionsGateway {
-    pub(super) fn from_keyring_with_tokens(tokens: LoginTokens)
+    pub(super) fn from_keyring_with_tokens(tokens: LoginTokens, token_status: TokenStatusHandle)
                                            -> Result<Self, CollectionsServiceError> {
-        let connection =
-            connection::connect_from_keyring_with_tokens(tokens).map_err(map_connection_error)?;
+        let connection = connection::connect_from_keyring_with_tokens(tokens, token_status)
+            .map_err(map_connection_error)?;
         Ok(Self { connection })
     }
 
     #[allow(dead_code)]
     pub(super) fn from_environment() -> Result<Self, CollectionsServiceError> {
-        let connection = connection::connect_from_environment().map_err(map_connection_error)?;
+        let connection = connection::connect_from_environment(TokenStatusHandle::default())
+            .map_err(map_connection_error)?;
         Ok(Self { connection })
     }
 

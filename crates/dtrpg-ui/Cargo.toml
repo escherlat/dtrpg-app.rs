@@ -25,6 +25,7 @@ md5 = { workspace = true }
 reqwest = { workspace = true }
 rust-i18n = { workspace = true }
 chrono = { workspace = true }
+base64 = { workspace = true }
 sys-locale = { workspace = true }
 open = { workspace = true }
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
