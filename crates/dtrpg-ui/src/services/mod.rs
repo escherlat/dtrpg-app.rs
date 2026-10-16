@@ -17,10 +17,8 @@ pub enum LibraryServiceErrorKind {
     NotFound,
     /// Session has expired and re-authentication is required.
     ///
-    /// # TODO
-    ///
-    /// Full token-refresh handling is deferred until `connect-sdk-to-rust-app`
-    /// lands.
+    /// The SDK adapters refresh an expired access token and retry once before
+    /// reporting this, so it means the refresh itself was rejected.
     NeedsReauth,
     /// Request failed due to an HTTP 429 (Too Many Requests) response.
     RateLimited,
