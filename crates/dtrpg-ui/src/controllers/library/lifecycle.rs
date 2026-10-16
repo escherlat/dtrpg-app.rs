@@ -170,8 +170,12 @@ impl LibraryController {
     /// avoids spawning hundreds of tiny tasks for a large library. Marks
     /// every item as verifying for the duration of the pass (see
     /// [`Self::is_verifying_downloads`]) so catalog rendering can show a
-    /// pending indicator; catalog/section-count application to the entry
-    /// itself is skipped if nothing changed.
+    /// pending indicator.
+    ///
+    /// The pass works on a snapshot of the catalog, but only the differences
+    /// it finds are applied back (see [`Self::apply_verifications`]), never
+    /// the snapshot itself: a download that finishes while the pass is
+    /// running must not be reverted to `Cloud` by a snapshot that predates it.
     pub(super) fn verify_catalog_downloads(&mut self, cx: &mut Context<Self>) {
         let catalog = self.catalog.clone();
         let ids: HashSet<Arc<str>> = catalog.iter().map(|i| Arc::clone(&i.id)).collect();
@@ -179,30 +183,21 @@ impl LibraryController {
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
-              let (catalog, changed) = async_cx.background_executor()
-                                               .spawn(async move {
-                                                   let storage = StorageConfig::load();
-                                                   let mut catalog = catalog;
-                                                   let mut changed = false;
-                                                   for item in &mut catalog {
-                                                       changed |=
-                                                           verify_item_downloads(item, &storage);
-                                                   }
-                                                   (catalog, changed)
-                                               })
-                                               .await;
+              let verifications =
+                  async_cx.background_executor()
+                          .spawn(async move {
+                              let storage = StorageConfig::load();
+                              catalog.iter()
+                                     .filter_map(|item| find_presence_changes(item, &storage))
+                                     .collect::<Vec<_>>()
+                          })
+                          .await;
 
               this.update(async_cx, |ctrl, cx| {
                       for id in &ids {
                           ctrl.verifying_downloads.remove(id);
                       }
-                      if changed {
-                          ctrl.catalog = catalog;
-                          ctrl.section_counts = section_counts(&ctrl.catalog,
-                                                               now_secs(),
-                                                               ctrl.recently_updated_window_days);
-                          ctrl.invalidate_cache();
-                      }
+                      ctrl.apply_verifications(&verifications);
                       cx.emit(LibraryChanged);
                   })
                   .ok();
