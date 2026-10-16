@@ -2,14 +2,12 @@
 //! HTTP-backed gateway and a stub used when no credentials are available.
 
 use dtrpg_sdk::{
-    LibraryClient as SdkLibraryClient, PageParams, ProductListCollectionResponse, ProductListItem,
-    ProductListItemsResponse,
+    PageParams, ProductListCollectionResponse, ProductListItem, ProductListItemsResponse,
 };
 use dtrpg_ui::services::{
     LoginTokens,
     collections::{CollectionsServiceError, CollectionsServiceErrorKind},
 };
-use tokio::runtime::Runtime;
 
 use super::super::connection::{self, SdkConnection};
 use super::errors::{map_client_error, map_connection_error};
@@ -71,23 +69,21 @@ pub trait SdkCollectionsGateway: Send + Sync {
 }
 
 pub(super) struct HttpSdkCollectionsGateway {
-    client:  SdkLibraryClient,
-    runtime: Runtime,
+    connection: SdkConnection,
 }
 
 impl HttpSdkCollectionsGateway {
     pub(super) fn from_keyring_with_tokens(tokens: LoginTokens)
                                            -> Result<Self, CollectionsServiceError> {
-        let SdkConnection { client, runtime } =
+        let connection =
             connection::connect_from_keyring_with_tokens(tokens).map_err(map_connection_error)?;
-        Ok(Self { client, runtime })
+        Ok(Self { connection })
     }
 
     #[allow(dead_code)]
     pub(super) fn from_environment() -> Result<Self, CollectionsServiceError> {
-        let SdkConnection { client, runtime } =
-            connection::connect_from_environment().map_err(map_connection_error)?;
-        Ok(Self { client, runtime })
+        let connection = connection::connect_from_environment().map_err(map_connection_error)?;
+        Ok(Self { connection })
     }
 
     /// Paginates a product list's items looking for one whose
@@ -97,13 +93,7 @@ impl HttpSdkCollectionsGateway {
                                  -> Result<Option<u64>, CollectionsServiceError> {
         let mut page: u32 = 1;
         loop {
-            let response =
-                self.runtime
-                    .block_on(self.client
-                                  .list_product_list_items(product_list_id,
-                                                           PageParams { page:      Some(page),
-                                                                        page_size: None, }))
-                    .map_err(map_client_error)?;
+            let response = self.list_product_list_items(product_list_id, page)?;
 
             for item in &response.data {
                 if extract_member_id(item) == Some(member_id)
@@ -124,39 +114,46 @@ impl HttpSdkCollectionsGateway {
 impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
     fn list_product_lists(&self, page: u32)
                           -> Result<ProductListCollectionResponse, CollectionsServiceError> {
-        self.runtime
-            .block_on(self.client
-                          .list_product_lists(PageParams { page:      Some(page),
-                                                           page_size: None, }))
+        self.connection
+            .run(|client| async move {
+                client.list_product_lists(PageParams { page:      Some(page),
+                                                       page_size: None, })
+                      .await
+            })
             .map_err(map_client_error)
     }
 
     fn list_product_list_items(&self, product_list_id: u64, page: u32)
                                -> Result<ProductListItemsResponse, CollectionsServiceError> {
-        self.runtime
-            .block_on(self.client.list_product_list_items(product_list_id,
-                                                          PageParams { page:      Some(page),
-                                                                       page_size: None, }))
+        self.connection
+            .run(|client| async move {
+                client.list_product_list_items(product_list_id,
+                                               PageParams { page:      Some(page),
+                                                            page_size: None, })
+                      .await
+            })
             .map_err(map_client_error)
     }
 
     fn create_product_list(&self, name: &str) -> Result<ProductListItem, CollectionsServiceError> {
-        self.runtime
-            .block_on(self.client.create_product_list(name))
+        self.connection
+            .run(|client| async move { client.create_product_list(name).await })
             .map_err(map_client_error)
     }
 
     fn delete_product_list(&self, id: u64) -> Result<(), CollectionsServiceError> {
-        self.runtime
-            .block_on(self.client.delete_product_list(id))
+        self.connection
+            .run(|client| async move { client.delete_product_list(id).await })
             .map_err(map_client_error)
     }
 
     fn add_product_list_item(&self, product_list_id: u64, product_id: u64)
                              -> Result<(), CollectionsServiceError> {
-        self.runtime
-            .block_on(self.client
-                          .add_product_list_item(product_list_id, product_id))
+        self.connection
+            .run(|client| async move {
+                client.add_product_list_item(product_list_id, product_id)
+                      .await
+            })
             .map_err(map_client_error)
             .map(|_| ())
     }
@@ -176,8 +173,8 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
                 )
                                        })?;
 
-        self.runtime
-            .block_on(self.client.delete_product_list_item(product_list_item_id))
+        self.connection
+            .run(|client| async move { client.delete_product_list_item(product_list_item_id).await })
             .map_err(map_client_error)
     }
 }

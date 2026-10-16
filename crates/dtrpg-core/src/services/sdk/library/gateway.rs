@@ -1,12 +1,8 @@
 //! SDK operation boundary and its concrete implementations: a real
 //! HTTP-backed gateway and a stub used when no credentials are available.
 
-use dtrpg_sdk::{
-    LibraryClient as SdkLibraryClient, LibraryItemsParams, OrderProductItemResponse,
-    OrderProductListResponse,
-};
+use dtrpg_sdk::{LibraryItemsParams, OrderProductItemResponse, OrderProductListResponse};
 use dtrpg_ui::services::LibraryServiceError;
-use tokio::runtime::Runtime;
 
 use super::super::connection::{self, SdkConnection};
 use super::errors::{map_client_error, map_connection_error};
@@ -40,8 +36,7 @@ pub trait SdkLibraryGateway: Send + Sync {
 }
 
 pub(super) struct HttpSdkLibraryGateway {
-    client:  SdkLibraryClient,
-    runtime: Runtime,
+    connection: SdkConnection,
 }
 
 impl HttpSdkLibraryGateway {
@@ -49,39 +44,51 @@ impl HttpSdkLibraryGateway {
     /// tokens.
     pub(super) fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens)
                                            -> Result<Self, LibraryServiceError> {
-        let SdkConnection { client, runtime } =
+        let connection =
             connection::connect_from_keyring_with_tokens(tokens).map_err(map_connection_error)?;
-        Ok(Self { client, runtime })
+        Ok(Self { connection })
     }
 
     #[allow(dead_code)]
     pub(super) fn from_environment() -> Result<Self, LibraryServiceError> {
-        let SdkConnection { client, runtime } =
-            connection::connect_from_environment().map_err(map_connection_error)?;
-        Ok(Self { client, runtime })
+        let connection = connection::connect_from_environment().map_err(map_connection_error)?;
+        Ok(Self { connection })
     }
 }
 
 impl SdkLibraryGateway for HttpSdkLibraryGateway {
     fn list_order_products(&self, params: LibraryItemsParams)
                            -> Result<OrderProductListResponse, LibraryServiceError> {
-        self.runtime
-            .block_on(self.client.list_order_products(params))
+        let params = &params;
+        self.connection
+            .run(|client| async move { client.list_order_products(copy_params(params)).await })
             .map_err(map_client_error)
     }
 
     fn get_order_product(&self, id: u64) -> Result<OrderProductItemResponse, LibraryServiceError> {
-        self.runtime
-            .block_on(self.client.get_order_product(id))
+        self.connection
+            .run(|client| async move { client.get_order_product(id).await })
             .map_err(map_client_error)
     }
 
     fn prepare_download(&self, order_product_id: u64, index: u32)
                         -> Result<serde_json::Value, LibraryServiceError> {
-        self.runtime
-            .block_on(self.client.prepare_download(order_product_id, index))
+        self.connection
+            .run(|client| async move { client.prepare_download(order_product_id, index).await })
             .map_err(map_client_error)
     }
+}
+
+/// `LibraryItemsParams` is not `Clone`, and a retried request needs a fresh
+/// copy.
+fn copy_params(params: &LibraryItemsParams) -> LibraryItemsParams {
+    LibraryItemsParams { page:               params.page,
+                         page_size:          params.page_size,
+                         get_checksum:       params.get_checksum,
+                         get_filters:        params.get_filters,
+                         library:            params.library,
+                         archived:           params.archived,
+                         updated_date_after: params.updated_date_after.clone(), }
 }
 
 pub(super) struct UnavailableSdkGateway {
