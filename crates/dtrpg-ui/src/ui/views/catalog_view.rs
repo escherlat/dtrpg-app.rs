@@ -14,9 +14,8 @@ use gpui::{
 use gpui_kit::component::ElementExt;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::badge::Badge;
-use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::menu::{ContextMenuExt, DropdownMenu, PopupMenu, PopupMenuItem};
+use gpui_kit::component::menu::{ContextMenuExt, PopupMenu, PopupMenuItem};
 use gpui_kit::component::scroll::ScrollableElement;
 use gpui_kit::component::spinner::Spinner;
 use gpui_kit::component::table::{
@@ -177,10 +176,7 @@ fn list_columns() -> Vec<Column> {
                                   .selectable(false),
          Column::new("open", "").width(28.)
                                 .resizable(false)
-                                .selectable(false),
-         Column::new("ctx", "").width(28.)
-                               .resizable(false)
-                               .selectable(false),]
+                                .selectable(false),]
 }
 
 /// Returns a 2–3 character badge abbreviation for an item kind string.
@@ -437,16 +433,6 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
             }
         }
 
-        8 => {
-            let ctrl = controller.clone();
-            div().h_full()
-                 .flex()
-                 .items_center()
-                 .justify_center()
-                 .child(render_thumbnail_menu(item, ctrl))
-                 .into_any_element()
-        }
-
         _ => div().into_any_element(),
     }
 }
@@ -629,7 +615,7 @@ impl TableDelegate for CatalogListDelegate {
                 }),
             ),
         };
-        append_collection_menu_items(menu, &item, &self.controller, window, cx)
+        append_common_menu_items(menu, &item, &self.controller, window, cx)
     }
 
     fn render_td(&mut self, row_ix: usize, col_ix: usize, window: &mut Window,
@@ -838,7 +824,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                 }),
             ),
         };
-        append_collection_menu_items(menu, item, &self.controller, window, cx)
+        append_common_menu_items(menu, item, &self.controller, window, cx)
     }
 
     fn render_tr(&mut self, row_ix: usize, _window: &mut Window,
@@ -1665,34 +1651,24 @@ fn render_verifying_indicator(id: &Arc<str>, colors: &ColorTokens)
          })
 }
 
-// ── Thumbnail context menu
-// ─────────────────────────────────────────────────────
+// ── Thumbnail context menu item
+// ─────────────────────────────────────────────────
 
-/// Renders a small "⋯" button that opens a dropdown with a "Load Thumbnail"
-/// action.  The action is disabled when no `cover_url` is present or when the
-/// cooldown guard is active.
-fn render_thumbnail_menu(item: &LibraryItem, entity: Entity<LibraryController>)
-                         -> impl IntoElement + 'static + use<> {
+/// Builds the "Load Thumbnail" right-click menu item. It is disabled when no
+/// `cover_url` is present or when the cooldown guard is active.
+fn thumbnail_menu_item(item: &LibraryItem, entity: &Entity<LibraryController>) -> PopupMenuItem {
     let can_load = item.cover_url.is_some() && thumbnail_cooldown_elapsed(item);
     let cover_url = item.cover_url.clone();
-    let btn_id: Arc<str> = Arc::from(format!("ctx-thumb-{}", &*item.id));
+    let entity = entity.clone();
 
-    Button::new(btn_id).ghost()
-                       .small()
-                       .label("\u{22ef}")
-                       .dropdown_menu(move |menu, _, _| {
-                           let eu = entity.clone();
-                           let url = cover_url.clone();
-                           menu.item(
-                PopupMenuItem::new(t!("catalog.action_load_thumbnail"))
-                    .disabled(!can_load)
-                    .on_click(move |_, _, cx| {
-                        if let Some(ref u) = url {
-                            eu.update(cx, |ctrl, cx| ctrl.load_thumbnail(Arc::clone(u), cx));
-                        }
-                    }),
-            )
-                       })
+    PopupMenuItem::new(t!("catalog.action_load_thumbnail")).disabled(!can_load)
+                                                           .on_click(move |_, _, cx| {
+                                                               if let Some(ref url) = cover_url {
+                                                                   entity.update(cx, |ctrl, cx| {
+                                                                             ctrl.load_thumbnail(Arc::clone(url), cx)
+                                                                         });
+                                                               }
+                                                           })
 }
 
 // ── Reveal action
@@ -1731,7 +1707,6 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let thumb_h = thumb_w * 10.0 / 7.0;
     let row_h = density.thumb_row_height;
     let colors = colors.clone();
-    let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
     let ctx_item = item.clone();
@@ -1866,7 +1841,6 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                               .children(render_checking_indicator(is_checking)))
          })
          .child(render_status(&id, status, is_verifying, &colors))
-         .child(ctx_menu)
          .context_menu(move |menu, window, cx| {
              let menu = match status {
                  ItemStatus::Downloaded => {
@@ -1949,29 +1923,28 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                     ))
                  }
              };
-             append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
+             append_common_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
          })
 }
 
-// ── Collections context menu items
-// ───────────────────────────────────────
+// ── Shared context menu items
+// ───────────────────────────────────────────────────
 
-/// Appends an "Add to…" submenu (checked per current membership) and, when
-/// the active sidebar filter is a collection, a "Remove from this
-/// collection" item to `menu` for `item`.
+/// Appends the actions every catalog item context menu offers regardless of
+/// download status: "Load Thumbnail" and "Manage Collections…".
 ///
 /// Shared by all four catalog item context menu sites (ungrouped/grouped
-/// list-layout table delegates, and the thumb/grid row builders) so the
-/// collections logic isn't duplicated four times over.
-fn append_collection_menu_items(menu: PopupMenu, item: &LibraryItem,
-                                entity: &Entity<LibraryController>, _window: &mut Window,
-                                _cx: &mut App)
-                                -> PopupMenu {
+/// list-layout table delegates, and the thumb/grid row builders) so these
+/// actions aren't duplicated four times over.
+fn append_common_menu_items(menu: PopupMenu, item: &LibraryItem,
+                            entity: &Entity<LibraryController>, _window: &mut Window,
+                            _cx: &mut App)
+                            -> PopupMenu {
     let member_id = collection_member_id(item);
     let product_id = item.product_id;
     let entity = entity.clone();
     let item_title = Arc::clone(&item.title);
-    menu.item(
+    menu.item(thumbnail_menu_item(item, &entity)).item(
         PopupMenuItem::new(t!("catalog.action_manage_collections")).on_click(
             move |_, window, cx| {
                 open_manage_collections_dialog(
@@ -2043,7 +2016,6 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let publisher = item.publisher.to_string();
     let status = item.status;
     let cover_h = card_w * 10.0 / 7.0;
-    let reveal_item_id = Arc::clone(&item.id);
     // Card has 4px horizontal padding on each side around the title text.
     let title_available_w = px(card_w) - px(8.0);
     let title_truncated = is_title_truncated(window,
@@ -2062,7 +2034,6 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
         render_generative_cover(item, card_w, cover_h, true).into_any_element()
     };
     let colors = colors.clone();
-    let ctx_menu = render_thumbnail_menu(item, entity.clone());
     let ctx_id = Arc::clone(&id);
     let ctx_entity = entity.clone();
     let ctx_item = item.clone();
@@ -2073,33 +2044,6 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let drag_payload = DraggedLibraryItem { title:      title.clone().into(),
                                             member_id:  collection_member_id(item),
                                             product_id: item.product_id, };
-
-    let reveal_row: AnyElement = if status == ItemStatus::Downloaded {
-        let item_reveal_path = crate::data::storage::publisher_dir(&storage_root_path, &publisher);
-        let reveal_elem_id: Arc<str> = Arc::from(format!("reveal-grid-{}", &*reveal_item_id));
-        div().id(reveal_elem_id)
-             .mt(px(2.0))
-             .cursor_pointer()
-             .on_click(move |_, _, _| {
-                 if !item_reveal_path.exists() {
-                     tracing::warn!(
-                         path = %item_reveal_path.display(),
-                         "reveal: file not found — item may need re-download"
-                     );
-                     return;
-                 }
-                 if let Err(e) = reveal_in_file_manager(&item_reveal_path) {
-                     tracing::warn!("reveal_in_file_manager failed: {e}");
-                 }
-             })
-             .child(div().text_xs()
-                         .text_color(colors.text_tertiary)
-                         .child(platform_reveal_label()))
-             .into_any_element()
-    }
-    else {
-        div().into_any_element()
-    };
 
     let checkbox_id = Arc::clone(&id);
     let checkbox_entity = entity.clone();
@@ -2192,9 +2136,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                              .text_color(colors.text_tertiary)
                                              .truncate()
                                              .child(publisher))
-                                 .child(render_status(&id, status, is_verifying, &colors)))
-                     .child(reveal_row)
-                     .child(ctx_menu))
+                                 .child(render_status(&id, status, is_verifying, &colors))))
          .context_menu(move |menu, window, cx| {
              let menu = match status {
                  ItemStatus::Downloaded => {
@@ -2277,6 +2219,6 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                     ))
                  }
              };
-             append_collection_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
+             append_common_menu_items(menu, &ctx_item, &ctx_entity, window, cx)
          })
 }
