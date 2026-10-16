@@ -27,16 +27,16 @@ use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,
-    settings_advanced_view::{render_about_section, render_advanced_section},
+    settings_advanced_view::render_advanced_section,
     settings_appearance_view::{AppearanceFontSelects, render_appearance_section},
     settings_file_openers_view::render_file_openers_section,
     settings_storage_view::render_storage_section,
 };
 
 /// Number of settings pages (Account, Appearance, Downloads Location, File
-/// Openers, Advanced, About); see [`page_title`] and the `match` in
+/// Openers, Advanced); see [`page_title`] and the `match` in
 /// [`render_settings_panel`]. Sidebar order matches index order.
-const PAGE_COUNT: usize = 6;
+const PAGE_COUNT: usize = 5;
 
 /// Returns the i18n title for page `ix`, or the Account page's title if `ix`
 /// is out of range (defensive default for a persisted index from a prior app
@@ -47,7 +47,6 @@ fn page_title(ix: usize) -> String {
         2 => t!("settings.downloads_location").to_string(),
         3 => t!("settings.file_openers_title").to_string(),
         4 => t!("settings.advanced_title").to_string(),
-        5 => t!("settings.about_title").to_string(),
         _ => t!("settings.account_title").to_string(),
     }
 }
@@ -124,7 +123,6 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                      &theme.fonts.value_font,
                                      recently_updated_window_days,
                                      recently_updated_window_input).into_any_element(),
-        5 => render_about_section(colors).into_any_element(),
         _ => render_account_section(&auth,
                                     entity.clone(),
                                     colors,

@@ -20,6 +20,7 @@ use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use crate::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use crate::data::profile::ProfileConfig;
 use crate::data::storage::{StorageConfig, StorageError, validate_writable};
+use crate::data::token_status::{TokenStatus, TokenStatusHandle};
 use crate::services::LoginService;
 
 /// State for one Appearance-page font picker: a searchable list of every
@@ -79,6 +80,9 @@ pub struct AuthStateSnapshot {
     pub avatar_bytes:    Option<Arc<Vec<u8>>>,
     /// Masked API key hint (first 4 + bullets + last 1), set at sign-in time.
     pub api_key_hint:    Option<String>,
+    /// When the current access token was acquired and when it expires, or
+    /// `None` when signed out or no token has been issued yet.
+    pub token_status:    Option<TokenStatus>,
 }
 
 // ── SettingsController
@@ -177,6 +181,9 @@ pub struct SettingsController {
     /// Masked API key hint computed at sign-in time (first 4 + bullets + last
     /// 1).
     api_key_hint:                   Option<String>,
+    /// Shared slot the SDK services publish the current access token's timing
+    /// into; read when the Account page renders.
+    token_status:                   TokenStatusHandle,
     /// Application path picked via the native file dialog, awaiting an
     /// extension typed inline in the File Openers list. `None` when no add
     /// is in progress.
@@ -289,6 +296,9 @@ impl SettingsController {
                               storage_path_draft,
                               storage_path_input: None,
                               api_key_hint: None,
+                              token_status: cx.try_global::<TokenStatusHandle>()
+                                              .cloned()
+                                              .unwrap_or_default(),
                               pending_file_opener: None,
                               active_page_ix:
                                   crate::data::ui_state::UiState::load().settings_page_ix()
@@ -332,6 +342,7 @@ impl SettingsController {
                storage_path_draft: String::new(),
                storage_path_input: None,
                api_key_hint: None,
+               token_status: TokenStatusHandle::default(),
                pending_file_opener: None,
                active_page_ix: 0,
                cache_counts: CacheCounts::default(),
@@ -473,6 +484,7 @@ impl SettingsController {
         self.is_authenticated = false;
         self.auth_state = AuthState::LoggedOut;
         self.api_key_hint = None;
+        self.token_status.clear();
         cx.emit(SettingsChanged);
         cx.emit(LogoutRequested);
     }
@@ -862,7 +874,8 @@ impl SettingsController {
                                                         email:           None,
                                                         display_initial: None,
                                                         avatar_bytes:    None,
-                                                        api_key_hint:    None, },
+                                                        api_key_hint:    None,
+                                                        token_status:    None, },
             AuthState::LoggedIn { email,
                                   avatar_bytes, } => {
                 AuthStateSnapshot { is_logged_in:    true,
@@ -871,7 +884,8 @@ impl SettingsController {
                                                           .map(|c| c.to_ascii_uppercase()),
                                     email:           email.clone(),
                                     avatar_bytes:    avatar_bytes.clone(),
-                                    api_key_hint:    self.api_key_hint.clone(), }
+                                    api_key_hint:    self.api_key_hint.clone(),
+                                    token_status:    self.token_status.get(), }
             }
         };
 
@@ -1013,5 +1027,43 @@ mod tests {
 
         let second_read = ctrl.update(cx, |ctrl, _| ctrl.take_focus_email_pending());
         assert!(!second_read);
+    }
+
+    fn logged_in_controller(status: TokenStatus) -> SettingsController {
+        let mut ctrl = SettingsController::for_test(Arc::new(UnusedLoginService));
+        ctrl.auth_state = AuthState::LoggedIn { email:        Some("a@b.c".to_string()),
+                                                avatar_bytes: None, };
+        ctrl.token_status.set(status);
+        ctrl
+    }
+
+    #[test]
+    fn snapshot_reports_token_status_while_logged_in() {
+        let status = TokenStatus { acquired_at: 1_000,
+                                   expires_at:  Some(2_000), };
+        let ctrl = logged_in_controller(status);
+
+        assert_eq!(ctrl.snapshot().auth.token_status, Some(status));
+    }
+
+    #[test]
+    fn snapshot_hides_token_status_while_logged_out() {
+        let ctrl = SettingsController::for_test(Arc::new(UnusedLoginService));
+        ctrl.token_status.set(TokenStatus { acquired_at: 1_000,
+                                            expires_at:  None, });
+
+        assert_eq!(ctrl.snapshot().auth.token_status, None);
+    }
+
+    #[gpui::test]
+    fn logout_clears_the_token_status(cx: &mut TestAppContext) {
+        let ctrl = cx.new(|_| {
+                         logged_in_controller(TokenStatus { acquired_at: 1_000,
+                                                            expires_at:  Some(2_000), })
+                     });
+
+        ctrl.update(cx, |ctrl, cx| ctrl.logout(cx));
+
+        ctrl.read_with(cx, |ctrl, _| assert_eq!(ctrl.token_status.get(), None));
     }
 }

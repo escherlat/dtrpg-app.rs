@@ -17,9 +17,11 @@ use rust_i18n::t;
 use crate::controllers::settings::{AuthStateSnapshot, SettingsController};
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::{selectable_text, small_caps_text};
+use crate::util::datetime::format_absolute;
 
-/// Width of the Email/API Key info rows' shared label column, sized to fit
-/// "API Key" (the longer of the two labels) at `text_sm` plus a small margin.
+/// Width of the Email/API Key/token info rows' shared label column, sized to
+/// fit the longest label ("Acquired", "API Key", "Expires") at `text_sm` plus a
+/// small margin.
 const ACCOUNT_INFO_LABEL_WIDTH: gpui::Pixels = px(80.0);
 
 /// Renders the Account settings section.
@@ -81,6 +83,25 @@ fn render_authenticated(auth: &AuthStateSnapshot, entity: Entity<SettingsControl
                                                       colors,
                                                       label_font_family,
                                                       mono_font_family));
+    }
+
+    if let Some(status) = auth.token_status {
+        info_list =
+            info_list.child(account_info_item("settings-account-token-acquired",
+                                              t!("settings.token_acquired_label").to_string(),
+                                              format_absolute(status.acquired_at),
+                                              colors,
+                                              label_font_family,
+                                              mono_font_family));
+        if let Some(expires_at) = status.expires_at {
+            info_list =
+                info_list.child(account_info_item("settings-account-token-expires",
+                                                  t!("settings.token_expires_label").to_string(),
+                                                  format_absolute(expires_at),
+                                                  colors,
+                                                  label_font_family,
+                                                  mono_font_family));
+        }
     }
 
     div().flex()

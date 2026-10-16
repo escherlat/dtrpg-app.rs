@@ -191,6 +191,8 @@ settings:
   default_account_name: "DriveThruRPG Account"
   email_label: "Email"
   api_key_label: "API Key"
+  token_acquired_label: "Acquired"
+  token_expires_label: "Expires"
   password_placeholder: "Password"
   email_placeholder: "Email address"
   sign_out_tooltip: "Sign Out"
@@ -198,7 +200,6 @@ settings:
   sign_in_in_progress: "Signing In…"
   file_opener_extension_placeholder: "Extension (e.g. pdf)"
   advanced_title: "Advanced"
-  about_title: "About"
   clear_cache_description: "Removes cached catalog metadata and the cached avatar image. Downloaded content and your account are not affected."
   clear_cache_button: "Clear Cache"
   clear_cache_confirm_title: "Clear cache?"
@@ -299,10 +300,6 @@ about:
   version: "Version %{version}"
   description: "A native library manager for your DriveThruRPG collection."
   ok: "OK"
-  version_label: "Version"
-  commit_label: "Commit"
-  build_date_label: "Build Date"
-  target_label: "Target"
 
 menu:
   app_about: "About Libri"

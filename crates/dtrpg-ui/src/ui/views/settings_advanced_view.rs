@@ -1,9 +1,5 @@
 //! Advanced settings section: cache visibility and destructive/maintenance
 //! actions (cache details, opening the cache folder, cache clearing).
-//!
-//! Also renders the About section, which is purely informational (app name,
-//! version, description) and shares no state with Advanced beyond both living
-//! in the Settings panel.
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
@@ -12,12 +8,10 @@ use gpui::{
 };
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::description_list::{DescriptionItem, DescriptionList};
 use gpui_kit::component::input::{InputState, NumberInput};
 use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
-use crate::build_info;
 use crate::controllers::settings::{CacheCounts, SettingsController};
 use crate::data::constants::{
     FORCE_RELOAD_COOLDOWN_SECS, ITEM_CHECK_BATCH_COOLDOWN_SECS, ITEM_CHECK_BATCH_TIMER_SECS,
@@ -333,54 +327,6 @@ pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts:
                         }),
                 ),
         )
-}
-
-/// Renders the About settings section: app name, version, and a short
-/// description.
-pub fn render_about_section(colors: &ColorTokens) -> impl IntoElement + 'static + use<> {
-    let text_primary = colors.text_primary;
-    let text_secondary = colors.text_secondary;
-
-    let build_info_list = DescriptionList::horizontal()
-        .columns(1)
-        .bordered(false)
-        .child(about_info_item(
-            t!("about.version_label").to_string(),
-            env!("CARGO_PKG_VERSION").to_string(),
-        ))
-        .child(about_info_item(
-            t!("about.commit_label").to_string(),
-            build_info::GIT_HASH.to_string(),
-        ))
-        .child(about_info_item(
-            t!("about.build_date_label").to_string(),
-            build_info::BUILD_DATE.to_string(),
-        ))
-        .child(about_info_item(
-            t!("about.target_label").to_string(),
-            build_info::TARGET.to_string(),
-        ));
-
-    div().flex()
-         .flex_col()
-         .gap(px(8.0))
-         .p(px(24.0))
-         .child(div().text_lg()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .text_color(text_primary)
-                     .child(t!("sidebar.app_name")))
-         .child(build_info_list)
-         .child(div().text_xs()
-                     .text_color(text_secondary)
-                     .child(t!("about.description")))
-}
-
-/// Builds a right-aligned label/value row for the About section's build-info
-/// `DescriptionList`. `DescriptionList` doesn't right-align its value cells on
-/// its own (the value cell is a plain `flex_1` div), so the value is wrapped
-/// in a full-width, right-aligned `div()` here.
-fn about_info_item(label: String, value: String) -> DescriptionItem {
-    DescriptionItem::new(label).value(div().w_full().text_right().child(value).into_any_element())
 }
 
 #[cfg(test)]

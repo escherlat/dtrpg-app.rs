@@ -2,7 +2,7 @@
 //! HTTP-backed gateway and a stub used when no credentials are available.
 
 use dtrpg_sdk::{LibraryItemsParams, OrderProductItemResponse, OrderProductListResponse};
-use dtrpg_ui::services::LibraryServiceError;
+use dtrpg_ui::{data::token_status::TokenStatusHandle, services::LibraryServiceError};
 
 use super::super::connection::{self, SdkConnection};
 use super::errors::{map_client_error, map_connection_error};
@@ -42,16 +42,18 @@ pub(super) struct HttpSdkLibraryGateway {
 impl HttpSdkLibraryGateway {
     /// Reads only the API key from the keyring and uses the provided in-memory
     /// tokens.
-    pub(super) fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens)
+    pub(super) fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens,
+                                           token_status: TokenStatusHandle)
                                            -> Result<Self, LibraryServiceError> {
-        let connection =
-            connection::connect_from_keyring_with_tokens(tokens).map_err(map_connection_error)?;
+        let connection = connection::connect_from_keyring_with_tokens(tokens, token_status)
+            .map_err(map_connection_error)?;
         Ok(Self { connection })
     }
 
     #[allow(dead_code)]
     pub(super) fn from_environment() -> Result<Self, LibraryServiceError> {
-        let connection = connection::connect_from_environment().map_err(map_connection_error)?;
+        let connection = connection::connect_from_environment(TokenStatusHandle::default())
+            .map_err(map_connection_error)?;
         Ok(Self { connection })
     }
 }
