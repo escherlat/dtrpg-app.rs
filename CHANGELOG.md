@@ -1,4 +1,11 @@
 
+## 0.4.0 - 2026-10-16
+
+### Added
+- Open About as a standalone window instead of a modal dialog
+
+
+
 ## 0.3.0 - 2026-10-15
 
 ### Added
