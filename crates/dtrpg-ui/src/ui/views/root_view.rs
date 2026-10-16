@@ -32,7 +32,7 @@ use crate::ui::actions::{
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
-    open_settings_window, save_library_window_bounds,
+    open_about_window, open_settings_window, save_library_window_bounds,
 };
 use crate::ui::views::report_feature_bug_window_view::open_report_feature_bug_window;
 use crate::ui::views::{
@@ -142,6 +142,10 @@ pub struct LibraryRootView {
     /// to front instead of opening a duplicate; `None` when no report window
     /// is open.
     report_feature_bug_window:   Option<WindowHandle<Root>>,
+    /// Handle to the currently-open About window, if any. Used by the
+    /// `About` action to bring an already-open window to front instead of
+    /// opening a duplicate; `None` when no About window is open.
+    about_window:                Option<WindowHandle<Root>>,
     /// Editable search input wired to the library controller's search query.
     search_input:                Entity<InputState>,
     /// Draft name input for the "Create Collection" dialog.
@@ -865,6 +869,7 @@ impl LibraryRootView {
                root_focus,
                settings_window: None,
                report_feature_bug_window: None,
+               about_window: None,
                search_input,
                collection_name_input,
                file_opener_extension_input,
@@ -910,6 +915,20 @@ impl LibraryRootView {
         if !already_open {
             let handle = open_report_feature_bug_window(cx);
             self.report_feature_bug_window = Some(handle);
+        }
+    }
+
+    /// Opens the About window, or brings an already-open one to front.
+    pub(crate) fn show_about(&mut self, cx: &mut Context<Self>) {
+        let already_open = self.about_window
+                               .map(|handle| {
+                                   handle.update(cx, |_, window, _| window.activate_window())
+                                         .is_ok()
+                               })
+                               .unwrap_or(false);
+        if !already_open {
+            let handle = open_about_window(cx);
+            self.about_window = Some(handle);
         }
     }
 
@@ -1211,6 +1230,7 @@ impl Render for LibraryRootView {
         let sidebar_col = div().size_full().relative().child(sidebar);
 
         let this_entity = cx.entity();
+        let this_entity_for_about = this_entity.clone();
         let this_entity_for_add = this_entity.clone();
         let this_entity_for_activity = this_entity.clone();
         let this_entity_for_alert_history = this_entity.clone();
@@ -1250,44 +1270,8 @@ impl Render for LibraryRootView {
             .on_action(move |_: &ShowSettings, _, cx| {
                 this_entity.update(cx, |view, cx| view.show_settings(cx));
             })
-            .on_action(move |_: &About, window, cx| {
-                window.open_dialog(cx, move |dialog, _window, _cx| {
-                    dialog
-                        .overlay_closable(true)
-                        .w(px(320.))
-                        .on_ok(|_, _, _| true)
-                        .content(move |content, _, _| {
-                            content.child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .items_center()
-                                    .gap_2()
-                                    .px_4()
-                                    .py_6()
-                                    .child(
-                                        div()
-                                            .text_lg()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                                            .child(t!("sidebar.app_name")),
-                                    )
-                                    .child(div().text_sm().child(t!(
-                                        "about.version",
-                                        version = env!("CARGO_PKG_VERSION")
-                                    )))
-                                    .child(div().text_xs().child(t!("about.description"))),
-                            )
-                        })
-                        .footer(
-                            DialogFooter::new()
-                                .px_4()
-                                .pb_4()
-                                .justify_center()
-                                .child(DialogAction::new().child(
-                                    Button::new("about-ok").primary().label(t!("about.ok")),
-                                )),
-                        )
-                });
+            .on_action(move |_: &About, _, cx| {
+                this_entity_for_about.update(cx, |view, cx| view.show_about(cx));
             })
             .on_action(move |_: &ReportFeatureBug, _, cx| {
                 this_entity_for_report_bug.update(cx, |view, cx| view.show_report_feature_bug(cx));
