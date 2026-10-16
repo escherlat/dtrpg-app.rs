@@ -168,12 +168,19 @@ impl LibraryItem {
     /// keep the entry-level status in sync. An entry with no files (should not
     /// occur in practice) is treated as `Cloud`.
     pub fn recompute_status(&mut self) {
-        self.status = if !self.files.is_empty() && self.files.iter().all(|f| f.downloaded) {
+        self.status = self.computed_status();
+    }
+
+    /// The `status` implied by the per-file `downloaded` flags, without
+    /// changing `self`; see [`Self::recompute_status`].
+    #[must_use]
+    pub fn computed_status(&self) -> ItemStatus {
+        if !self.files.is_empty() && self.files.iter().all(|f| f.downloaded) {
             ItemStatus::Downloaded
         }
         else {
             ItemStatus::Cloud
-        };
+        }
     }
 }
 
