@@ -13,6 +13,7 @@
 use std::path::PathBuf;
 
 use dtrpg_core::data::file_openers::FileOpenerEntry;
+use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
 use gpui::prelude::*;
 use gpui::{
@@ -62,7 +63,7 @@ fn page_title(ix: usize) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
                              storage_root_path: PathBuf, storage_path_exists: bool,
-                             storage_roots: Vec<StorageRoot>,
+                             storage_roots: Vec<StorageRoot>, storage_rules: Vec<PlacementRule>,
                              entity: Entity<SettingsController>,
                              library: Entity<LibraryController>, focus_handle: &FocusHandle,
                              colors: &ColorTokens, theme: &LibriTheme,
@@ -113,7 +114,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     max_concurrent_downloads,
                                     max_concurrent_downloads_input,
                                     create_collections,
-                                    storage_roots).into_any_element(),
+                                    storage_roots,
+                                    storage_rules).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
                                          colors,

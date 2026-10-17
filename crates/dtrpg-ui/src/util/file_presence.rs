@@ -33,6 +33,14 @@ pub fn resolved_file_path_in_collections(storage: &StorageConfig, item: &Library
     StorageConfig::path_for_publisher_in(&root, &item.publisher).join(file_name)
 }
 
+/// Resolves an item's directory using its first file's placement inputs.
+#[must_use]
+pub fn resolved_item_dir(storage: &StorageConfig, item: &LibraryItem) -> PathBuf {
+    let size_mb = item.files.first().map_or(item.size_mb, |file| file.size_mb);
+    let root = storage.resolve_root_for(&item.publisher, &[], size_mb);
+    StorageConfig::path_for_publisher_in(&root, &item.publisher)
+}
+
 /// Returns the collection IDs containing `item`, matching either API identity
 /// field just as collection filtering does elsewhere in the UI.
 #[must_use]

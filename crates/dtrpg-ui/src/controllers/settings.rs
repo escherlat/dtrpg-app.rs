@@ -10,6 +10,7 @@ use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use dtrpg_core::data::profile::ProfileConfig;
+use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
 use dtrpg_core::data::token_status::{TokenStatus, TokenStatusHandle};
@@ -100,6 +101,8 @@ pub struct SettingsSnapshot {
     pub storage_root_path:              PathBuf,
     /// Configured download roots, including the immutable default root.
     pub storage_roots:                  Vec<StorageRoot>,
+    /// Ordered placement rules used for future downloads.
+    pub storage_rules:                  Vec<PlacementRule>,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -520,6 +523,23 @@ impl SettingsController {
         cx.emit(SettingsChanged);
     }
 
+    /// Removes a placement rule by its ordered index.
+    pub fn remove_storage_rule(&mut self, index: usize, cx: &mut Context<Self>) {
+        self.storage.remove_rule(index);
+        cx.emit(SettingsChanged);
+    }
+
+    /// Moves a placement rule earlier or later in evaluation order.
+    pub fn move_storage_rule(&mut self, index: usize, down: bool, cx: &mut Context<Self>) {
+        if down {
+            self.storage.move_rule_down(index);
+        }
+        else {
+            self.storage.move_rule_up(index);
+        }
+        cx.emit(SettingsChanged);
+    }
+
     /// Validates `path` for writability and saves it as the new storage root.
     ///
     /// Emits [`SettingsChanged`] on success. Returns the validation error on
@@ -917,6 +937,7 @@ impl SettingsController {
                            is_authenticated: self.is_authenticated,
                            storage_root_path: self.storage.root_path(),
                            storage_roots: self.storage.roots(),
+                           storage_rules: self.storage.rules().to_vec(),
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,

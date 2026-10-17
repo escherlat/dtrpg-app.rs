@@ -195,7 +195,7 @@ impl LibraryController {
                                                                     self.catalog
                     .iter()
                     .find(|i| &i.id == id && i.status == ItemStatus::Downloaded)
-                    .map(|i| (storage.path_for_publisher(&i.publisher), i.files.clone()))
+                    .map(|i| (resolved_item_dir(&storage, i), i.files.clone()))
                                                                 })
                                                                 .collect();
         for (entry_dir, files) in targets {

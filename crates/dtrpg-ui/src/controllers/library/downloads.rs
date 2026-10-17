@@ -360,7 +360,11 @@ pub(crate) fn create_collections_symlinks(dest: &Path, order_product_id: u64, pr
     else {
         return;
     };
-    let root = storage.root_path();
+    let root = dest.parent()
+                   .and_then(Path::parent)
+                   .and_then(Path::parent)
+                   .map(Path::to_path_buf)
+                   .unwrap_or_else(|| storage.root_path());
     for collection in collections {
         if !member_ids_contain(&collection.member_ids, order_product_id, product_id) {
             continue;

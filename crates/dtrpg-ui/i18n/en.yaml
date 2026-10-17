@@ -175,6 +175,7 @@ settings:
   storage_roots_title: "Storage roots"
   storage_add_root_tooltip: "Add storage root…"
   storage_remove_root_tooltip: "Remove storage root"
+  storage_rules_title: "Placement rules"
   max_concurrent_downloads_title: "Max concurrent downloads"
   max_concurrent_downloads_note: "Shared limit for thumbnail loading and file downloads."
   recently_updated_window_title: "Recently Updated window"

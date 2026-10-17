@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use dtrpg_core::data::enums::ItemStatus;
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+use dtrpg_core::data::storage::StorageConfig;
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::util::matching::{collection_member_id, member_ids_contain};
 use gpui::prelude::FluentBuilder as _;
@@ -40,6 +41,7 @@ use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
+use crate::util::file_presence::resolved_item_dir;
 use crate::util::reveal::reveal_in_file_manager;
 
 /// Renders the expanded detail tab's content: a large cover, title,
@@ -187,9 +189,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             .items_center()
                             .gap(px(8.0))
                             .child({
-                                let read_path =
-                                    dtrpg_core::data::storage::publisher_dir(&storage_root_path,
-                                                                        &item.publisher);
+                                let read_path = resolved_item_dir(&StorageConfig::load(), &item);
                                 Button::new("detail-tab-read")
                                     .primary()
                                     .icon(IconName::BookOpen)
@@ -657,7 +657,7 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
-    let entry_dir = dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
+    let entry_dir = resolved_item_dir(&StorageConfig::load(), item);
 
     let table = item_list_table(tabs, &entity, &entry_id, entry_dir, window, cx);
     let table_for_prepaint = table.clone();
@@ -1178,7 +1178,8 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 /// is in flight), shows a distinct pending glyph and tooltip rather than a
 /// downloaded/cloud state that may be stale.
 fn render_status_icon(is_downloaded: bool, is_offloaded: bool, is_verifying: bool,
-                      color: gpui::Hsla) -> impl IntoElement + 'static {
+                      color: gpui::Hsla)
+                      -> impl IntoElement + 'static {
     let (glyph, tooltip_text) = if is_verifying {
         ("\u{22ef}", t!("detail.tooltip_verifying_download").to_string())
     }
