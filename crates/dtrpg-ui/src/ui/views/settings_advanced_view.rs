@@ -37,14 +37,11 @@ fn format_static_duration(secs: u64) -> String {
 
     if secs >= DAY && secs.is_multiple_of(DAY) {
         pluralize((secs / DAY) as usize, "count.day", "count.days")
-    }
-    else if secs >= HOUR && secs.is_multiple_of(HOUR) {
+    } else if secs >= HOUR && secs.is_multiple_of(HOUR) {
         pluralize((secs / HOUR) as usize, "count.hour", "count.hours")
-    }
-    else if secs >= MINUTE && secs.is_multiple_of(MINUTE) {
+    } else if secs >= MINUTE && secs.is_multiple_of(MINUTE) {
         pluralize((secs / MINUTE) as usize, "count.minute", "count.minutes")
-    }
-    else {
+    } else {
         pluralize(secs as usize, "count.second", "count.seconds")
     }
 }
@@ -55,39 +52,52 @@ fn format_static_duration(secs: u64) -> String {
 /// ([`stat_row`]) or a tooltip-carrying element ([`timestamp_row`]). The
 /// label styling (font, weight, size, color) matches every other settings
 /// section's row labels — see `settings_appearance_view::row_label`.
-fn row_frame(label: impl Into<SharedString>, value_el: impl IntoElement,
-             description: impl Into<SharedString>, colors: &ColorTokens, label_font_family: &str)
-             -> impl IntoElement + 'static {
+fn row_frame(
+    label: impl Into<SharedString>, value_el: impl IntoElement,
+    description: impl Into<SharedString>, colors: &ColorTokens, label_font_family: &str,
+) -> impl IntoElement + 'static {
     let label = label.into();
     let description = description.into();
-    div().flex()
-         .flex_col()
-         .gap(px(2.0))
-         .child(div().flex()
-                     .justify_between()
-                     .items_baseline()
-                     .gap(px(12.0))
-                     .child(div().text_sm()
-                                 .font_family(label_font_family.to_string())
-                                 .text_color(colors.text_primary)
-                                 .child(small_caps_text(label)))
-                     .child(value_el))
-         .child(div().text_xs()
-                     .text_color(colors.text_tertiary)
-                     .child(description))
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(2.0))
+        .child(
+            div()
+                .flex()
+                .justify_between()
+                .items_baseline()
+                .gap(px(12.0))
+                .child(
+                    div()
+                        .text_sm()
+                        .font_family(label_font_family.to_string())
+                        .text_color(colors.text_primary)
+                        .child(small_caps_text(label)),
+                )
+                .child(value_el),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(colors.text_tertiary)
+                .child(description),
+        )
 }
 
 /// Renders one "Cache details" data point with a plain-text value: counts
 /// and the fixed timing/cooldown constants.
-fn stat_row(label: impl Into<SharedString>, value: impl Into<SharedString>,
-            description: impl Into<SharedString>, colors: &ColorTokens, label_font_family: &str,
-            value_font_family: &str)
-            -> impl IntoElement + 'static {
-    let value_el = div().text_sm()
-                        .text_right()
-                        .font_family(value_font_family.to_string())
-                        .text_color(colors.text_secondary)
-                        .child(value.into());
+fn stat_row(
+    label: impl Into<SharedString>, value: impl Into<SharedString>,
+    description: impl Into<SharedString>, colors: &ColorTokens, label_font_family: &str,
+    value_font_family: &str,
+) -> impl IntoElement + 'static {
+    let value_el = div()
+        .text_sm()
+        .text_right()
+        .font_family(value_font_family.to_string())
+        .text_color(colors.text_secondary)
+        .child(value.into());
     row_frame(label, value_el, description, colors, label_font_family)
 }
 
@@ -98,19 +108,20 @@ fn stat_row(label: impl Into<SharedString>, value: impl Into<SharedString>,
 /// `detail_panel_view::render_relative_date_value`) rather than showing
 /// both inline. `id` must be unique per row — it identifies the value
 /// element so it can carry a tooltip.
-fn timestamp_row(id: &'static str, label: impl Into<SharedString>, ts: i64,
-                 description: impl Into<SharedString>, colors: &ColorTokens,
-                 label_font_family: &str, value_font_family: &str)
-                 -> impl IntoElement + 'static {
+fn timestamp_row(
+    id: &'static str, label: impl Into<SharedString>, ts: i64,
+    description: impl Into<SharedString>, colors: &ColorTokens, label_font_family: &str,
+    value_font_family: &str,
+) -> impl IntoElement + 'static {
     let absolute = format_absolute(ts);
-    let value_el =
-        div().id(id)
-             .text_sm()
-             .text_right()
-             .font_family(value_font_family.to_string())
-             .text_color(colors.text_secondary)
-             .child(format_relative(ts))
-             .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx));
+    let value_el = div()
+        .id(id)
+        .text_sm()
+        .text_right()
+        .font_family(value_font_family.to_string())
+        .text_color(colors.text_secondary)
+        .child(format_relative(ts))
+        .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx));
     row_frame(label, value_el, description, colors, label_font_family)
 }
 
@@ -118,95 +129,121 @@ fn timestamp_row(id: &'static str, label: impl Into<SharedString>, ts: i64,
 /// cache-related timeout/cooldown constants, and — where a real timestamp
 /// exists — a companion row showing exactly when that data was last
 /// recorded, each with a label and description.
-fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens,
-                        label_font_family: &str, value_font_family: &str)
-                        -> impl IntoElement + 'static + use<> {
+fn render_cache_details(
+    cache_counts: CacheCounts, colors: &ColorTokens, label_font_family: &str,
+    value_font_family: &str,
+) -> impl IntoElement + 'static + use<> {
     let avatar_value = if cache_counts.avatar_cached {
         t!("settings.cache_avatar_value_cached").to_string()
-    }
-    else {
+    } else {
         t!("settings.cache_avatar_value_not_cached").to_string()
     };
 
-    div().flex()
-         .flex_col()
-         .gap(px(12.0))
-         .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .text_color(colors.text_primary)
-                     .child(t!("settings.cache_details_title")))
-         .child(stat_row(t!("settings.cache_metadata_label"),
-                         cache_counts.metadata_items.to_string(),
-                         t!("settings.cache_metadata_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .when_some(cache_counts.metadata_saved_at_secs, |this, ts| {
-             this.child(timestamp_row("cache-stat-metadata-saved",
-                                      t!("settings.cache_metadata_saved_label"),
-                                      ts,
-                                      t!("settings.cache_metadata_saved_description"),
-                                      colors,
-                                      label_font_family,
-                                      value_font_family))
-         })
-         .child(stat_row(t!("settings.cache_covers_label"),
-                         cache_counts.cover_thumbnails.to_string(),
-                         t!("settings.cache_covers_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .child(stat_row(t!("settings.cache_avatar_label"),
-                         avatar_value,
-                         t!("settings.cache_avatar_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .child(stat_row(t!("settings.cache_staleness_label"),
-                         format_static_duration(STALE_SECS),
-                         t!("settings.cache_staleness_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .child(stat_row(t!("settings.cache_reload_cooldown_label"),
-                         format_static_duration(FORCE_RELOAD_COOLDOWN_SECS),
-                         t!("settings.cache_reload_cooldown_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .child(stat_row(t!("settings.cache_item_check_cooldown_label"),
-                         format_static_duration(ITEM_CHECK_COOLDOWN_SECS),
-                         t!("settings.cache_item_check_cooldown_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .child(stat_row(t!("settings.cache_batch_cooldown_label"),
-                         format_static_duration(ITEM_CHECK_BATCH_COOLDOWN_SECS),
-                         t!("settings.cache_batch_cooldown_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .when_some(cache_counts.last_item_check_batch_secs, |this, ts| {
-             this.child(timestamp_row("cache-stat-last-batch-check",
-                                      t!("settings.cache_last_batch_check_label"),
-                                      ts,
-                                      t!("settings.cache_last_batch_check_description"),
-                                      colors,
-                                      label_font_family,
-                                      value_font_family))
-         })
-         .child(stat_row(t!("settings.cache_batch_timer_label"),
-                         format_static_duration(ITEM_CHECK_BATCH_TIMER_SECS),
-                         t!("settings.cache_batch_timer_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
-         .child(stat_row(t!("settings.cache_thumbnail_cooldown_label"),
-                         format_static_duration(THUMBNAIL_COOLDOWN_SECS),
-                         t!("settings.cache_thumbnail_cooldown_description"),
-                         colors,
-                         label_font_family,
-                         value_font_family))
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(12.0))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(colors.text_primary)
+                .child(t!("settings.cache_details_title")),
+        )
+        .child(stat_row(
+            t!("settings.cache_metadata_label"),
+            cache_counts.metadata_items.to_string(),
+            t!("settings.cache_metadata_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .when_some(cache_counts.metadata_saved_at_secs, |this, ts| {
+            this.child(timestamp_row(
+                "cache-stat-metadata-saved",
+                t!("settings.cache_metadata_saved_label"),
+                ts,
+                t!("settings.cache_metadata_saved_description"),
+                colors,
+                label_font_family,
+                value_font_family,
+            ))
+        })
+        .child(stat_row(
+            t!("settings.cache_covers_label"),
+            cache_counts.cover_thumbnails.to_string(),
+            t!("settings.cache_covers_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .child(stat_row(
+            t!("settings.cache_avatar_label"),
+            avatar_value,
+            t!("settings.cache_avatar_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .child(stat_row(
+            t!("settings.cache_staleness_label"),
+            format_static_duration(STALE_SECS),
+            t!("settings.cache_staleness_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .child(stat_row(
+            t!("settings.cache_reload_cooldown_label"),
+            format_static_duration(FORCE_RELOAD_COOLDOWN_SECS),
+            t!("settings.cache_reload_cooldown_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .child(stat_row(
+            t!("settings.cache_item_check_cooldown_label"),
+            format_static_duration(ITEM_CHECK_COOLDOWN_SECS),
+            t!("settings.cache_item_check_cooldown_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .child(stat_row(
+            t!("settings.cache_batch_cooldown_label"),
+            format_static_duration(ITEM_CHECK_BATCH_COOLDOWN_SECS),
+            t!("settings.cache_batch_cooldown_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .when_some(cache_counts.last_item_check_batch_secs, |this, ts| {
+            this.child(timestamp_row(
+                "cache-stat-last-batch-check",
+                t!("settings.cache_last_batch_check_label"),
+                ts,
+                t!("settings.cache_last_batch_check_description"),
+                colors,
+                label_font_family,
+                value_font_family,
+            ))
+        })
+        .child(stat_row(
+            t!("settings.cache_batch_timer_label"),
+            format_static_duration(ITEM_CHECK_BATCH_TIMER_SECS),
+            t!("settings.cache_batch_timer_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
+        .child(stat_row(
+            t!("settings.cache_thumbnail_cooldown_label"),
+            format_static_duration(THUMBNAIL_COOLDOWN_SECS),
+            t!("settings.cache_thumbnail_cooldown_description"),
+            colors,
+            label_font_family,
+            value_font_family,
+        ))
 }
 
 /// Renders the "Recently Updated window" row: a label/note pair and an
@@ -216,33 +253,40 @@ fn render_cache_details(cache_counts: CacheCounts, colors: &ColorTokens,
 /// Falls back to a plain, non-editable value when `input` is `None` (before
 /// the root view attaches the shared input state), matching the pattern used
 /// for `storage_path_input` in `settings_storage_view`.
-fn render_recently_updated_window_row(recently_updated_window_days: u32,
-                                      input: Option<Entity<InputState>>, colors: &ColorTokens)
-                                      -> impl IntoElement + 'static + use<> {
+fn render_recently_updated_window_row(
+    recently_updated_window_days: u32, input: Option<Entity<InputState>>, colors: &ColorTokens,
+) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
 
     let field: AnyElement = if let Some(input_state) = input {
         NumberInput::new(&input_state).into_any_element()
-    }
-    else {
-        div().text_sm()
-             .text_color(text_primary)
-             .child(recently_updated_window_days.to_string())
-             .into_any_element()
+    } else {
+        div()
+            .text_sm()
+            .text_color(text_primary)
+            .child(recently_updated_window_days.to_string())
+            .into_any_element()
     };
 
-    div().flex()
-         .flex_col()
-         .gap(px(6.0))
-         .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .text_color(text_primary)
-                     .child(t!("settings.recently_updated_window_title")))
-         .child(div().w(px(140.0)).child(field))
-         .child(div().text_xs()
-                     .text_color(text_secondary)
-                     .child(t!("settings.recently_updated_window_note")))
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(6.0))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(text_primary)
+                .child(t!("settings.recently_updated_window_title")),
+        )
+        .child(div().w(px(140.0)).child(field))
+        .child(
+            div()
+                .text_xs()
+                .text_color(text_secondary)
+                .child(t!("settings.recently_updated_window_note")),
+        )
 }
 
 /// Renders the Advanced settings section: the "Recently Updated window"
@@ -250,11 +294,11 @@ fn render_recently_updated_window_row(recently_updated_window_days: u32,
 /// cache folder" action, and a "Clear cache" action with a confirmation
 /// dialog.
 #[allow(clippy::too_many_arguments)]
-pub fn render_advanced_section(entity: Entity<SettingsController>, cache_counts: CacheCounts,
-                               colors: &ColorTokens, label_font_family: &str,
-                               value_font_family: &str, recently_updated_window_days: u32,
-                               recently_updated_window_input: Option<Entity<InputState>>)
-                               -> impl IntoElement + 'static + use<> {
+pub fn render_advanced_section(
+    entity: Entity<SettingsController>, cache_counts: CacheCounts, colors: &ColorTokens,
+    label_font_family: &str, value_font_family: &str, recently_updated_window_days: u32,
+    recently_updated_window_input: Option<Entity<InputState>>,
+) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;

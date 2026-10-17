@@ -66,11 +66,8 @@ pub fn compute_file_info(path: &Path, format: &str) -> FileInfo {
     match format.to_ascii_uppercase().as_str() {
         "PDF" => extract_pdf_page_count(path).map_or(FileInfo::None, FileInfo::PageCount),
         "ZIP" => extract_zip_file_count(path).map_or(FileInfo::None, FileInfo::ContainedFiles),
-        "JPG" | "JPEG" | "PNG" | "GIF" | "WEBP" | "BMP" => {
-            extract_image_dimensions(path).map_or(FileInfo::None, |(w, h)| {
-                                              FileInfo::Dimensions(w, h)
-                                          })
-        }
+        "JPG" | "JPEG" | "PNG" | "GIF" | "WEBP" | "BMP" => extract_image_dimensions(path)
+            .map_or(FileInfo::None, |(w, h)| FileInfo::Dimensions(w, h)),
         _ => FileInfo::None,
     }
 }

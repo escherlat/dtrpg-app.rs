@@ -36,84 +36,93 @@ struct ManageCollectionsState {
 /// the same id space `CollectionEntry::member_ids` uses; it drives the
 /// checked state and removal. `product_id` is the item's catalog
 /// `product_id`, sent as the network add call's product identifier.
-pub fn open_manage_collections_dialog(window: &mut Window, cx: &mut App,
-                                      controller: Entity<LibraryController>,
-                                      item_title: Arc<str>, member_id: u64, product_id: u64) {
+pub fn open_manage_collections_dialog(
+    window: &mut Window, cx: &mut App, controller: Entity<LibraryController>, item_title: Arc<str>,
+    member_id: u64, product_id: u64,
+) {
     let state = Rc::new(RefCell::new(ManageCollectionsState { error: None }));
-    let new_collection_input =
-        cx.new(|cx| {
-            InputState::new(window, cx).placeholder(t!("collections.name_placeholder").to_string())
-        });
+    let new_collection_input = cx.new(|cx| {
+        InputState::new(window, cx).placeholder(t!("collections.name_placeholder").to_string())
+    });
 
     subscribe_failure_events(window, cx, &controller, &state);
 
     window.open_dialog(cx, move |dialog, _window, _cx| {
-              let controller = controller.clone();
-              let state = state.clone();
-              let new_collection_input = new_collection_input.clone();
-              let item_title = item_title.clone();
-              dialog.w(px(360.))
-                    .overlay_closable(true)
-                    .content(move |content, window, cx| {
-                        render_content(content,
-                                       window,
-                                       cx,
-                                       &controller,
-                                       &state,
-                                       &new_collection_input,
-                                       &item_title,
-                                       member_id,
-                                       product_id)
-                    })
-          });
+        let controller = controller.clone();
+        let state = state.clone();
+        let new_collection_input = new_collection_input.clone();
+        let item_title = item_title.clone();
+        dialog
+            .w(px(360.))
+            .overlay_closable(true)
+            .content(move |content, window, cx| {
+                render_content(
+                    content,
+                    window,
+                    cx,
+                    &controller,
+                    &state,
+                    &new_collection_input,
+                    &item_title,
+                    member_id,
+                    product_id,
+                )
+            })
+    });
 }
 
 /// Subscribes to the add/remove/create failure events for the lifetime of the
 /// shared `state`. Uses a weak reference so a stale subscription (the dialog's
 /// own `Rc` clones are dropped once the dialog closes) becomes a harmless no-op
 /// rather than keeping the state alive forever.
-fn subscribe_failure_events(window: &mut Window, cx: &mut App,
-                            controller: &Entity<LibraryController>,
-                            state: &Rc<RefCell<ManageCollectionsState>>) {
+fn subscribe_failure_events(
+    window: &mut Window, cx: &mut App, controller: &Entity<LibraryController>,
+    state: &Rc<RefCell<ManageCollectionsState>>,
+) {
     let weak = Rc::downgrade(state);
-    window.subscribe(controller, cx, {
-              let weak = weak.clone();
-              move |_ctrl, event: &CollectionMemberAddFailed, window, _cx| {
-                  if let Some(state) = weak.upgrade() {
-                      state.borrow_mut().error = Some(event.message.clone());
-                      window.refresh();
-                  }
-              }
-          })
-          .detach();
-    window.subscribe(controller, cx, {
-              let weak = weak.clone();
-              move |_ctrl, event: &CollectionMemberRemoveFailed, window, _cx| {
-                  if let Some(state) = weak.upgrade() {
-                      state.borrow_mut().error = Some(event.message.clone());
-                      window.refresh();
-                  }
-              }
-          })
-          .detach();
-    window.subscribe(controller,
-                     cx,
-                     move |_ctrl, event: &CollectionCreateFailed, window, _cx| {
-                         if let Some(state) = weak.upgrade() {
-                             state.borrow_mut().error = Some(event.message.clone());
-                             window.refresh();
-                         }
-                     })
-          .detach();
+    window
+        .subscribe(controller, cx, {
+            let weak = weak.clone();
+            move |_ctrl, event: &CollectionMemberAddFailed, window, _cx| {
+                if let Some(state) = weak.upgrade() {
+                    state.borrow_mut().error = Some(event.message.clone());
+                    window.refresh();
+                }
+            }
+        })
+        .detach();
+    window
+        .subscribe(controller, cx, {
+            let weak = weak.clone();
+            move |_ctrl, event: &CollectionMemberRemoveFailed, window, _cx| {
+                if let Some(state) = weak.upgrade() {
+                    state.borrow_mut().error = Some(event.message.clone());
+                    window.refresh();
+                }
+            }
+        })
+        .detach();
+    window
+        .subscribe(
+            controller,
+            cx,
+            move |_ctrl, event: &CollectionCreateFailed, window, _cx| {
+                if let Some(state) = weak.upgrade() {
+                    state.borrow_mut().error = Some(event.message.clone());
+                    window.refresh();
+                }
+            },
+        )
+        .detach();
 }
 
 #[allow(clippy::too_many_arguments)]
-fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
-                  controller: &Entity<LibraryController>,
-                  state: &Rc<RefCell<ManageCollectionsState>>,
-                  new_collection_input: &Entity<InputState>, item_title: &Arc<str>,
-                  member_id: u64, product_id: u64)
-                  -> DialogContent {
+fn render_content(
+    content: DialogContent, _window: &mut Window, cx: &mut App,
+    controller: &Entity<LibraryController>, state: &Rc<RefCell<ManageCollectionsState>>,
+    new_collection_input: &Entity<InputState>, item_title: &Arc<str>, member_id: u64,
+    product_id: u64,
+) -> DialogContent {
     let colors = cx.global::<LibriTheme>().colors.clone();
     let collections = controller.read(cx).collections.clone();
     let error = state.borrow().error.clone();
@@ -146,9 +155,12 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
         );
     }
     if collections.is_empty() {
-        rows = rows.child(div().text_sm()
-                               .text_color(colors.text_secondary)
-                               .child(t!("collections.manage_empty")));
+        rows = rows.child(
+            div()
+                .text_sm()
+                .text_color(colors.text_secondary)
+                .child(t!("collections.manage_empty")),
+        );
     }
 
     let new_collection_row = {
@@ -177,21 +189,26 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
             )
     };
 
-    content.child(
-                  DialogHeader::new().px_4()
-                                     .pt_4()
-                                     .child(DialogTitle::new().child(t!(
-        "collections.manage_dialog_title",
-        title = item_title.to_string()
-    ))),
-    )
-           .child(div().px_4().py_2().child(rows))
-           .when_some(error, |c, msg| {
-               c.child(div().px_4()
-                            .pb_2()
-                            .text_sm()
-                            .text_color(colors.error)
-                            .child(msg))
-           })
-           .child(div().px_4().pb_4().child(new_collection_row))
+    content
+        .child(
+            DialogHeader::new()
+                .px_4()
+                .pt_4()
+                .child(DialogTitle::new().child(t!(
+                    "collections.manage_dialog_title",
+                    title = item_title.to_string()
+                ))),
+        )
+        .child(div().px_4().py_2().child(rows))
+        .when_some(error, |c, msg| {
+            c.child(
+                div()
+                    .px_4()
+                    .pb_2()
+                    .text_sm()
+                    .text_color(colors.error)
+                    .child(msg),
+            )
+        })
+        .child(div().px_4().pb_4().child(new_collection_row))
 }

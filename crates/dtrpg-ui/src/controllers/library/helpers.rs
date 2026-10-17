@@ -6,8 +6,9 @@ use super::*;
 ///
 /// Used by per-entry ephemeral UI toggles (e.g. the "Other details"
 /// disclosure) that default to a collapsed/off state until first toggled.
-pub(crate) fn toggle_bool_flag<K: std::hash::Hash + Eq>(map: &mut HashMap<K, bool>, key: K)
-                                                        -> bool {
+pub(crate) fn toggle_bool_flag<K: std::hash::Hash + Eq>(
+    map: &mut HashMap<K, bool>, key: K,
+) -> bool {
     let flag = map.entry(key).or_insert(false);
     *flag = !*flag;
     *flag
@@ -21,11 +22,10 @@ pub(crate) fn toggle_bool_flag<K: std::hash::Hash + Eq>(map: &mut HashMap<K, boo
 /// Extracted as a pure function (independent of `LibraryController`'s
 /// service/entity fields) so the caching behavior can be unit tested
 /// directly.
-pub(crate) fn cached_file_info(cache: &mut HashMap<(Arc<str>, usize),
-                                            crate::util::file_info::FileInfo>,
-                               entry_id: &Arc<str>, row_ix: usize, downloaded: bool,
-                               path: &Path, format: &str)
-                               -> crate::util::file_info::FileInfo {
+pub(crate) fn cached_file_info(
+    cache: &mut HashMap<(Arc<str>, usize), crate::util::file_info::FileInfo>, entry_id: &Arc<str>,
+    row_ix: usize, downloaded: bool, path: &Path, format: &str,
+) -> crate::util::file_info::FileInfo {
     use crate::util::file_info::{FileInfo, compute_file_info};
 
     let key = (Arc::clone(entry_id), row_ix);
@@ -47,12 +47,12 @@ pub(crate) fn cached_file_info(cache: &mut HashMap<(Arc<str>, usize),
 /// row deselects it, and clicking any other row switches the selection to
 /// it — regardless of whether rows share a duplicate id (see
 /// `LibraryItem::dedupe_files`).
-pub(crate) fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K, usize>, key: K,
-                                                            row_ix: usize) {
+pub(crate) fn toggle_row_selection<K: std::hash::Hash + Eq>(
+    map: &mut HashMap<K, usize>, key: K, row_ix: usize,
+) {
     if map.get(&key) == Some(&row_ix) {
         map.remove(&key);
-    }
-    else {
+    } else {
         map.insert(key, row_ix);
     }
 }
@@ -76,12 +76,13 @@ pub(crate) fn toggle_row_selection<K: std::hash::Hash + Eq>(map: &mut HashMap<K,
 /// Existing catalog ordering is preserved for known items since
 /// `added_order`/list position is otherwise meaningful; only genuinely new
 /// items are appended.
-pub(crate) fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryItem>)
-                                -> Vec<LibraryItem> {
-    let mut live_by_id: HashMap<Arc<str>, LibraryItem> =
-        live.into_iter()
-            .map(|item| (Arc::clone(&item.id), item))
-            .collect();
+pub(crate) fn reconcile_catalog(
+    existing: Vec<LibraryItem>, live: Vec<LibraryItem>,
+) -> Vec<LibraryItem> {
+    let mut live_by_id: HashMap<Arc<str>, LibraryItem> = live
+        .into_iter()
+        .map(|item| (Arc::clone(&item.id), item))
+        .collect();
 
     // The API mints a new `orderProductId` (and thus a new `id`) when a
     // title's files are republished, so `id` alone isn't stable across a
@@ -94,45 +95,43 @@ pub(crate) fn reconcile_catalog(existing: Vec<LibraryItem>, live: Vec<LibraryIte
     let mut live_id_by_product_id: HashMap<u64, Arc<str>> = HashMap::new();
     for item in live_by_id.values() {
         if item.product_id != 0 {
-            live_id_by_product_id.entry(item.product_id)
-                                 .or_insert_with(|| Arc::clone(&item.id));
+            live_id_by_product_id
+                .entry(item.product_id)
+                .or_insert_with(|| Arc::clone(&item.id));
         }
     }
 
-    let mut reconciled: Vec<LibraryItem> =
-        existing.into_iter()
-                .map(|mut item| {
-                    let matched_id = if live_by_id.contains_key(&item.id) {
-                        Some(Arc::clone(&item.id))
-                    }
-                    else if item.product_id != 0 {
-                        live_id_by_product_id.get(&item.product_id).cloned()
-                    }
-                    else {
-                        None
-                    };
+    let mut reconciled: Vec<LibraryItem> = existing
+        .into_iter()
+        .map(|mut item| {
+            let matched_id = if live_by_id.contains_key(&item.id) {
+                Some(Arc::clone(&item.id))
+            } else if item.product_id != 0 {
+                live_id_by_product_id.get(&item.product_id).cloned()
+            } else {
+                None
+            };
 
-                    if let Some(mut live_item) = matched_id.and_then(|id| live_by_id.remove(&id)) {
-                        let downloaded_by_id: HashMap<Arc<str>, bool> =
-                            item.files
-                                .iter()
-                                .map(|f| (Arc::clone(&f.id), f.downloaded))
-                                .collect();
-                        for file in &mut live_item.files {
-                            if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
-                                file.downloaded = downloaded;
-                            }
-                        }
-                        item = live_item;
-                        item.is_available = true;
-                        item.recompute_status();
+            if let Some(mut live_item) = matched_id.and_then(|id| live_by_id.remove(&id)) {
+                let downloaded_by_id: HashMap<Arc<str>, bool> = item
+                    .files
+                    .iter()
+                    .map(|f| (Arc::clone(&f.id), f.downloaded))
+                    .collect();
+                for file in &mut live_item.files {
+                    if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
+                        file.downloaded = downloaded;
                     }
-                    else {
-                        item.is_available = false;
-                    }
-                    item
-                })
-                .collect();
+                }
+                item = live_item;
+                item.is_available = true;
+                item.recompute_status();
+            } else {
+                item.is_available = false;
+            }
+            item
+        })
+        .collect();
 
     reconciled.extend(live_by_id.into_values());
     reconciled
@@ -181,11 +180,12 @@ pub(crate) fn dedupe_by_product_id(items: Vec<LibraryItem>) -> Vec<LibraryItem> 
 /// never re-enqueued, so a bundle with some items already present only
 /// queues the missing ones.
 pub(crate) fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
-    files.iter()
-         .enumerate()
-         .filter(|(_, f)| !f.downloaded)
-         .map(|(idx, _)| idx as u32)
-         .collect()
+    files
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| !f.downloaded)
+        .map(|(idx, _)| idx as u32)
+        .collect()
 }
 
 /// Sums `size_mb` across every not-yet-downloaded file in `files`.
@@ -194,10 +194,11 @@ pub(crate) fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
 /// queuing action would enqueue, for comparison against
 /// [`dtrpg_core::data::storage::available_space_mb`].
 pub(crate) fn missing_files_size_mb(files: &[LibraryItemFile]) -> f64 {
-    files.iter()
-         .filter(|f| !f.downloaded)
-         .map(|f| f.size_mb)
-         .sum()
+    files
+        .iter()
+        .filter(|f| !f.downloaded)
+        .map(|f| f.size_mb)
+        .sum()
 }
 
 /// Sums [`missing_files_size_mb`] across every item in `catalog` whose id is
@@ -206,14 +207,15 @@ pub(crate) fn missing_files_size_mb(files: &[LibraryItemFile]) -> f64 {
 /// Used by the collection/publisher `request_download_all_for_*` wrappers to
 /// compute one aggregate size across every matching item's missing files,
 /// rather than checking each item individually.
-pub(crate) fn missing_files_size_mb_for_items<'a>(catalog: &[LibraryItem],
-                                                  ids: impl Iterator<Item = &'a str>)
-                                                  -> f64 {
+pub(crate) fn missing_files_size_mb_for_items<'a>(
+    catalog: &[LibraryItem], ids: impl Iterator<Item = &'a str>,
+) -> f64 {
     let ids: HashSet<&str> = ids.collect();
-    catalog.iter()
-           .filter(|item| ids.contains(item.id.as_ref()))
-           .map(|item| missing_files_size_mb(&item.files))
-           .sum()
+    catalog
+        .iter()
+        .filter(|item| ids.contains(item.id.as_ref()))
+        .map(|item| missing_files_size_mb(&item.files))
+        .sum()
 }
 
 /// Returns `(id, title)` for every `catalog` item that is a member of
@@ -225,12 +227,14 @@ pub(crate) fn missing_files_size_mb_for_items<'a>(catalog: &[LibraryItem],
 /// already-downloaded items are filtered out downstream by
 /// [`enqueue_download`](LibraryController::enqueue_download) via
 /// [`missing_file_indices`], not here.
-pub(crate) fn collection_download_targets(catalog: &[LibraryItem], member_ids: &[u64])
-                                          -> Vec<(Arc<str>, Arc<str>)> {
-    catalog.iter()
-           .filter(|item| member_ids_contain(member_ids, item.order_product_id, item.product_id))
-           .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
-           .collect()
+pub(crate) fn collection_download_targets(
+    catalog: &[LibraryItem], member_ids: &[u64],
+) -> Vec<(Arc<str>, Arc<str>)> {
+    catalog
+        .iter()
+        .filter(|item| member_ids_contain(member_ids, item.order_product_id, item.product_id))
+        .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
+        .collect()
 }
 
 /// Returns `(id, title)` for every `catalog` item whose publisher exactly
@@ -242,12 +246,14 @@ pub(crate) fn collection_download_targets(catalog: &[LibraryItem], member_ids: &
 /// already-downloaded items are filtered out downstream by
 /// [`enqueue_download`](LibraryController::enqueue_download) via
 /// [`missing_file_indices`], not here.
-pub(crate) fn publisher_download_targets(catalog: &[LibraryItem], publisher: &str)
-                                         -> Vec<(Arc<str>, Arc<str>)> {
-    catalog.iter()
-           .filter(|item| item.publisher.as_ref() == publisher)
-           .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
-           .collect()
+pub(crate) fn publisher_download_targets(
+    catalog: &[LibraryItem], publisher: &str,
+) -> Vec<(Arc<str>, Arc<str>)> {
+    catalog
+        .iter()
+        .filter(|item| item.publisher.as_ref() == publisher)
+        .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
+        .collect()
 }
 
 /// Returns `(id, title)` for every `catalog` item matching `filter`, in
@@ -261,16 +267,15 @@ pub(crate) fn publisher_download_targets(catalog: &[LibraryItem], publisher: &st
 /// already-downloaded items are filtered out downstream by
 /// [`enqueue_download`](LibraryController::enqueue_download) via
 /// [`missing_file_indices`], not here.
-pub(crate) fn filter_download_targets(catalog: &[LibraryItem], filter: &SidebarFilter,
-                                      collection_members: &HashSet<u64>, now_secs: i64,
-                                      window_days: u32)
-                                      -> Vec<(Arc<str>, Arc<str>)> {
-    catalog.iter()
-           .filter(|item| {
-               item_matches_filter(item, filter, collection_members, now_secs, window_days)
-           })
-           .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
-           .collect()
+pub(crate) fn filter_download_targets(
+    catalog: &[LibraryItem], filter: &SidebarFilter, collection_members: &HashSet<u64>,
+    now_secs: i64, window_days: u32,
+) -> Vec<(Arc<str>, Arc<str>)> {
+    catalog
+        .iter()
+        .filter(|item| item_matches_filter(item, filter, collection_members, now_secs, window_days))
+        .map(|item| (Arc::clone(&item.id), Arc::clone(&item.title)))
+        .collect()
 }
 
 /// Removes the queued download for `(id, index)` from `queue`, if present.
@@ -278,8 +283,9 @@ pub(crate) fn filter_download_targets(catalog: &[LibraryItem], filter: &SidebarF
 /// Returns `true` if an entry was removed. Only the matching `(id, index)`
 /// pair is removed — other queued files for the same entry (different
 /// index) or for other entries are left untouched.
-pub(crate) fn dequeue_file(queue: &mut VecDeque<(Arc<str>, u32, String)>, id: &str, index: u32)
-                           -> bool {
+pub(crate) fn dequeue_file(
+    queue: &mut VecDeque<(Arc<str>, u32, String)>, id: &str, index: u32,
+) -> bool {
     let before = queue.len();
     queue.retain(|(qid, qidx, _)| !(qid.as_ref() == id && *qidx == index));
     queue.len() != before
@@ -294,12 +300,11 @@ pub(crate) fn dequeue_file(queue: &mut VecDeque<(Arc<str>, u32, String)>, id: &s
 /// clears the on-disk cache) — treated as "not recently reloaded," so a
 /// missing timestamp never blocks a reload.
 pub(crate) fn reload_cooldown_active(meta: Option<&CacheMetadata>, now_secs: u64) -> bool {
-    let Some(meta) = meta
-    else {
+    let Some(meta) = meta else {
         return false;
     };
     now_secs.saturating_sub(meta.saved_at_secs)
-    < dtrpg_core::data::constants::FORCE_RELOAD_COOLDOWN_SECS
+        < dtrpg_core::data::constants::FORCE_RELOAD_COOLDOWN_SECS
 }
 
 /// Returns `true` if a fresh-install catalog-initialization request should be
@@ -310,8 +315,7 @@ pub(crate) fn reload_cooldown_active(meta: Option<&CacheMetadata>, now_secs: u64
 /// recorded (first launch, or metadata missing/unreadable) — treated as "not
 /// recently requested," so a missing timestamp never blocks the request.
 pub(crate) fn fresh_install_request_gated(last_request_secs: Option<u64>, now_secs: u64) -> bool {
-    let Some(last) = last_request_secs
-    else {
+    let Some(last) = last_request_secs else {
         return false;
     };
     now_secs.saturating_sub(last) < CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS
@@ -325,7 +329,7 @@ pub(crate) fn item_check_due(last_checked: Option<std::time::SystemTime>) -> boo
         None => true,
         Some(last) => {
             last.elapsed().map(|e| e.as_secs()).unwrap_or(0)
-            >= dtrpg_core::data::constants::ITEM_CHECK_COOLDOWN_SECS
+                >= dtrpg_core::data::constants::ITEM_CHECK_COOLDOWN_SECS
         }
     }
 }
@@ -339,9 +343,10 @@ pub(crate) fn item_check_due(last_checked: Option<std::time::SystemTime>) -> boo
 ///   = false`, and records `checked_at`.
 /// - Any other `Err` (network, session, or otherwise): leaves `item` and its
 ///   flag entirely unchanged — a transient failure is not evidence of removal.
-pub(crate) fn apply_check_result(item: &mut LibraryItem,
-                                 result: Result<LibraryItem, LibraryServiceError>,
-                                 checked_at: std::time::SystemTime) {
+pub(crate) fn apply_check_result(
+    item: &mut LibraryItem, result: Result<LibraryItem, LibraryServiceError>,
+    checked_at: std::time::SystemTime,
+) {
     match result {
         Ok(fresh) => {
             // Preserve identity/collection-membership fields from the existing
@@ -364,11 +369,11 @@ pub(crate) fn apply_check_result(item: &mut LibraryItem,
             // verification racing it, see
             // `verify-downloaded-status-against-disk`) doesn't get its
             // correction wiped the moment this slower network check resolves.
-            let downloaded_by_id: HashMap<Arc<str>, bool> =
-                item.files
-                    .iter()
-                    .map(|f| (Arc::clone(&f.id), f.downloaded))
-                    .collect();
+            let downloaded_by_id: HashMap<Arc<str>, bool> = item
+                .files
+                .iter()
+                .map(|f| (Arc::clone(&f.id), f.downloaded))
+                .collect();
             *item = fresh;
             item.id = id;
             item.numeric_id = numeric_id;
@@ -393,9 +398,9 @@ pub(crate) fn apply_check_result(item: &mut LibraryItem,
 
 /// Returns `true` if `id` should be pushed onto the check queue: not already
 /// queued and not already in flight.
-pub(crate) fn should_enqueue_check(check_queue: &VecDeque<Arc<str>>,
-                                   checking_items: &HashSet<Arc<str>>, id: &Arc<str>)
-                                   -> bool {
+pub(crate) fn should_enqueue_check(
+    check_queue: &VecDeque<Arc<str>>, checking_items: &HashSet<Arc<str>>, id: &Arc<str>,
+) -> bool {
     !checking_items.contains(id) && !check_queue.contains(id)
 }
 
@@ -405,9 +410,9 @@ pub(crate) fn should_enqueue_check(check_queue: &VecDeque<Arc<str>>,
 ///
 /// Thumbnail and download slots share one aggregate limit, so this always
 /// checks their sum rather than either count individually.
-pub(crate) fn remaining_slots(max_concurrent_downloads: usize, active_thumbnail_fetches: usize,
-                              active_downloads: usize)
-                              -> usize {
+pub(crate) fn remaining_slots(
+    max_concurrent_downloads: usize, active_thumbnail_fetches: usize, active_downloads: usize,
+) -> usize {
     max_concurrent_downloads.saturating_sub(active_thumbnail_fetches + active_downloads)
 }
 
@@ -416,8 +421,7 @@ pub(crate) fn remaining_slots(max_concurrent_downloads: usize, active_thumbnail_
 /// `ITEM_CHECK_BATCH_COOLDOWN_SECS`. `None` (no prior batch recorded) never
 /// blocks a request.
 pub(crate) fn check_batch_cooldown_active(last_batch_secs: Option<u64>, now_secs: u64) -> bool {
-    let Some(last) = last_batch_secs
-    else {
+    let Some(last) = last_batch_secs else {
         return false;
     };
     now_secs.saturating_sub(last) < dtrpg_core::data::constants::ITEM_CHECK_BATCH_COOLDOWN_SECS
@@ -428,15 +432,16 @@ pub(crate) fn check_batch_cooldown_active(last_batch_secs: Option<u64>, now_secs
 /// (`None`) sort first as maximally overdue, per `Option`'s `Ord`
 /// implementation (`None < Some(_)`).
 pub(crate) fn select_check_batch(catalog: &[LibraryItem], limit: usize) -> Vec<Arc<str>> {
-    let mut candidates: Vec<&LibraryItem> =
-        catalog.iter()
-               .filter(|item| item_check_due(item.availability_last_checked))
-               .collect();
+    let mut candidates: Vec<&LibraryItem> = catalog
+        .iter()
+        .filter(|item| item_check_due(item.availability_last_checked))
+        .collect();
     candidates.sort_by_key(|item| item.availability_last_checked);
-    candidates.into_iter()
-              .take(limit)
-              .map(|item| Arc::clone(&item.id))
-              .collect()
+    candidates
+        .into_iter()
+        .take(limit)
+        .map(|item| Arc::clone(&item.id))
+        .collect()
 }
 
 /// Merges a partial date-filtered fetch's `partial` results into `existing`
@@ -445,22 +450,20 @@ pub(crate) fn select_check_batch(catalog: &[LibraryItem], limit: usize) -> Vec<A
 /// refreshed and `is_available` set to `true` (if already present); items
 /// absent from `partial` are left completely untouched — a partial response
 /// is never a complete listing, so absence from it means nothing.
-pub(crate) fn merge_partial_fetch(mut existing: Vec<LibraryItem>, partial: Vec<LibraryItem>)
-                                  -> Vec<LibraryItem> {
+pub(crate) fn merge_partial_fetch(
+    mut existing: Vec<LibraryItem>, partial: Vec<LibraryItem>,
+) -> Vec<LibraryItem> {
     for mut item in partial {
         item.is_available = true;
         // Same `product_id` fallback as `reconcile_catalog`: a republished
         // title's `id` can change between fetches, so matching on `id` alone
         // would append a duplicate instead of refreshing the existing entry.
-        let existing_match =
-            existing.iter_mut()
-                    .find(|e| {
-                        e.id == item.id || (item.product_id != 0 && e.product_id == item.product_id)
-                    });
+        let existing_match = existing
+            .iter_mut()
+            .find(|e| e.id == item.id || (item.product_id != 0 && e.product_id == item.product_id));
         if let Some(existing_item) = existing_match {
             *existing_item = item;
-        }
-        else {
+        } else {
             existing.push(item);
         }
     }
@@ -472,9 +475,10 @@ pub(crate) fn merge_partial_fetch(mut existing: Vec<LibraryItem>, partial: Vec<L
 /// formatted as RFC 3339. Returns `None` if the catalog is empty or every
 /// item has neither timestamp populated.
 pub(crate) fn partial_fetch_since(catalog: &[LibraryItem]) -> Option<String> {
-    let max_epoch = catalog.iter()
-                           .filter_map(|item| item.date_updated.or(item.date_added))
-                           .max()?;
+    let max_epoch = catalog
+        .iter()
+        .filter_map(|item| item.date_updated.or(item.date_added))
+        .max()?;
     dtrpg_core::util::datetime::epoch_to_rfc3339(max_epoch)
 }
 
@@ -493,13 +497,13 @@ pub(crate) fn should_attempt_partial_fetch(remote_count: usize, cached_count: us
 /// Builds the map of every catalog entry that is not idle, from the ids being
 /// verified against disk and the ids with a file queued or downloading. An id
 /// in both is downloading (see [`ItemActivity::of`]).
-pub(crate) fn item_activity_map<'a>(verifying: &HashSet<Arc<str>>,
-                                    downloading: impl Iterator<Item = &'a Arc<str>>)
-                                    -> HashMap<Arc<str>, ItemActivity> {
-    let mut activity: HashMap<Arc<str>, ItemActivity> =
-        verifying.iter()
-                 .map(|id| (Arc::clone(id), ItemActivity::Verifying))
-                 .collect();
+pub(crate) fn item_activity_map<'a>(
+    verifying: &HashSet<Arc<str>>, downloading: impl Iterator<Item = &'a Arc<str>>,
+) -> HashMap<Arc<str>, ItemActivity> {
+    let mut activity: HashMap<Arc<str>, ItemActivity> = verifying
+        .iter()
+        .map(|id| (Arc::clone(id), ItemActivity::Verifying))
+        .collect();
     for id in downloading {
         activity.insert(Arc::clone(id), ItemActivity::Downloading);
     }

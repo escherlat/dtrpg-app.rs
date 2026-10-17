@@ -32,21 +32,23 @@ pub enum LibraryPaneState {
 /// UI-facing library view model that mediates between the service and the
 /// controller.
 pub struct LibraryViewModel {
-    service:    Arc<dyn LibraryService>,
-    items:      Vec<LibraryItem>,
-    selected:   Option<LibraryItem>,
-    pane:       LibraryPaneState,
+    service: Arc<dyn LibraryService>,
+    items: Vec<LibraryItem>,
+    selected: Option<LibraryItem>,
+    pane: LibraryPaneState,
     last_error: Option<LibraryServiceError>,
 }
 
 impl LibraryViewModel {
     /// Creates a new view model from a backend-agnostic service implementation.
     pub fn new(service: Box<dyn LibraryService>) -> Self {
-        Self { service:    Arc::from(service),
-               items:      Vec::new(),
-               selected:   None,
-               pane:       LibraryPaneState::Loading,
-               last_error: None, }
+        Self {
+            service: Arc::from(service),
+            items: Vec::new(),
+            selected: None,
+            pane: LibraryPaneState::Loading,
+            last_error: None,
+        }
     }
 
     /// Returns a cloneable reference to the service for use in background
@@ -198,8 +200,10 @@ mod tests {
         assert_eq!(vm.pane_state(), &LibraryPaneState::Error);
         assert!(vm.items().is_empty());
         assert!(vm.last_error().is_some());
-        assert_eq!(vm.last_error().map(|e| e.kind),
-                   Some(LibraryServiceErrorKind::Network));
+        assert_eq!(
+            vm.last_error().map(|e| e.kind),
+            Some(LibraryServiceErrorKind::Network)
+        );
     }
 
     #[test]

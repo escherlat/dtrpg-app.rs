@@ -69,23 +69,21 @@ impl LibraryController {
 
     /// Adds every visible item whose `field` contains `pattern`
     /// (case-insensitive) to the bulk selection. No-op for an empty pattern.
-    pub fn bulk_select_by_pattern(&mut self, pattern: &str, field: SelectionField,
-                                  cx: &mut Context<Self>) {
+    pub fn bulk_select_by_pattern(
+        &mut self, pattern: &str, field: SelectionField, cx: &mut Context<Self>,
+    ) {
         if pattern.is_empty() {
             return;
         }
         let needle = pattern.to_lowercase();
-        let matches =
-            self.visible_items().into_iter().filter_map(|item| {
-                                                let haystack = match field {
-                                                    SelectionField::Title => &item.title,
-                                                    SelectionField::Publisher => &item.publisher,
-                                                    SelectionField::System => &item.line,
-                                                };
-                                                haystack.to_lowercase()
-                                                        .contains(&needle)
-                                                        .then_some(item.id)
-                                            });
+        let matches = self.visible_items().into_iter().filter_map(|item| {
+            let haystack = match field {
+                SelectionField::Title => &item.title,
+                SelectionField::Publisher => &item.publisher,
+                SelectionField::System => &item.line,
+            };
+            haystack.to_lowercase().contains(&needle).then_some(item.id)
+        });
         self.bulk_selected_ids.extend(matches);
         cx.emit(LibraryChanged);
     }
@@ -103,16 +101,16 @@ impl LibraryController {
     /// Queues a download for every not-yet-downloaded file across the
     /// selection, then clears the selection and exits selection mode.
     pub fn bulk_download(&mut self, cx: &mut Context<Self>) {
-        let targets: Vec<(Arc<str>, String)> =
-            self.bulk_selected_ids
-                .iter()
-                .filter_map(|id| {
-                    self.catalog
-                        .iter()
-                        .find(|i| &i.id == id && i.status != ItemStatus::Downloaded)
-                        .map(|i| (Arc::clone(&i.id), i.title.to_string()))
-                })
-                .collect();
+        let targets: Vec<(Arc<str>, String)> = self
+            .bulk_selected_ids
+            .iter()
+            .filter_map(|id| {
+                self.catalog
+                    .iter()
+                    .find(|i| &i.id == id && i.status != ItemStatus::Downloaded)
+                    .map(|i| (Arc::clone(&i.id), i.title.to_string()))
+            })
+            .collect();
         for (id, title) in targets {
             self.enqueue_download(&id, title, cx);
         }
@@ -132,15 +130,16 @@ impl LibraryController {
     /// Enqueues a thumbnail fetch for every selected item that has a cover
     /// URL, then clears the selection and exits selection mode.
     pub fn bulk_fetch_thumbnail(&mut self, cx: &mut Context<Self>) {
-        let cover_urls: Vec<Arc<str>> = self.bulk_selected_ids
-                                            .iter()
-                                            .filter_map(|id| {
-                                                self.catalog
-                                                    .iter()
-                                                    .find(|i| &i.id == id)
-                                                    .and_then(|i| i.cover_url.clone())
-                                            })
-                                            .collect();
+        let cover_urls: Vec<Arc<str>> = self
+            .bulk_selected_ids
+            .iter()
+            .filter_map(|id| {
+                self.catalog
+                    .iter()
+                    .find(|i| &i.id == id)
+                    .and_then(|i| i.cover_url.clone())
+            })
+            .collect();
         for url in cover_urls {
             self.load_thumbnail(url, cx);
         }
@@ -150,15 +149,16 @@ impl LibraryController {
     /// Adds every selected item to `collection_id`, then clears the
     /// selection and exits selection mode.
     pub fn bulk_add_to_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
-        let targets: Vec<(u64, u64)> = self.bulk_selected_ids
-                                           .iter()
-                                           .filter_map(|id| {
-                                               self.catalog
-                                                   .iter()
-                                                   .find(|i| &i.id == id)
-                                                   .map(|i| (collection_member_id(i), i.product_id))
-                                           })
-                                           .collect();
+        let targets: Vec<(u64, u64)> = self
+            .bulk_selected_ids
+            .iter()
+            .filter_map(|id| {
+                self.catalog
+                    .iter()
+                    .find(|i| &i.id == id)
+                    .map(|i| (collection_member_id(i), i.product_id))
+            })
+            .collect();
         for (member_id, product_id) in targets {
             self.add_item_to_collection(collection_id, member_id, product_id, cx);
         }
@@ -168,15 +168,16 @@ impl LibraryController {
     /// Removes every selected item from `collection_id` that belongs to it,
     /// then clears the selection and exits selection mode.
     pub fn bulk_remove_from_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
-        let targets: Vec<(u64, u64)> = self.bulk_selected_ids
-                                           .iter()
-                                           .filter_map(|id| {
-                                               self.catalog
-                                                   .iter()
-                                                   .find(|i| &i.id == id)
-                                                   .map(|i| (collection_member_id(i), i.product_id))
-                                           })
-                                           .collect();
+        let targets: Vec<(u64, u64)> = self
+            .bulk_selected_ids
+            .iter()
+            .filter_map(|id| {
+                self.catalog
+                    .iter()
+                    .find(|i| &i.id == id)
+                    .map(|i| (collection_member_id(i), i.product_id))
+            })
+            .collect();
         for (member_id, product_id) in targets {
             self.remove_item_from_collection(collection_id, member_id, product_id, cx);
         }
@@ -189,15 +190,16 @@ impl LibraryController {
     /// exits selection mode.
     pub fn bulk_open(&mut self, cx: &mut Context<Self>) {
         let storage = StorageConfig::load();
-        let targets: Vec<(PathBuf, Vec<LibraryItemFile>)> = self.bulk_selected_ids
-                                                                .iter()
-                                                                .filter_map(|id| {
-                                                                    self.catalog
+        let targets: Vec<(PathBuf, Vec<LibraryItemFile>)> = self
+            .bulk_selected_ids
+            .iter()
+            .filter_map(|id| {
+                self.catalog
                     .iter()
                     .find(|i| &i.id == id && i.status == ItemStatus::Downloaded)
                     .map(|i| (storage.path_for_publisher(&i.publisher), i.files.clone()))
-                                                                })
-                                                                .collect();
+            })
+            .collect();
         for (entry_dir, files) in targets {
             if let Err(e) = ItemOpener::open_item(&entry_dir, &files) {
                 tracing::warn!("bulk_open: skipping item: {e:?}");

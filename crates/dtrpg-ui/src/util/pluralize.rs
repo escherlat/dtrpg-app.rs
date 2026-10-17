@@ -50,10 +50,14 @@ mod tests {
 
     #[test]
     fn irregular_plural_key_pair() {
-        assert_eq!(pluralize(1, "count.publisher_item", "count.publisher_items"),
-                   "1 publisher item");
-        assert_eq!(pluralize(3, "count.publisher_item", "count.publisher_items"),
-                   "3 publisher items");
+        assert_eq!(
+            pluralize(1, "count.publisher_item", "count.publisher_items"),
+            "1 publisher item"
+        );
+        assert_eq!(
+            pluralize(3, "count.publisher_item", "count.publisher_items"),
+            "3 publisher items"
+        );
     }
 
     #[test]
@@ -61,7 +65,9 @@ mod tests {
         // No locale entry exists for these keys; `t!()` falls back to returning
         // the key itself when no translation and no literal fallback text
         // apply.
-        assert_eq!(pluralize(1, "count.nonexistent", "count.nonexistent_plural"),
-                   "1 count.nonexistent");
+        assert_eq!(
+            pluralize(1, "count.nonexistent", "count.nonexistent_plural"),
+            "1 count.nonexistent"
+        );
     }
 }

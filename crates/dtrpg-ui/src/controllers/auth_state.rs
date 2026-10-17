@@ -9,8 +9,8 @@ use crate::data::events::AuthStateChanged;
 
 /// Owns the application's authentication state and the derived notice list.
 pub struct AuthStateController {
-    state:           AuthState,
-    notices:         Vec<Notice>,
+    state: AuthState,
+    notices: Vec<Notice>,
     is_auth_pending: bool,
 }
 
@@ -23,9 +23,11 @@ impl AuthStateController {
     /// without real credentials.
     pub fn new(initial_state: AuthState) -> Self {
         let notices = notices_for(initial_state, false);
-        Self { state: initial_state,
-               notices,
-               is_auth_pending: false }
+        Self {
+            state: initial_state,
+            notices,
+            is_auth_pending: false,
+        }
     }
 
     /// Returns the current authentication state.
@@ -87,12 +89,16 @@ fn notices_for(state: AuthState, is_auth_pending: bool) -> Vec<Notice> {
     }
     match state {
         AuthState::Authenticated => vec![],
-        AuthState::Unauthenticated => vec![Notice { kind:      NoticeKind::NotSignedIn,
-                                                    dismissed: false,
-                                                    action:    NoticeAction::OpenSettings, }],
-        AuthState::SessionExpired => vec![Notice { kind:      NoticeKind::SessionExpired,
-                                                   dismissed: false,
-                                                   action:    NoticeAction::OpenSettings, }],
+        AuthState::Unauthenticated => vec![Notice {
+            kind: NoticeKind::NotSignedIn,
+            dismissed: false,
+            action: NoticeAction::OpenSettings,
+        }],
+        AuthState::SessionExpired => vec![Notice {
+            kind: NoticeKind::SessionExpired,
+            dismissed: false,
+            action: NoticeAction::OpenSettings,
+        }],
     }
 }
 

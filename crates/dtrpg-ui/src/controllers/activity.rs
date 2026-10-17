@@ -15,17 +15,17 @@ use crate::data::events::{ActivityChanged, DownloadComplete, DownloadError};
 
 /// Owns the activity item list and panel open/close state.
 pub struct ActivityController {
-    next_id:          u64,
-    in_progress:      Vec<ActivityItem>,
-    recent:           VecDeque<ActivityItem>,
-    panel_open:       bool,
+    next_id: u64,
+    in_progress: Vec<ActivityItem>,
+    recent: VecDeque<ActivityItem>,
+    panel_open: bool,
     /// The id of the item row currently expanded in the panel, if any.
-    selected_id:      Option<u64>,
+    selected_id: Option<u64>,
     /// Durable, non-expiring log of error-status activity items.
     ///
     /// Never cleared by [`clear`](Self::clear) — this is a session-long record
     /// independent of the active service, capped at [`ALERT_LOG_CAP`].
-    alert_log:        VecDeque<AlertEntry>,
+    alert_log: VecDeque<AlertEntry>,
     /// Whether the alert history panel overlay is open.
     alert_panel_open: bool,
     /// Whether an alert has been logged since the panel was last opened.
@@ -39,14 +39,16 @@ pub struct ActivityController {
 impl ActivityController {
     /// Creates a new controller with no items and the panel closed.
     pub fn new() -> Self {
-        Self { next_id:          0,
-               in_progress:      Vec::new(),
-               recent:           VecDeque::with_capacity(RECENT_CAP),
-               panel_open:       false,
-               selected_id:      None,
-               alert_log:        VecDeque::with_capacity(ALERT_LOG_CAP),
-               alert_panel_open: false,
-               has_unread_alert: false, }
+        Self {
+            next_id: 0,
+            in_progress: Vec::new(),
+            recent: VecDeque::with_capacity(RECENT_CAP),
+            panel_open: false,
+            selected_id: None,
+            alert_log: VecDeque::with_capacity(ALERT_LOG_CAP),
+            alert_panel_open: false,
+            has_unread_alert: false,
+        }
     }
 
     /// Clears all activity items (in-progress and recent) and closes the panel.
@@ -68,19 +70,21 @@ impl ActivityController {
     ///
     /// Returns the assigned activity id, which the caller must pass to
     /// [`complete`] or [`error`].
-    pub fn start(&mut self, label: &str,
-                 cancel_fn: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
-                 cx: &mut Context<Self>)
-                 -> u64 {
+    pub fn start(
+        &mut self, label: &str, cancel_fn: Option<Arc<dyn Fn() + Send + Sync + 'static>>,
+        cx: &mut Context<Self>,
+    ) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
-        self.in_progress.push(ActivityItem { id,
-                                             label: Arc::from(label),
-                                             status: ActivityStatus::InProgress,
-                                             started_at: Instant::now(),
-                                             elapsed_secs: None,
-                                             progress: None,
-                                             cancel_fn });
+        self.in_progress.push(ActivityItem {
+            id,
+            label: Arc::from(label),
+            status: ActivityStatus::InProgress,
+            started_at: Instant::now(),
+            elapsed_secs: None,
+            progress: None,
+            cancel_fn,
+        });
         cx.emit(ActivityChanged);
         id
     }
@@ -110,12 +114,13 @@ impl ActivityController {
             cx.emit(ActivityChanged);
             cx.emit(DownloadComplete { title });
             cx.spawn(async move |this, async_cx| {
-                  async_cx.background_executor()
-                          .timer(Duration::from_secs(EXPIRY_SECS))
-                          .await;
-                  this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();
-              })
-              .detach();
+                async_cx
+                    .background_executor()
+                    .timer(Duration::from_secs(EXPIRY_SECS))
+                    .await;
+                this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();
+            })
+            .detach();
         }
     }
 
@@ -129,20 +134,23 @@ impl ActivityController {
             item.elapsed_secs = Some(item.started_at.elapsed().as_secs());
             let title = item.label.clone();
             item.status = ActivityStatus::Error(message.clone());
-            self.push_alert(AlertEntry { id:          item.id,
-                                         label:       title.clone(),
-                                         message:     message.clone(),
-                                         occurred_at: SystemTime::now(), });
+            self.push_alert(AlertEntry {
+                id: item.id,
+                label: title.clone(),
+                message: message.clone(),
+                occurred_at: SystemTime::now(),
+            });
             self.push_recent(item);
             cx.emit(ActivityChanged);
             cx.emit(DownloadError { title, message });
             cx.spawn(async move |this, async_cx| {
-                  async_cx.background_executor()
-                          .timer(Duration::from_secs(ERROR_EXPIRY_SECS))
-                          .await;
-                  this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();
-              })
-              .detach();
+                async_cx
+                    .background_executor()
+                    .timer(Duration::from_secs(ERROR_EXPIRY_SECS))
+                    .await;
+                this.update(async_cx, |a, cx| a.expire_item(id, cx)).ok();
+            })
+            .detach();
         }
     }
 
@@ -157,14 +165,17 @@ impl ActivityController {
     ///
     /// [`start`]: Self::start
     /// [`error`]: Self::error
-    pub fn log_alert(&mut self, label: impl Into<Arc<str>>, message: String,
-                     cx: &mut Context<Self>) {
+    pub fn log_alert(
+        &mut self, label: impl Into<Arc<str>>, message: String, cx: &mut Context<Self>,
+    ) {
         let id = self.next_id;
         self.next_id += 1;
-        self.push_alert(AlertEntry { id,
-                                     label: label.into(),
-                                     message,
-                                     occurred_at: SystemTime::now() });
+        self.push_alert(AlertEntry {
+            id,
+            label: label.into(),
+            message,
+            occurred_at: SystemTime::now(),
+        });
         cx.emit(ActivityChanged);
     }
 
@@ -207,8 +218,7 @@ impl ActivityController {
     pub fn select_activity(&mut self, id: u64, cx: &mut Context<Self>) {
         self.selected_id = if self.selected_id == Some(id) {
             None
-        }
-        else {
+        } else {
             Some(id)
         };
         cx.emit(ActivityChanged);
@@ -231,7 +241,7 @@ impl ActivityController {
     /// No-op if `id` is not found in the in-progress list.
     pub fn cancel_activity(&mut self, id: u64, cx: &mut Context<Self>) {
         if let Some(item) = self.in_progress.iter().find(|i| i.id == id)
-           && let Some(cancel_fn) = item.cancel_fn.clone()
+            && let Some(cancel_fn) = item.cancel_fn.clone()
         {
             cancel_fn();
         }
@@ -290,9 +300,11 @@ impl ActivityController {
     /// Returns a snapshot of the alert history log for rendering.
     #[must_use]
     pub fn alert_snapshot(&self) -> AlertHistorySnapshot {
-        AlertHistorySnapshot { open:       self.alert_panel_open,
-                               entries:    self.alert_log.iter().cloned().collect(),
-                               has_unread: self.has_unread_alert, }
+        AlertHistorySnapshot {
+            open: self.alert_panel_open,
+            entries: self.alert_log.iter().cloned().collect(),
+            has_unread: self.has_unread_alert,
+        }
     }
 
     /// Returns a snapshot of current activity state for rendering.
@@ -300,13 +312,15 @@ impl ActivityController {
         let mut items: Vec<ActivityItem> = self.in_progress.clone();
         items.extend(self.recent.iter().cloned());
 
-        ActivitySnapshot { in_progress_count: self.in_progress.len(),
-                           alert_count: self.alert_log.len(),
-                           recent_count: self.recent.len(),
-                           panel_open: self.panel_open,
-                           items,
-                           selected_id: self.selected_id,
-                           aggregate_progress: self.aggregate_progress() }
+        ActivitySnapshot {
+            in_progress_count: self.in_progress.len(),
+            alert_count: self.alert_log.len(),
+            recent_count: self.recent.len(),
+            panel_open: self.panel_open,
+            items,
+            selected_id: self.selected_id,
+            aggregate_progress: self.aggregate_progress(),
+        }
     }
 
     /// Computes the mean of known `progress` values among in-progress items.
@@ -360,20 +374,24 @@ mod tests {
     /// exactly the behavior in question: `snapshot().alert_count` must track
     /// `alert_log`, independent of `recent`.
     fn alert_entry(id: u64) -> AlertEntry {
-        AlertEntry { id,
-                     label: "Sync failed".into(),
-                     message: "network error".to_string(),
-                     occurred_at: SystemTime::now() }
+        AlertEntry {
+            id,
+            label: "Sync failed".into(),
+            message: "network error".to_string(),
+            occurred_at: SystemTime::now(),
+        }
     }
 
     fn error_item(id: u64) -> ActivityItem {
-        ActivityItem { id,
-                       label: "Sync".into(),
-                       status: ActivityStatus::Error("network error".to_string()),
-                       started_at: Instant::now(),
-                       elapsed_secs: Some(1),
-                       progress: None,
-                       cancel_fn: None }
+        ActivityItem {
+            id,
+            label: "Sync".into(),
+            status: ActivityStatus::Error("network error".to_string()),
+            started_at: Instant::now(),
+            elapsed_secs: Some(1),
+            progress: None,
+            cancel_fn: None,
+        }
     }
 
     #[test]
@@ -424,15 +442,19 @@ mod tests {
         let ctrl = cx.new(|_| ActivityController::new());
 
         ctrl.update(cx, |ctrl, cx| {
-                ctrl.log_alert("Add to collection 'Favorites'",
-                               "network error".to_string(),
-                               cx);
-            });
+            ctrl.log_alert(
+                "Add to collection 'Favorites'",
+                "network error".to_string(),
+                cx,
+            );
+        });
 
         let alerts = ctrl.read_with(cx, |ctrl, _| ctrl.alert_snapshot());
         assert_eq!(alerts.entries.len(), 1);
-        assert_eq!(alerts.entries[0].label.as_ref(),
-                   "Add to collection 'Favorites'");
+        assert_eq!(
+            alerts.entries[0].label.as_ref(),
+            "Add to collection 'Favorites'"
+        );
         assert_eq!(alerts.entries[0].message, "network error");
 
         let snapshot = ctrl.read_with(cx, |ctrl, _| ctrl.snapshot());

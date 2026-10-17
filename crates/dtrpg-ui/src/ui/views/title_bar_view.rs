@@ -26,9 +26,9 @@ use crate::ui::actions::{ReportFeatureBug, ShowSettings};
 /// Renders the title bar: app title on the left, a drag region, and the
 /// account button on the right, separated from the content below by a
 /// horizontal rule.
-pub fn render_title_bar(auth: &AuthStateSnapshot, settings: Entity<SettingsController>,
-                        colors: &ColorTokens, cx: &App)
-                        -> impl IntoElement + 'static + use<> {
+pub fn render_title_bar(
+    auth: &AuthStateSnapshot, settings: Entity<SettingsController>, colors: &ColorTokens, cx: &App,
+) -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
     let text_primary = colors.text_primary;
@@ -40,38 +40,43 @@ pub fn render_title_bar(auth: &AuthStateSnapshot, settings: Entity<SettingsContr
     // no longer repeats it.
     let leading_inset = if Platform.kind() == PlatformKind::MacOs {
         px(78.0)
-    }
-    else {
+    } else {
         px(12.0)
     };
 
-    div().h(px(44.0))
-         .flex_none()
-         .flex()
-         .items_center()
-         .gap(px(8.0))
-         .pl(leading_inset)
-         .pr(px(12.0))
-         .border_b_1()
-         .border_color(border)
-         .bg(surface)
-         .child(div().text_color(text_primary)
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .child(t!("sidebar.app_name").to_string()))
-         .child(div().id("title-bar-drag-region")
-                     .flex_1()
-                     .h_full()
-                     .on_mouse_down(MouseButton::Left, |_, window, _| {
-                         window.start_window_move();
-                     }))
-         .child(render_account_button(auth, settings, colors, cx))
+    div()
+        .h(px(44.0))
+        .flex_none()
+        .flex()
+        .items_center()
+        .gap(px(8.0))
+        .pl(leading_inset)
+        .pr(px(12.0))
+        .border_b_1()
+        .border_color(border)
+        .bg(surface)
+        .child(
+            div()
+                .text_color(text_primary)
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .child(t!("sidebar.app_name").to_string()),
+        )
+        .child(
+            div()
+                .id("title-bar-drag-region")
+                .flex_1()
+                .h_full()
+                .on_mouse_down(MouseButton::Left, |_, window, _| {
+                    window.start_window_move();
+                }),
+        )
+        .child(render_account_button(auth, settings, colors, cx))
 }
 
 fn detect_image_format(bytes: &[u8]) -> ImageFormat {
     if bytes.starts_with(b"\x89PNG") {
         ImageFormat::Png
-    }
-    else {
+    } else {
         ImageFormat::Jpeg
     }
 }
@@ -79,28 +84,33 @@ fn detect_image_format(bytes: &[u8]) -> ImageFormat {
 /// Renders the account button; its dropdown menu exposes user info, a
 /// settings action, and a sign-out action when authenticated, or a sign-in
 /// action when not.
-fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsController>,
-                         colors: &ColorTokens, cx: &App)
-                         -> AnyElement {
+fn render_account_button(
+    auth: &AuthStateSnapshot, settings: Entity<SettingsController>, colors: &ColorTokens, cx: &App,
+) -> AnyElement {
     if !auth.is_logged_in {
         let surface_alt = colors.surface_alt;
         let border_strong = colors.border_strong;
         let text_tertiary = colors.text_tertiary;
-        let unauthenticated_variant =
-            ButtonCustomVariant::new(cx).color(surface_alt)
-                                        .foreground(text_tertiary)
-                                        .hover(gpui::Hsla { l: (surface_alt.l * 0.9).min(1.0),
-                                                            ..surface_alt })
-                                        .active(gpui::Hsla { l: (surface_alt.l * 0.8).min(1.0),
-                                                             ..surface_alt });
-        let inner = div().flex()
-                         .items_center()
-                         .justify_center()
-                         .size_full()
-                         .text_xs()
-                         .text_color(text_tertiary)
-                         .child("👤")
-                         .into_any_element();
+        let unauthenticated_variant = ButtonCustomVariant::new(cx)
+            .color(surface_alt)
+            .foreground(text_tertiary)
+            .hover(gpui::Hsla {
+                l: (surface_alt.l * 0.9).min(1.0),
+                ..surface_alt
+            })
+            .active(gpui::Hsla {
+                l: (surface_alt.l * 0.8).min(1.0),
+                ..surface_alt
+            });
+        let inner = div()
+            .flex()
+            .items_center()
+            .justify_center()
+            .size_full()
+            .text_xs()
+            .text_color(text_tertiary)
+            .child("👤")
+            .into_any_element();
         return Button::new("title-bar-account-btn")
             .custom(unauthenticated_variant)
             .tooltip(t!("toolbar.tooltip_not_signed_in").to_string())
@@ -127,18 +137,23 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
             .into_any_element();
     }
 
-    let initial_text = auth.display_initial
-                           .map(|c| c.to_string())
-                           .unwrap_or_else(|| "D".to_string());
+    let initial_text = auth
+        .display_initial
+        .map(|c| c.to_string())
+        .unwrap_or_else(|| "D".to_string());
 
     let accent = colors.accent;
-    let avatar_variant =
-        ButtonCustomVariant::new(cx).color(accent)
-                                    .foreground(gpui::white())
-                                    .hover(gpui::Hsla { l: (accent.l * 0.85).min(1.0),
-                                                        ..accent })
-                                    .active(gpui::Hsla { l: (accent.l * 0.75).min(1.0),
-                                                         ..accent });
+    let avatar_variant = ButtonCustomVariant::new(cx)
+        .color(accent)
+        .foreground(gpui::white())
+        .hover(gpui::Hsla {
+            l: (accent.l * 0.85).min(1.0),
+            ..accent
+        })
+        .active(gpui::Hsla {
+            l: (accent.l * 0.75).min(1.0),
+            ..accent
+        });
 
     let inner: AnyElement = if let Some(bytes) = &auth.avatar_bytes {
         let format = detect_image_format(bytes);
@@ -146,38 +161,44 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
         // See the .p(px(0.0)) on the enclosing Button below for the actual
         // fix to this avatar looking squished - this flex_none() wrapper
         // alone wasn't it.
-        div().flex_none()
-             .child(Avatar::new().with_size(gpui_kit::component::Size::Size(px(28.0)))
-                                 .rounded_full()
-                                 .src(ImageSource::Image(image)))
-             .into_any_element()
-    }
-    else {
-        div().flex()
-             .items_center()
-             .justify_center()
-             .size_full()
-             .text_xs()
-             .text_color(gpui::white())
-             .child(initial_text)
-             .into_any_element()
+        div()
+            .flex_none()
+            .child(
+                Avatar::new()
+                    .with_size(gpui_kit::component::Size::Size(px(28.0)))
+                    .rounded_full()
+                    .src(ImageSource::Image(image)),
+            )
+            .into_any_element()
+    } else {
+        div()
+            .flex()
+            .items_center()
+            .justify_center()
+            .size_full()
+            .text_xs()
+            .text_color(gpui::white())
+            .child(initial_text)
+            .into_any_element()
     };
 
-    let menu_email = auth.email
-                         .clone()
-                         .or_else(|| auth.api_key_hint.clone())
-                         .unwrap_or_else(|| t!("settings.default_account_name").to_string());
+    let menu_email = auth
+        .email
+        .clone()
+        .or_else(|| auth.api_key_hint.clone())
+        .unwrap_or_else(|| t!("settings.default_account_name").to_string());
 
-    Button::new("title-bar-account-btn").custom(avatar_variant)
-                                        .tooltip(t!("toolbar.tooltip_account").to_string())
-                                        .rounded_full()
-                                        .w(px(28.0))
-                                        .h(px(28.0))
-                                        .p(px(0.0))
-                                        .child(inner)
-                                        .dropdown_menu(move |menu, _, _| {
-                                            let s_logout = settings.clone();
-                                            menu.item(PopupMenuItem::label(menu_email.clone()))
+    Button::new("title-bar-account-btn")
+        .custom(avatar_variant)
+        .tooltip(t!("toolbar.tooltip_account").to_string())
+        .rounded_full()
+        .w(px(28.0))
+        .h(px(28.0))
+        .p(px(0.0))
+        .child(inner)
+        .dropdown_menu(move |menu, _, _| {
+            let s_logout = settings.clone();
+            menu.item(PopupMenuItem::label(menu_email.clone()))
                 .item(PopupMenuItem::separator())
                 .item(PopupMenuItem::new(t!("toolbar.tooltip_settings")).on_click(
                     move |_, window, cx| {
@@ -206,6 +227,6 @@ fn render_account_button(auth: &AuthStateSnapshot, settings: Entity<SettingsCont
                         s_logout.update(cx, |ctrl, cx| ctrl.logout(cx));
                     }),
                 )
-                                        })
-                                        .into_any_element()
+        })
+        .into_any_element()
 }

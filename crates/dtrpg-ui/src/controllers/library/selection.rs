@@ -43,8 +43,9 @@ impl LibraryController {
     /// Only re-emits [`LibraryChanged`] when the bounds actually changed, so
     /// repeated paints of an entry that hasn't moved don't trigger a
     /// re-render feedback loop.
-    pub fn set_entry_bounds(&mut self, id: Arc<str>, bounds: Bounds<Pixels>,
-                            cx: &mut Context<Self>) {
+    pub fn set_entry_bounds(
+        &mut self, id: Arc<str>, bounds: Bounds<Pixels>, cx: &mut Context<Self>,
+    ) {
         if self.entry_bounds.get(&id) != Some(&bounds) {
             self.entry_bounds.insert(id, bounds);
             cx.emit(LibraryChanged);
@@ -89,9 +90,10 @@ impl LibraryController {
     /// Emits [`LibraryChanged`].
     pub fn clear_item_selection(&mut self, entry_id: &str, cx: &mut Context<Self>) {
         let had_selection = self.selected_item_file.remove(entry_id).is_some();
-        let had_zip_preview = self.zip_preview
-                                  .as_ref()
-                                  .is_some_and(|p| p.entry_id.as_ref() == entry_id);
+        let had_zip_preview = self
+            .zip_preview
+            .as_ref()
+            .is_some_and(|p| p.entry_id.as_ref() == entry_id);
         if had_zip_preview {
             self.zip_preview = None;
         }

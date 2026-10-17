@@ -19,11 +19,10 @@ use crate::ui::widgets::selectable_text;
 /// `pending_file_opener`, when `Some`, is the application path picked via the
 /// native file dialog and awaiting an extension; a pending row renders in its
 /// place in the list with `extension_input` focused for inline entry.
-pub fn render_file_openers_section(file_openers: &[FileOpenerEntry],
-                                   entity: Entity<SettingsController>, colors: &ColorTokens,
-                                   extension_input: Entity<InputState>,
-                                   pending_file_opener: Option<PathBuf>)
-                                   -> impl IntoElement + 'static + use<> {
+pub fn render_file_openers_section(
+    file_openers: &[FileOpenerEntry], entity: Entity<SettingsController>, colors: &ColorTokens,
+    extension_input: Entity<InputState>, pending_file_opener: Option<PathBuf>,
+) -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_tertiary = colors.text_tertiary;
     let border = colors.border;
@@ -31,48 +30,67 @@ pub fn render_file_openers_section(file_openers: &[FileOpenerEntry],
     let accent_on = colors.accent_on;
 
     // Collect extensions whose app path no longer exists on disk.
-    let stale_extensions: Vec<String> = file_openers.iter()
-                                                    .filter(|e| !e.app_path.exists())
-                                                    .map(|e| e.extension.clone())
-                                                    .collect();
+    let stale_extensions: Vec<String> = file_openers
+        .iter()
+        .filter(|e| !e.app_path.exists())
+        .map(|e| e.extension.clone())
+        .collect();
 
     let is_pending = pending_file_opener.is_some();
 
-    let mut col =
-        div().flex()
-             .flex_col()
-             .gap(px(24.0))
-             .p(px(24.0))
-             // ── Header row ────────────────────────────────────────────────────
-             .child(div().flex()
-                         .items_center()
-                         .justify_between()
-                         .child(div().flex()
-                                     .flex_col()
-                                     .gap(px(2.0))
-                                     .child(div().text_sm()
-                                                 .font_weight(gpui::FontWeight::SEMIBOLD)
-                                                 .text_color(text_primary)
-                                                 .child(t!("settings.file_openers_title")))
-                                     .child(div().text_xs()
-                                                 .text_color(text_tertiary)
-                                                 .child(t!("settings.file_openers_description"))))
-                         .child(render_add_button(entity.clone(),
-                                                  extension_input.clone(),
-                                                  accent,
-                                                  accent_on,
-                                                  is_pending)))
-             // ── Divider ───────────────────────────────────────────────────────
-             .child(div().h(px(1.0)).bg(border));
+    let mut col = div()
+        .flex()
+        .flex_col()
+        .gap(px(24.0))
+        .p(px(24.0))
+        // ── Header row ────────────────────────────────────────────────────
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(2.0))
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .text_color(text_primary)
+                                .child(t!("settings.file_openers_title")),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(text_tertiary)
+                                .child(t!("settings.file_openers_description")),
+                        ),
+                )
+                .child(render_add_button(
+                    entity.clone(),
+                    extension_input.clone(),
+                    accent,
+                    accent_on,
+                    is_pending,
+                )),
+        )
+        // ── Divider ───────────────────────────────────────────────────────
+        .child(div().h(px(1.0)).bg(border));
 
     if let Some(app_path) = pending_file_opener {
-        col = col.child(render_pending_row(&app_path, extension_input, entity.clone(), colors));
+        col = col.child(render_pending_row(
+            &app_path,
+            extension_input,
+            entity.clone(),
+            colors,
+        ));
     }
 
     if file_openers.is_empty() && !is_pending {
         col = col.child(render_empty_state(text_tertiary));
-    }
-    else {
+    } else {
         for entry in file_openers {
             let is_stale = stale_extensions.contains(&entry.extension);
             col = col.child(render_entry_row(entry, is_stale, entity.clone(), colors));
@@ -86,13 +104,17 @@ pub fn render_file_openers_section(file_openers: &[FileOpenerEntry],
 // ───────────────────────────────────────────────────────────────
 
 fn render_empty_state(text_tertiary: gpui::Hsla) -> impl IntoElement + 'static {
-    div().flex()
-         .items_center()
-         .justify_center()
-         .py(px(32.0))
-         .child(div().text_sm()
-                     .text_color(text_tertiary)
-                     .child(t!("settings.file_openers_empty")))
+    div()
+        .flex()
+        .items_center()
+        .justify_center()
+        .py(px(32.0))
+        .child(
+            div()
+                .text_sm()
+                .text_color(text_tertiary)
+                .child(t!("settings.file_openers_empty")),
+        )
 }
 
 // ── Pending row (inline add)
@@ -104,9 +126,10 @@ fn render_empty_state(text_tertiary: gpui::Hsla) -> impl IntoElement + 'static {
 ///
 /// Escape cancels the pending add without persisting anything, and stops the
 /// keystroke from bubbling to the settings panel's own Escape-to-close handler.
-fn render_pending_row(app_path: &std::path::Path, extension_input: Entity<InputState>,
-                      entity: Entity<SettingsController>, colors: &ColorTokens)
-                      -> AnyElement {
+fn render_pending_row(
+    app_path: &std::path::Path, extension_input: Entity<InputState>,
+    entity: Entity<SettingsController>, colors: &ColorTokens,
+) -> AnyElement {
     let text_secondary = colors.text_secondary;
     let text_tertiary = colors.text_tertiary;
     let border = colors.border;
@@ -166,9 +189,10 @@ fn render_pending_row(app_path: &std::path::Path, extension_input: Entity<InputS
 // ── Entry row
 // ─────────────────────────────────────────────────────────────────
 
-fn render_entry_row(entry: &FileOpenerEntry, is_stale: bool, entity: Entity<SettingsController>,
-                    colors: &ColorTokens)
-                    -> AnyElement {
+fn render_entry_row(
+    entry: &FileOpenerEntry, is_stale: bool, entity: Entity<SettingsController>,
+    colors: &ColorTokens,
+) -> AnyElement {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let text_tertiary = colors.text_tertiary;
@@ -272,38 +296,41 @@ fn render_entry_row(entry: &FileOpenerEntry, is_stale: bool, entity: Entity<Sett
 // ── Add button
 // ────────────────────────────────────────────────────────────────
 
-fn render_add_button(entity: Entity<SettingsController>, extension_input: Entity<InputState>,
-                     accent: gpui::Hsla, accent_on: gpui::Hsla, is_pending: bool)
-                     -> impl IntoElement + 'static {
+fn render_add_button(
+    entity: Entity<SettingsController>, extension_input: Entity<InputState>, accent: gpui::Hsla,
+    accent_on: gpui::Hsla, is_pending: bool,
+) -> impl IntoElement + 'static {
     // Disabled (dimmed, inert) while an add is already in progress, so a second
     // click can't start a new pending row and orphan the first one.
     let bg = if is_pending {
         accent.opacity(0.4)
-    }
-    else {
+    } else {
         accent
     };
 
-    let mut btn =
-        div().id("add-file-opener")
-             .size(px(30.0))
-             .rounded(px(8.0))
-             .bg(bg)
-             .flex()
-             .items_center()
-             .justify_center()
-             .tooltip(|window, cx| {
-                 Tooltip::new(t!("settings.file_opener_add_tooltip").to_string()).build(window, cx)
-             })
-             .child(div().text_sm()
-                         .font_weight(gpui::FontWeight::MEDIUM)
-                         .text_color(accent_on)
-                         .child("+"));
+    let mut btn = div()
+        .id("add-file-opener")
+        .size(px(30.0))
+        .rounded(px(8.0))
+        .bg(bg)
+        .flex()
+        .items_center()
+        .justify_center()
+        .tooltip(|window, cx| {
+            Tooltip::new(t!("settings.file_opener_add_tooltip").to_string()).build(window, cx)
+        })
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .text_color(accent_on)
+                .child("+"),
+        );
 
     if !is_pending {
         btn = btn.cursor_pointer().on_click(move |_, window, cx| {
-                                      pick_app_and_begin_add(&entity, &extension_input, window, cx);
-                                  });
+            pick_app_and_begin_add(&entity, &extension_input, window, cx);
+        });
     }
 
     btn
@@ -320,14 +347,16 @@ fn render_add_button(entity: Entity<SettingsController>, extension_input: Entity
 /// resuming mid-modal aborts in `AppCell::borrow_mut` (see issue #257). The
 /// post-pick UI work therefore goes through the window context's `update`
 /// rather than the borrowed `window`/`cx` handed to this function.
-fn pick_app_and_begin_add(entity: &Entity<SettingsController>,
-                          extension_input: &Entity<InputState>, window: &mut Window,
-                          cx: &mut App) {
+fn pick_app_and_begin_add(
+    entity: &Entity<SettingsController>, extension_input: &Entity<InputState>, window: &mut Window,
+    cx: &mut App,
+) {
     let entity = entity.clone();
     let extension_input = extension_input.clone();
-    window.to_async(cx)
-          .spawn(async move |cx| {
-              let picked = rfd::AsyncFileDialog::new()
+    window
+        .to_async(cx)
+        .spawn(async move |cx| {
+            let picked = rfd::AsyncFileDialog::new()
                 .add_filter(
                     t!("settings.file_opener_app_filter_name").to_string(),
                     &["app"],
@@ -335,31 +364,30 @@ fn pick_app_and_begin_add(entity: &Entity<SettingsController>,
                 .set_directory("/Applications")
                 .pick_file()
                 .await;
-              let Some(handle) = picked
-              else {
-                  return;
-              };
-              let app_path = handle.path().to_path_buf();
+            let Some(handle) = picked else {
+                return;
+            };
+            let app_path = handle.path().to_path_buf();
 
-              cx.update(|window, cx| {
-                    extension_input.update(cx, |state, cx| state.set_value("", window, cx));
-                    // The native panel can leave the GPUI window without OS
-                    // key-window status. Without reclaiming it here, gpui's
-                    // focus tracking still thinks the handle is focused but no
-                    // keyboard events arrive, so the extension input below
-                    // silently refuses focus.
-                    window.activate_window();
-                })
-                .ok();
+            cx.update(|window, cx| {
+                extension_input.update(cx, |state, cx| state.set_value("", window, cx));
+                // The native panel can leave the GPUI window without OS
+                // key-window status. Without reclaiming it here, gpui's
+                // focus tracking still thinks the handle is focused but no
+                // keyboard events arrive, so the extension input below
+                // silently refuses focus.
+                window.activate_window();
+            })
+            .ok();
 
-              entity.update(cx, |ctrl, cx| ctrl.begin_add_file_opener(app_path, cx));
+            entity.update(cx, |ctrl, cx| ctrl.begin_add_file_opener(app_path, cx));
 
-              cx.update(|window, cx| {
-                    extension_input.update(cx, |state, cx| state.focus(window, cx));
-                })
-                .ok();
-          })
-          .detach();
+            cx.update(|window, cx| {
+                extension_input.update(cx, |state, cx| state.focus(window, cx));
+            })
+            .ok();
+        })
+        .detach();
 }
 
 // ── Helpers

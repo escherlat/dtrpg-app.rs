@@ -58,8 +58,9 @@ impl Locale {
 ///
 /// Must be called before any `t!()` macro is evaluated.
 pub fn init() {
-    let persisted = dtrpg_core::data::ui_preferences::UiPreferences::load().locale()
-                                                                           .map(str::to_owned);
+    let persisted = dtrpg_core::data::ui_preferences::UiPreferences::load()
+        .locale()
+        .map(str::to_owned);
 
     let chosen = resolve_locale(persisted.as_deref(), &detect_os_locale());
 
@@ -70,23 +71,24 @@ pub fn init() {
 /// Picks the locale code to activate: a persisted override if present and
 /// still supported, otherwise the OS-detected code.
 fn resolve_locale(persisted: Option<&str>, os_detected: &str) -> String {
-    persisted.filter(|code| SUPPORTED.contains(code))
-             .unwrap_or(os_detected)
-             .to_owned()
+    persisted
+        .filter(|code| SUPPORTED.contains(code))
+        .unwrap_or(os_detected)
+        .to_owned()
 }
 
 fn detect_os_locale() -> String {
     let raw = sys_locale::get_locale();
 
-    let locale = raw.as_deref()
-                    .and_then(|l| l.split(['-', '_']).next())
-                    .unwrap_or("en")
-                    .to_owned();
+    let locale = raw
+        .as_deref()
+        .and_then(|l| l.split(['-', '_']).next())
+        .unwrap_or("en")
+        .to_owned();
 
     if SUPPORTED.contains(&locale.as_str()) {
         locale
-    }
-    else {
+    } else {
         "en".to_owned()
     }
 }

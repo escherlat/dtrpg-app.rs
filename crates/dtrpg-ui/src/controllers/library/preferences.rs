@@ -21,8 +21,8 @@ impl LibraryController {
         let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
         cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
-              apply_theme_colors(theme, &colors);
-          });
+            apply_theme_colors(theme, &colors);
+        });
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_theme_key(key.as_str());
         cx.notify();
     }
@@ -57,8 +57,8 @@ impl LibraryController {
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
         cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
-              theme.font_family = font.clone();
-          });
+            theme.font_family = font.clone();
+        });
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_body_font_name(&font);
         cx.notify();
     }

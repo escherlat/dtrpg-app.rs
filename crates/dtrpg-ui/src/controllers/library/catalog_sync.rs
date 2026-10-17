@@ -20,7 +20,9 @@ impl LibraryController {
         // it as pending instead; [`Self::finish_catalog_sync`] starts a
         // follow-up load once the in-flight one completes.
         if self.catalog_sync_in_flight {
-            tracing::debug!("catalog sync already in flight; queuing a follow-up reload once it completes");
+            tracing::debug!(
+                "catalog sync already in flight; queuing a follow-up reload once it completes"
+            );
             self.pending_reload = true;
             return;
         }

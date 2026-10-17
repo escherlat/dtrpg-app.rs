@@ -15,38 +15,39 @@ use crate::ui::views::root_view::LibraryRootView;
 ///
 /// Returns an invisible empty element when `notices` is empty so the caller
 /// does not need to conditionalize the insertion point.
-pub fn render_notification_banner(notices: Vec<Notice>,
-                                  auth_entity: Entity<AuthStateController>,
-                                  root_entity: Entity<LibraryRootView>, colors: &ColorTokens)
-                                  -> AnyElement {
+pub fn render_notification_banner(
+    notices: Vec<Notice>, auth_entity: Entity<AuthStateController>,
+    root_entity: Entity<LibraryRootView>, colors: &ColorTokens,
+) -> AnyElement {
     if notices.is_empty() {
         return div().into_any_element();
     }
 
     let border = colors.border;
 
-    div().flex_none()
-         .flex()
-         .flex_col()
-         .border_b_1()
-         .border_color(border)
-         .children(notices.into_iter().map(|notice| {
-             let (message, action_label) = notice_strings(&notice);
-             let kind = notice.kind;
+    div()
+        .flex_none()
+        .flex()
+        .flex_col()
+        .border_b_1()
+        .border_color(border)
+        .children(notices.into_iter().map(|notice| {
+            let (message, action_label) = notice_strings(&notice);
+            let kind = notice.kind;
 
-             let auth_entity_action = auth_entity.clone();
-             let auth_entity_dismiss = auth_entity.clone();
-             let root_entity = root_entity.clone();
+            let auth_entity_action = auth_entity.clone();
+            let auth_entity_dismiss = auth_entity.clone();
+            let root_entity = root_entity.clone();
 
-             // Border and background live on this outer container, not the
-             // inner `Alert`, so the emphasis encloses both the
-             // message and the action button as one banner rather
-             // than boxing the message alone. `Alert`'s own
-             // banner-mode border/background use a warning color
-             // mixed with white, which reads as barely-there; its own border is
-             // muted to `warning_bg` here so it doesn't compete with the outer
-             // one.
-             div()
+            // Border and background live on this outer container, not the
+            // inner `Alert`, so the emphasis encloses both the
+            // message and the action button as one banner rather
+            // than boxing the message alone. `Alert`'s own
+            // banner-mode border/background use a warning color
+            // mixed with white, which reads as barely-there; its own border is
+            // muted to `warning_bg` here so it doesn't compete with the outer
+            // one.
+            div()
                 .flex()
                 .items_center()
                 .gap(px(8.0))
@@ -88,18 +89,24 @@ pub fn render_notification_banner(notices: Vec<Notice>,
                             });
                         }),
                 )
-         }))
-         .into_any_element()
+        }))
+        .into_any_element()
 }
 
-fn notice_strings(notice: &Notice)
-                  -> (std::borrow::Cow<'static, str>, std::borrow::Cow<'static, str>) {
+fn notice_strings(
+    notice: &Notice,
+) -> (
+    std::borrow::Cow<'static, str>,
+    std::borrow::Cow<'static, str>,
+) {
     match notice.kind {
-        NoticeKind::NotSignedIn => {
-            (t!("settings.not_signed_in"), t!("notification.set_up_account"))
-        }
-        NoticeKind::SessionExpired => {
-            (t!("notification.session_expired"), t!("notification.sign_in_again"))
-        }
+        NoticeKind::NotSignedIn => (
+            t!("settings.not_signed_in"),
+            t!("notification.set_up_account"),
+        ),
+        NoticeKind::SessionExpired => (
+            t!("notification.session_expired"),
+            t!("notification.sign_in_again"),
+        ),
     }
 }

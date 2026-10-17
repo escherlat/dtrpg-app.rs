@@ -54,12 +54,11 @@ use crate::util::reveal::reveal_in_file_manager;
 /// metadata area in place (see `catalog-entry-detail-view`). Single-item
 /// entries keep the existing inline entry-tier metadata table.
 #[allow(clippy::too_many_arguments)]
-pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
-                                 entity: Entity<LibraryController>,
-                                 tabs: &Entity<TabsController>, colors: &ColorTokens,
-                                 cover_image: Option<Arc<Image>>, window: &mut Window,
-                                 cx: &mut App)
-                                 -> AnyElement {
+pub fn render_detail_tab_content(
+    item: &LibraryItem, storage_root_path: PathBuf, entity: Entity<LibraryController>,
+    tabs: &Entity<TabsController>, colors: &ColorTokens, cover_image: Option<Arc<Image>>,
+    window: &mut Window, cx: &mut App,
+) -> AnyElement {
     let surface = colors.surface;
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -82,12 +81,12 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let cover_w = dtrpg_core::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH * 1.5;
     let cover_h = cover_w * 10.0 / 7.0;
     let cover: AnyElement = if let Some(image) = cover_image {
-        img(image).w(px(cover_w))
-                  .h(px(cover_h))
-                  .object_fit(ObjectFit::Cover)
-                  .into_any_element()
-    }
-    else {
+        img(image)
+            .w(px(cover_w))
+            .h(px(cover_h))
+            .object_fit(ObjectFit::Cover)
+            .into_any_element()
+    } else {
         render_generative_cover(&item, cover_w, cover_h, true).into_any_element()
     };
     let has_cover = item.detail_cover_url.is_some() || item.cover_url.is_some();
@@ -342,21 +341,28 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
 /// right-aligned as a group. All four are still user-resizable — see
 /// `detail-item-list-column-resize`.
 pub(crate) fn item_list_columns() -> Vec<Column> {
-    vec![Column::new("name", t!("detail.item_list_column_name")).width(240.)
-                                                                .min_width(120.)
-                                                                .resizable(true),
-         Column::new("type", t!("detail.item_list_column_type")).width(90.)
-                                                                .min_width(60.)
-                                                                .resizable(true),
-         Column::new("size", t!("detail.item_list_column_size")).width(90.)
-                                                                .min_width(60.)
-                                                                .resizable(true),
-         Column::new("info", t!("detail.item_list_column_info")).width(100.)
-                                                                .min_width(60.)
-                                                                .resizable(true),
-         Column::new("status", t!("detail.item_list_column_status")).width(90.)
-                                                                    .min_width(60.)
-                                                                    .resizable(true),]
+    vec![
+        Column::new("name", t!("detail.item_list_column_name"))
+            .width(240.)
+            .min_width(120.)
+            .resizable(true),
+        Column::new("type", t!("detail.item_list_column_type"))
+            .width(90.)
+            .min_width(60.)
+            .resizable(true),
+        Column::new("size", t!("detail.item_list_column_size"))
+            .width(90.)
+            .min_width(60.)
+            .resizable(true),
+        Column::new("info", t!("detail.item_list_column_info"))
+            .width(100.)
+            .min_width(60.)
+            .resizable(true),
+        Column::new("status", t!("detail.item_list_column_status"))
+            .width(90.)
+            .min_width(60.)
+            .resizable(true),
+    ]
 }
 
 /// `TableDelegate` for a multi-item entry's item list. Backed by
@@ -364,16 +370,16 @@ pub(crate) fn item_list_columns() -> Vec<Column> {
 /// than cloning the file list, mirroring `CatalogListDelegate`'s
 /// read-through-controller pattern.
 pub(crate) struct ItemListDelegate {
-    pub(crate) controller:  Entity<LibraryController>,
-    pub(crate) entry_id:    Arc<str>,
-    pub(crate) columns:     Vec<Column>,
+    pub(crate) controller: Entity<LibraryController>,
+    pub(crate) entry_id: Arc<str>,
+    pub(crate) columns: Vec<Column>,
     /// User-adjusted column widths. `None` means use the static default from
     /// `item_list_columns()`.
     pub(crate) user_widths: Vec<Option<Pixels>>,
     /// The entry's on-disk download directory, used to resolve each file's
     /// on-disk size suffix in the Size column (see `render_metadata_table`'s
     /// equivalent computation).
-    pub(crate) entry_dir:   PathBuf,
+    pub(crate) entry_dir: PathBuf,
     /// Current rendered width of the item list table, captured by
     /// `render_item_tier`'s `on_prepaint` hook. Drives the Name column's
     /// fill-remaining-width sizing in [`Self::column`] — `gpui-kit`'s
@@ -398,9 +404,8 @@ impl TableDelegate for ItemListDelegate {
         let mut col = self.columns[col_ix].clone();
         if let Some(Some(w)) = self.user_widths.get(col_ix) {
             col = col.width(w.as_f32());
-        }
-        else if col_ix == 0
-                  && let Some(table_width) = self.table_width
+        } else if col_ix == 0
+            && let Some(table_width) = self.table_width
         {
             // Name has no user override yet: fill whatever width
             // Type/Size/Status don't use, so those three stay
@@ -414,15 +419,14 @@ impl TableDelegate for ItemListDelegate {
         col
     }
 
-    fn render_td(&mut self, row_ix: usize, col_ix: usize, _window: &mut Window,
-                 cx: &mut Context<TableState<Self>>)
-                 -> impl IntoElement {
-        let Some(item) = self.controller.read(cx).item_by_id(&self.entry_id).cloned()
-        else {
+    fn render_td(
+        &mut self, row_ix: usize, col_ix: usize, _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        let Some(item) = self.controller.read(cx).item_by_id(&self.entry_id).cloned() else {
             return div().into_any_element();
         };
-        let Some(file) = item.files.get(row_ix)
-        else {
+        let Some(file) = item.files.get(row_ix) else {
             return div().into_any_element();
         };
         let colors = cx.global::<LibriTheme>().colors.clone();
@@ -435,17 +439,21 @@ impl TableDelegate for ItemListDelegate {
             // closes it, and a click pins it open (a second click unpins).
             0 => {
                 let is_zip = file.format.eq_ignore_ascii_case("zip");
-                let name_cell = div().h_full()
-                                     .flex()
-                                     .items_center()
-                                     .gap(px(4.0))
-                                     .text_sm()
-                                     .font_family(value_font_family.to_string())
-                                     .text_color(colors.text_primary)
-                                     .child(div().flex_1()
-                                                 .min_w_0()
-                                                 .truncate()
-                                                 .child(file.name.to_string()));
+                let name_cell = div()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .gap(px(4.0))
+                    .text_sm()
+                    .font_family(value_font_family.to_string())
+                    .text_color(colors.text_primary)
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .child(file.name.to_string()),
+                    );
 
                 if !is_zip {
                     return name_cell.into_any_element();
@@ -495,44 +503,50 @@ impl TableDelegate for ItemListDelegate {
                     })
                     .into_any_element()
             }
-            1 => div().h_full()
-                      .flex()
-                      .items_center()
-                      .text_sm()
-                      .font_family(value_font_family.to_string())
-                      .text_color(colors.text_secondary)
-                      .truncate()
-                      .child(file.format.to_string())
-                      .into_any_element(),
+            1 => div()
+                .h_full()
+                .flex()
+                .items_center()
+                .text_sm()
+                .font_family(value_font_family.to_string())
+                .text_color(colors.text_secondary)
+                .truncate()
+                .child(file.format.to_string())
+                .into_any_element(),
             2 => {
                 let catalog_str = format!("{:.1} {}", file.size_mb, t!("size.mb"));
                 let on_disk =
                     crate::util::file_size::on_disk_file_size(&self.entry_dir, file.name.as_ref());
-                div().h_full()
-                     .flex()
-                     .items_center()
-                     .text_sm()
-                     .font_family(value_font_family.to_string())
-                     .text_color(colors.text_secondary)
-                     .child(crate::util::file_size::prefer_on_disk_size(catalog_str, on_disk))
-                     .into_any_element()
+                div()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .text_sm()
+                    .font_family(value_font_family.to_string())
+                    .text_color(colors.text_secondary)
+                    .child(crate::util::file_size::prefer_on_disk_size(
+                        catalog_str,
+                        on_disk,
+                    ))
+                    .into_any_element()
             }
             3 => {
                 let entry_id = Arc::clone(&self.entry_id);
                 let entry_dir = self.entry_dir.clone();
                 let info = self.controller.update(cx, |ctrl, _cx| {
-                                              ctrl.file_info(&entry_id, row_ix, &entry_dir)
-                                          });
+                    ctrl.file_info(&entry_id, row_ix, &entry_dir)
+                });
                 let text = info.display().unwrap_or_else(|| "\u{2014}".to_string());
-                div().h_full()
-                     .flex()
-                     .items_center()
-                     .text_sm()
-                     .font_family(value_font_family.to_string())
-                     .text_color(colors.text_secondary)
-                     .truncate()
-                     .child(text)
-                     .into_any_element()
+                div()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .text_sm()
+                    .font_family(value_font_family.to_string())
+                    .text_color(colors.text_secondary)
+                    .truncate()
+                    .child(text)
+                    .into_any_element()
             }
             4 => {
                 // Status: downloaded checkmark, in-progress indicator, or a
@@ -541,107 +555,117 @@ impl TableDelegate for ItemListDelegate {
                 // `queue-per-item-downloads`). Cancelling an in-progress
                 // download is done from the activity panel rather than a
                 // second cancel control here.
-                let is_downloading = self.controller
-                                         .read(cx)
-                                         .is_file_queued_or_active(&self.entry_id, row_ix as u32);
-                let is_verifying = self.controller
-                                       .read(cx)
-                                       .is_verifying_downloads(&self.entry_id);
+                let is_downloading = self
+                    .controller
+                    .read(cx)
+                    .is_file_queued_or_active(&self.entry_id, row_ix as u32);
+                let is_verifying = self
+                    .controller
+                    .read(cx)
+                    .is_verifying_downloads(&self.entry_id);
 
                 if is_verifying {
-                    div().h_full()
-                         .flex()
-                         .items_center()
-                         .id(SharedString::from(format!("item-row-{row_ix}-verifying")))
-                         .tooltip(move |window, cx| {
-                             Tooltip::new(t!("detail.tooltip_verifying_download").to_string())
+                    div()
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .id(SharedString::from(format!("item-row-{row_ix}-verifying")))
+                        .tooltip(move |window, cx| {
+                            Tooltip::new(t!("detail.tooltip_verifying_download").to_string())
                                 .build(window, cx)
-                         })
-                         .child(Spinner::new().with_size(Size::XSmall)
-                                              .color(colors.text_tertiary))
-                         .into_any_element()
-                }
-                else if file.downloaded {
-                    div().h_full()
-                         .flex()
-                         .items_center()
-                         .text_sm()
-                         .text_color(colors.text_secondary)
-                         .id(SharedString::from(format!("item-row-{row_ix}-status")))
-                         .tooltip(move |window, cx| {
-                             Tooltip::new(t!("detail.item_status_local").to_string()).build(window,
-                                                                                            cx)
-                         })
-                         // Checkmark for "on this device", matching
-                         // `render_status_icon`'s glyph convention rather than a
-                         // separate `IconName` so both status indicators read the
-                         // same way.
-                         .child("\u{2713}")
-                         .into_any_element()
-                }
-                else if is_downloading {
-                    div().h_full()
-                         .flex()
-                         .items_center()
-                         .text_sm()
-                         .text_color(colors.text_tertiary)
-                         .child(t!("detail.item_status_downloading").to_string())
-                         .into_any_element()
-                }
-                else {
+                        })
+                        .child(
+                            Spinner::new()
+                                .with_size(Size::XSmall)
+                                .color(colors.text_tertiary),
+                        )
+                        .into_any_element()
+                } else if file.downloaded {
+                    div()
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .text_sm()
+                        .text_color(colors.text_secondary)
+                        .id(SharedString::from(format!("item-row-{row_ix}-status")))
+                        .tooltip(move |window, cx| {
+                            Tooltip::new(t!("detail.item_status_local").to_string())
+                                .build(window, cx)
+                        })
+                        // Checkmark for "on this device", matching
+                        // `render_status_icon`'s glyph convention rather than a
+                        // separate `IconName` so both status indicators read the
+                        // same way.
+                        .child("\u{2713}")
+                        .into_any_element()
+                } else if is_downloading {
+                    div()
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .text_sm()
+                        .text_color(colors.text_tertiary)
+                        .child(t!("detail.item_status_downloading").to_string())
+                        .into_any_element()
+                } else {
                     let controller = self.controller.clone();
                     let entry_id = Arc::clone(&self.entry_id);
-                    let title = self.controller
-                                    .read(cx)
-                                    .item_by_id(&self.entry_id)
-                                    .map(|item| item.title.to_string())
-                                    .unwrap_or_default();
-                    div().h_full()
-                         .flex()
-                         .items_center()
-                         .text_sm()
-                         .text_color(colors.text_secondary)
-                         .id(SharedString::from(format!("item-row-{row_ix}-download")))
-                         .cursor_pointer()
-                         .tooltip(move |window, cx| {
-                             Tooltip::new(t!("detail.item_download_button").to_string())
+                    let title = self
+                        .controller
+                        .read(cx)
+                        .item_by_id(&self.entry_id)
+                        .map(|item| item.title.to_string())
+                        .unwrap_or_default();
+                    div()
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .text_sm()
+                        .text_color(colors.text_secondary)
+                        .id(SharedString::from(format!("item-row-{row_ix}-download")))
+                        .cursor_pointer()
+                        .tooltip(move |window, cx| {
+                            Tooltip::new(t!("detail.item_download_button").to_string())
                                 .build(window, cx)
-                         })
-                         // Cloud glyph for "in the cloud, not yet on this device" —
-                         // an arrow-down here previously read as an already-completed
-                         // download indicator rather than a pending one.
-                         .child("\u{2601}")
-                         // Stop propagation so clicking download doesn't also fire the
-                         // row's own click (which selects this row) — same class of bug
-                         // fixed in the activity panel's cancel button.
-                         .on_click(move |_, _, cx| {
-                             cx.stop_propagation();
-                             controller.update(cx, |ctrl, cx| {
-                                           ctrl.request_item_download(&entry_id,
-                                                                      row_ix as u32,
-                                                                      title.clone(),
-                                                                      cx);
-                                       });
-                         })
-                         .into_any_element()
+                        })
+                        // Cloud glyph for "in the cloud, not yet on this device" —
+                        // an arrow-down here previously read as an already-completed
+                        // download indicator rather than a pending one.
+                        .child("\u{2601}")
+                        // Stop propagation so clicking download doesn't also fire the
+                        // row's own click (which selects this row) — same class of bug
+                        // fixed in the activity panel's cancel button.
+                        .on_click(move |_, _, cx| {
+                            cx.stop_propagation();
+                            controller.update(cx, |ctrl, cx| {
+                                ctrl.request_item_download(
+                                    &entry_id,
+                                    row_ix as u32,
+                                    title.clone(),
+                                    cx,
+                                );
+                            });
+                        })
+                        .into_any_element()
                 }
             }
             _ => div().into_any_element(),
         }
     }
 
-    fn render_th(&mut self, col_ix: usize, _window: &mut Window,
-                 cx: &mut Context<TableState<Self>>)
-                 -> impl IntoElement {
+    fn render_th(
+        &mut self, col_ix: usize, _window: &mut Window, cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
         let name = self.column(col_ix, cx).name;
         let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
-        div().h_full()
-             .flex()
-             .items_center()
-             .text_sm()
-             .font_family(label_font_family.to_string())
-             .font_weight(gpui::FontWeight::MEDIUM)
-             .child(name)
+        div()
+            .h_full()
+            .flex()
+            .items_center()
+            .text_sm()
+            .font_family(label_font_family.to_string())
+            .font_weight(gpui::FontWeight::MEDIUM)
+            .child(name)
     }
 }
 
@@ -651,10 +675,10 @@ impl TableDelegate for ItemListDelegate {
 /// See `catalog-entry-detail-view`'s persistent-item-list and
 /// update-in-place requirements.
 #[allow(clippy::too_many_arguments)]
-fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
-                    entity: Entity<LibraryController>, tabs: &Entity<TabsController>,
-                    colors: &ColorTokens, window: &mut Window, cx: &mut App)
-                    -> impl IntoElement + 'static {
+fn render_item_tier(
+    item: &LibraryItem, storage_root_path: &Path, entity: Entity<LibraryController>,
+    tabs: &Entity<TabsController>, colors: &ColorTokens, window: &mut Window, cx: &mut App,
+) -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
     let entry_dir = dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
@@ -672,24 +696,26 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
     let row_height = Size::default().table_row_height();
     let visible_rows = item.files.len().min(8) as f32;
     let table_height = row_height * (visible_rows + 1.0);
-    let item_list =
-        div().h(table_height)
-             .child(DataTable::new(&table).bordered(false)
-                                          .scrollbar_visible(true, false))
-             // Captures the table's rendered width so the Name column can
-             // fill whatever space Type/Size/Status don't use — see
-             // `ItemListDelegate::table_width`. Mirrors
-             // `LibraryController::set_entry_bounds`'s guarded-update
-             // pattern so an unchanged width doesn't re-notify every frame.
-             .on_prepaint(move |bounds, _window, cx| {
-                 table_for_prepaint.update(cx, |state, cx| {
-                                       if state.delegate().table_width != Some(bounds.size.width) {
-                                           state.delegate_mut().table_width =
-                                               Some(bounds.size.width);
-                                           cx.notify();
-                                       }
-                                   });
-             });
+    let item_list = div()
+        .h(table_height)
+        .child(
+            DataTable::new(&table)
+                .bordered(false)
+                .scrollbar_visible(true, false),
+        )
+        // Captures the table's rendered width so the Name column can
+        // fill whatever space Type/Size/Status don't use — see
+        // `ItemListDelegate::table_width`. Mirrors
+        // `LibraryController::set_entry_bounds`'s guarded-update
+        // pattern so an unchanged width doesn't re-notify every frame.
+        .on_prepaint(move |bounds, _window, cx| {
+            table_for_prepaint.update(cx, |state, cx| {
+                if state.delegate().table_width != Some(bounds.size.width) {
+                    state.delegate_mut().table_width = Some(bounds.size.width);
+                    cx.notify();
+                }
+            });
+        });
 
     let selected_file = selected_ix.and_then(|ix| item.files.get(ix).map(|file| (ix, file)));
 
@@ -716,29 +742,39 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
         None => div().into_any_element(),
     };
 
-    div().flex()
-         .flex_col()
-         .gap(px(12.0))
-         .child(div().text_sm()
-                     .font_weight(gpui::FontWeight::SEMIBOLD)
-                     .text_color(colors.text_primary)
-                     .child(t!("detail.items_heading").to_string()))
-         .child(div().text_sm()
-                     .text_color(colors.text_tertiary)
-                     .child(t!("detail.item_prompt_select").to_string())
-                     .into_any_element())
-         .child(item_list)
-         .child(match selected_file {
-                    Some((ix, file)) => render_item_metadata(item,
-                                                             file,
-                                                             ix,
-                                                             storage_root_path,
-                                                             entity.clone(),
-                                                             colors,
-                                                             cx).into_any_element(),
-                    None => div().into_any_element(),
-                })
-         .child(zip_popover)
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(12.0))
+        .child(
+            div()
+                .text_sm()
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(colors.text_primary)
+                .child(t!("detail.items_heading").to_string()),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_color(colors.text_tertiary)
+                .child(t!("detail.item_prompt_select").to_string())
+                .into_any_element(),
+        )
+        .child(item_list)
+        .child(match selected_file {
+            Some((ix, file)) => render_item_metadata(
+                item,
+                file,
+                ix,
+                storage_root_path,
+                entity.clone(),
+                colors,
+                cx,
+            )
+            .into_any_element(),
+            None => div().into_any_element(),
+        })
+        .child(zip_popover)
 }
 
 /// Renders the metadata area for a single selected item within a multi-item
@@ -752,24 +788,26 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
 /// key element ids and disclosure state, since the API has been observed to
 /// reuse the same download id across genuinely distinct files within a
 /// bundle (see `LibraryItem::dedupe_files`).
-fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usize,
-                        storage_root_path: &Path, entity: Entity<LibraryController>,
-                        colors: &ColorTokens, cx: &App)
-                        -> impl IntoElement + 'static {
+fn render_item_metadata(
+    item: &LibraryItem, file: &LibraryItemFile, row_ix: usize, storage_root_path: &Path,
+    entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App,
+) -> impl IntoElement + 'static {
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
     let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
-    let name_value = copyable_value(SharedString::from(format!("file-name-{row_ix}")),
-                                    file.name.to_string(),
-                                    &value_font_family);
+    let name_value = copyable_value(
+        SharedString::from(format!("file-name-{row_ix}")),
+        file.name.to_string(),
+        &value_font_family,
+    );
 
     let file_size_value = {
         let entry_dir =
             dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
         let on_disk = crate::util::file_size::on_disk_file_size(&entry_dir, file.name.as_ref());
-        crate::util::file_size::prefer_on_disk_size(format!("{:.1} {}",
-                                                            file.size_mb,
-                                                            t!("size.mb")),
-                                                    on_disk)
+        crate::util::file_size::prefer_on_disk_size(
+            format!("{:.1} {}", file.size_mb, t!("size.mb")),
+            on_disk,
+        )
     };
 
     let metadata = DescriptionList::vertical()
@@ -794,20 +832,24 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
         //            .span(2))
     ;
 
-    div().flex()
-         .flex_col()
-         .gap(px(12.0))
-         .child(metadata)
-         .child(render_file_other_details(FileOtherDetailsContext { entry_id: &item.id,
-                                                                    publisher: &item.publisher,
-                                                                    row_ix,
-                                                                    is_downloaded:
-                                                                        file.downloaded,
-                                                                    storage_root_path },
-                                          file,
-                                          entity,
-                                          colors,
-                                          cx))
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(12.0))
+        .child(metadata)
+        .child(render_file_other_details(
+            FileOtherDetailsContext {
+                entry_id: &item.id,
+                publisher: &item.publisher,
+                row_ix,
+                is_downloaded: file.downloaded,
+                storage_root_path,
+            },
+            file,
+            entity,
+            colors,
+            cx,
+        ))
 }
 
 /// Builds the shared toggle-state key for a single file's "Other details"
@@ -819,10 +861,10 @@ fn file_other_details_key(entry_id: &str, row_ix: usize) -> Arc<str> {
 /// Grouped context for [`render_file_other_details`], kept below Rust's
 /// preferred argument count.
 struct FileOtherDetailsContext<'a> {
-    entry_id:          &'a str,
-    publisher:         &'a str,
-    row_ix:            usize,
-    is_downloaded:     bool,
+    entry_id: &'a str,
+    publisher: &'a str,
+    row_ix: usize,
+    is_downloaded: bool,
     storage_root_path: &'a Path,
 }
 
@@ -833,14 +875,17 @@ struct FileOtherDetailsContext<'a> {
 /// The download location is the entry's shared item folder — per-file paths
 /// aren't tracked separately (see `LibraryItemFile`), so every file in a
 /// bundle reports the same location.
-fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryItemFile,
-                             entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App)
-                             -> impl IntoElement + 'static {
-    let FileOtherDetailsContext { entry_id,
-                                  publisher,
-                                  row_ix,
-                                  is_downloaded,
-                                  storage_root_path, } = ctx;
+fn render_file_other_details(
+    ctx: FileOtherDetailsContext<'_>, file: &LibraryItemFile, entity: Entity<LibraryController>,
+    colors: &ColorTokens, cx: &App,
+) -> impl IntoElement + 'static {
+    let FileOtherDetailsContext {
+        entry_id,
+        publisher,
+        row_ix,
+        is_downloaded,
+        storage_root_path,
+    } = ctx;
     let toggle_key = file_other_details_key(entry_id, row_ix);
     let open = entity.read(cx).is_file_other_details_open(&toggle_key);
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
@@ -849,32 +894,37 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
     let toggle_entity = entity;
     let toggle_key_for_click = Arc::clone(&toggle_key);
 
-    let header = div().id(SharedString::from(format!("file-other-details-header-{toggle_key}")))
-                      .flex()
-                      .items_center()
-                      .gap(px(6.0))
-                      .cursor_pointer()
-                      .text_sm()
-                      .font_weight(gpui::FontWeight::SEMIBOLD)
-                      .text_color(colors.text_primary)
-                      .on_click(move |_, _, cx| {
-                          toggle_entity.update(cx, |ctrl, cx| {
-                              ctrl.toggle_file_other_details(Arc::clone(&toggle_key_for_click), cx);
-                          });
-                      })
-                      .child(Icon::new(if open {
-                                           IconName::ChevronUp
-                                       }
-                                       else {
-                                           IconName::ChevronDown
-                                       }).text_color(colors.text_secondary))
-                      .child(t!("detail.other_details_heading").to_string());
+    let header = div()
+        .id(SharedString::from(format!(
+            "file-other-details-header-{toggle_key}"
+        )))
+        .flex()
+        .items_center()
+        .gap(px(6.0))
+        .cursor_pointer()
+        .text_sm()
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .text_color(colors.text_primary)
+        .on_click(move |_, _, cx| {
+            toggle_entity.update(cx, |ctrl, cx| {
+                ctrl.toggle_file_other_details(Arc::clone(&toggle_key_for_click), cx);
+            });
+        })
+        .child(
+            Icon::new(if open {
+                IconName::ChevronUp
+            } else {
+                IconName::ChevronDown
+            })
+            .text_color(colors.text_secondary),
+        )
+        .child(t!("detail.other_details_heading").to_string());
 
     let path_value = if is_downloaded {
-        dtrpg_core::data::storage::publisher_dir(storage_root_path, publisher).display()
-                                                                              .to_string()
-    }
-    else {
+        dtrpg_core::data::storage::publisher_dir(storage_root_path, publisher)
+            .display()
+            .to_string()
+    } else {
         value_or_dash("")
     };
 
@@ -906,10 +956,11 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
             .span(2),
         );
 
-    Collapsible::new().gap(px(8.0))
-                      .open(open)
-                      .child(header)
-                      .content(content)
+    Collapsible::new()
+        .gap(px(8.0))
+        .open(open)
+        .child(header)
+        .content(content)
 }
 
 /// Renders the "Other details" disclosure section: a clickable header that
@@ -918,9 +969,9 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
 /// id, product id, added-order value, and the generative cover color).
 ///
 /// See `catalog-entry-detail-advanced-disclosure`.
-fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
-                        colors: &ColorTokens, cx: &App)
-                        -> impl IntoElement + 'static {
+fn render_other_details(
+    item: &LibraryItem, entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App,
+) -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let open = entity.read(cx).is_other_details_open(&entry_id);
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
@@ -929,27 +980,29 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
     let toggle_entity = entity;
     let toggle_entry_id = Arc::clone(&entry_id);
 
-    let header = div().id("other-details-header")
-                      .flex()
-                      .items_center()
-                      .gap(px(6.0))
-                      .cursor_pointer()
-                      .text_sm()
-                      .font_weight(gpui::FontWeight::SEMIBOLD)
-                      .text_color(colors.text_primary)
-                      .on_click(move |_, _, cx| {
-                          toggle_entity.update(cx, |ctrl, cx| {
-                                           ctrl.toggle_other_details(Arc::clone(&toggle_entry_id),
-                                                                     cx);
-                                       });
-                      })
-                      .child(Icon::new(if open {
-                                           IconName::ChevronUp
-                                       }
-                                       else {
-                                           IconName::ChevronDown
-                                       }).text_color(colors.text_secondary))
-                      .child(t!("detail.other_details_heading").to_string());
+    let header = div()
+        .id("other-details-header")
+        .flex()
+        .items_center()
+        .gap(px(6.0))
+        .cursor_pointer()
+        .text_sm()
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .text_color(colors.text_primary)
+        .on_click(move |_, _, cx| {
+            toggle_entity.update(cx, |ctrl, cx| {
+                ctrl.toggle_other_details(Arc::clone(&toggle_entry_id), cx);
+            });
+        })
+        .child(
+            Icon::new(if open {
+                IconName::ChevronUp
+            } else {
+                IconName::ChevronDown
+            })
+            .text_color(colors.text_secondary),
+        )
+        .child(t!("detail.other_details_heading").to_string());
 
     let swatch_color = cover_style(item).background;
     let content = DescriptionList::vertical()
@@ -1030,43 +1083,48 @@ fn render_other_details(item: &LibraryItem, entity: Entity<LibraryController>,
             .span(2),
         );
 
-    Collapsible::new().gap(px(8.0))
-                      .open(open)
-                      .child(header)
-                      .content(content)
+    Collapsible::new()
+        .gap(px(8.0))
+        .open(open)
+        .child(header)
+        .content(content)
 }
 
 /// Renders a summary of the collections this entry currently belongs to, with a
 /// "Manage…" button opening the Manage Collections dialog scoped to this entry.
 ///
 /// See `detail-view-collection-membership`.
-fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryController>,
-                              colors: &ColorTokens, cx: &App)
-                              -> impl IntoElement + 'static {
+fn render_collections_section(
+    item: &LibraryItem, entity: Entity<LibraryController>, colors: &ColorTokens, cx: &App,
+) -> impl IntoElement + 'static {
     let member_id = collection_member_id(item);
     let product_id = item.product_id;
-    let member_names: Vec<Arc<str>> =
-        entity.read(cx)
-              .collections
-              .iter()
-              .filter(|c| member_ids_contain(&c.member_ids, member_id, product_id))
-              .map(|c| Arc::clone(&c.name))
-              .collect();
+    let member_names: Vec<Arc<str>> = entity
+        .read(cx)
+        .collections
+        .iter()
+        .filter(|c| member_ids_contain(&c.member_ids, member_id, product_id))
+        .map(|c| Arc::clone(&c.name))
+        .collect();
 
     let summary: AnyElement = if member_names.is_empty() {
-        div().text_sm()
-             .text_color(colors.text_tertiary)
-             .child(t!("detail.collections_empty").to_string())
-             .into_any_element()
-    }
-    else {
-        selectable_text("detail-tab-collections-summary",
-                        member_names.iter()
-                                    .map(|n| n.to_string())
-                                    .collect::<Vec<_>>()
-                                    .join(", ")).text_sm()
-                                                .text_color(colors.text_secondary)
-                                                .into_any_element()
+        div()
+            .text_sm()
+            .text_color(colors.text_tertiary)
+            .child(t!("detail.collections_empty").to_string())
+            .into_any_element()
+    } else {
+        selectable_text(
+            "detail-tab-collections-summary",
+            member_names
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+        )
+        .text_sm()
+        .text_color(colors.text_secondary)
+        .into_any_element()
     };
 
     let item_title = Arc::clone(&item.title);
@@ -1114,9 +1172,9 @@ fn render_collections_section(item: &LibraryItem, entity: Entity<LibraryControll
 ///
 /// `field_id` must be unique within the surrounding view — it doubles as the
 /// hover group name and the copy button's element id.
-fn copyable_value(field_id: SharedString, value: impl Into<SharedString>,
-                  value_font_family: &str)
-                  -> AnyElement {
+fn copyable_value(
+    field_id: SharedString, value: impl Into<SharedString>, value_font_family: &str,
+) -> AnyElement {
     let value: SharedString = value.into();
 
     div()
@@ -1149,17 +1207,19 @@ fn copyable_value(field_id: SharedString, value: impl Into<SharedString>,
 /// small caps, distinguishing field names from their values (rendered in the
 /// dedicated value font — see [`styled_value`]).
 fn styled_label(label: impl Into<SharedString>, label_font_family: &str) -> AnyElement {
-    div().font_family(label_font_family.to_string())
-         .child(small_caps_text(label))
-         .into_any_element()
+    div()
+        .font_family(label_font_family.to_string())
+        .child(small_caps_text(label))
+        .into_any_element()
 }
 
 /// Renders a `DescriptionList` value in the app's dedicated value font, for
 /// plain text values that don't need [`copyable_value`]'s copy button.
 fn styled_value(value: impl Into<SharedString>, value_font_family: &str) -> AnyElement {
-    div().font_family(value_font_family.to_string())
-         .child(value.into())
-         .into_any_element()
+    div()
+        .font_family(value_font_family.to_string())
+        .child(value.into())
+        .into_any_element()
 }
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
@@ -1177,26 +1237,31 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 /// true (a file-presence check per `verify-downloaded-status-against-disk`
 /// is in flight), shows a distinct pending glyph and tooltip rather than a
 /// downloaded/cloud state that may be stale.
-fn render_status_icon(is_downloaded: bool, is_offloaded: bool, is_verifying: bool,
-                      color: gpui::Hsla) -> impl IntoElement + 'static {
+fn render_status_icon(
+    is_downloaded: bool, is_offloaded: bool, is_verifying: bool, color: gpui::Hsla,
+) -> impl IntoElement + 'static {
     let (glyph, tooltip_text) = if is_verifying {
-        ("\u{22ef}", t!("detail.tooltip_verifying_download").to_string())
-    }
-    else if is_offloaded {
-        ("\u{2601}", t!("detail.tooltip_offloaded_download").to_string())
-    }
-    else if is_downloaded {
+        (
+            "\u{22ef}",
+            t!("detail.tooltip_verifying_download").to_string(),
+        )
+    } else if is_offloaded {
+        (
+            "\u{2601}",
+            t!("detail.tooltip_offloaded_download").to_string(),
+        )
+    } else if is_downloaded {
         ("\u{2713}", t!("detail.status_on_device").to_string())
-    }
-    else {
+    } else {
         ("\u{2601}", t!("detail.status_in_cloud").to_string())
     };
 
-    div().id("detail-status-icon")
-         .text_sm()
-         .text_color(color)
-         .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
-         .child(glyph)
+    div()
+        .id("detail-status-icon")
+        .text_sm()
+        .text_color(color)
+        .tooltip(move |window, cx| Tooltip::new(tooltip_text.clone()).build(window, cx))
+        .child(glyph)
 }
 
 /// Renders a metadata value, falling back to an em dash when the underlying
@@ -1205,19 +1270,17 @@ fn render_status_icon(is_downloaded: bool, is_offloaded: bool, is_verifying: boo
 fn value_or_dash(value: &str) -> String {
     if value.trim().is_empty() {
         "\u{2014}".to_string()
-    }
-    else {
+    } else {
         value.to_string()
     }
 }
 
-fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_font_family: &str,
-                         value_font_family: &str)
-                         -> impl IntoElement + 'static + use<> {
+fn render_metadata_table(
+    item: &LibraryItem, storage_root_path: &Path, label_font_family: &str, value_font_family: &str,
+) -> impl IntoElement + 'static + use<> {
     let file_size_label = if item.files.len() > 1 {
         t!("detail.field_total_file_size").to_string()
-    }
-    else {
+    } else {
         t!("detail.field_file_size").to_string()
     };
 
@@ -1228,39 +1291,34 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
     let file_size_value = {
         let catalog_mb: f64 = if item.files.is_empty() {
             item.size_mb
-        }
-        else {
+        } else {
             item.files.iter().map(|f| f.size_mb).sum()
         };
         let catalog_str = format!("{:.0} {}", catalog_mb, t!("size.mb"));
 
         if item.files.is_empty() {
             catalog_str
-        }
-        else {
+        } else {
             let entry_dir =
                 dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
             let downloaded_count = item.files.iter().filter(|f| f.downloaded).count();
-            let resolved: Vec<u64> =
-                item.files
-                    .iter()
-                    .filter(|f| f.downloaded)
-                    .filter_map(|f| {
-                        crate::util::file_size::on_disk_file_size(&entry_dir, f.name.as_ref())
-                    })
-                    .collect();
+            let resolved: Vec<u64> = item
+                .files
+                .iter()
+                .filter(|f| f.downloaded)
+                .filter_map(|f| {
+                    crate::util::file_size::on_disk_file_size(&entry_dir, f.name.as_ref())
+                })
+                .collect();
 
             if downloaded_count == 0 {
                 catalog_str
-            }
-            else if downloaded_count == item.files.len() && resolved.len() == item.files.len() {
+            } else if downloaded_count == item.files.len() && resolved.len() == item.files.len() {
                 crate::util::file_size::format_bytes(resolved.iter().sum())
-            }
-            else {
+            } else {
                 let on_disk_bytes = if resolved.is_empty() {
                     None
-                }
-                else {
+                } else {
                     Some(resolved.iter().sum())
                 };
                 crate::util::file_size::with_on_disk_suffix(catalog_str, on_disk_bytes)
@@ -1339,17 +1397,26 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
 
     if let Some(ts) = item.date_added {
         let value = render_relative_date_value(&item.id, "added", ts, value_font_family);
-        list = list.child(DescriptionItem::new(styled_label(t!("detail.field_added").to_string(),
-                                                            label_font_family)).value(value)
-                                                                               .span(2));
+        list = list.child(
+            DescriptionItem::new(styled_label(
+                t!("detail.field_added").to_string(),
+                label_font_family,
+            ))
+            .value(value)
+            .span(2),
+        );
     }
 
     if let Some(ts) = item.date_updated {
         let value = render_relative_date_value(&item.id, "updated", ts, value_font_family);
-        list =
-            list.child(DescriptionItem::new(styled_label(t!("detail.field_updated").to_string(),
-                                                         label_font_family)).value(value)
-                                                                            .span(2));
+        list = list.child(
+            DescriptionItem::new(styled_label(
+                t!("detail.field_updated").to_string(),
+                label_font_family,
+            ))
+            .value(value)
+            .span(2),
+        );
     }
 
     list
@@ -1360,16 +1427,23 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
 ///
 /// `slot` disambiguates the element id (e.g. `"added"`, `"updated"`) so
 /// multiple date rows on the same item don't collide.
-fn render_relative_date_value(item_id: &str, slot: &str, ts: i64, value_font_family: &str)
-                              -> AnyElement {
+fn render_relative_date_value(
+    item_id: &str, slot: &str, ts: i64, value_font_family: &str,
+) -> AnyElement {
     let relative = format_relative(ts);
     let absolute = format_absolute(ts);
     let id = SharedString::from(format!("detail-{slot}-{item_id}"));
-    div().id(id)
-         .child(selectable_text(SharedString::from(format!("detail-{slot}-{item_id}-text")),
-                                relative).font_family(value_font_family.to_string()))
-         .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
-         .into_any_element()
+    div()
+        .id(id)
+        .child(
+            selectable_text(
+                SharedString::from(format!("detail-{slot}-{item_id}-text")),
+                relative,
+            )
+            .font_family(value_font_family.to_string()),
+        )
+        .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
+        .into_any_element()
 }
 
 #[cfg(test)]

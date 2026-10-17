@@ -28,24 +28,27 @@ use crate::services::{LibraryService, LibraryServiceError};
 /// stateless-per-call pattern -- see `index_root`'s doc comment for why this
 /// facade does not hold a long-lived `LibraryIndex` connection.
 pub struct LibraryApi {
-    library:     Box<dyn LibraryService>,
+    library: Box<dyn LibraryService>,
     collections: Box<dyn CollectionsService>,
     /// Directory the library index database lives in -- the same directory
     /// `data::catalog_cache`/`data::collections_cache` already use (the
     /// app's own cache directory, not a user-configurable path).
-    index_root:  PathBuf,
+    index_root: PathBuf,
 }
 
 impl LibraryApi {
     /// Constructs the facade over the given service implementations.
     ///
     /// `index_root` is the directory the library index database lives in.
-    pub fn new(library: Box<dyn LibraryService>, collections: Box<dyn CollectionsService>,
-               index_root: impl Into<PathBuf>)
-               -> Self {
-        Self { library,
-               collections,
-               index_root: index_root.into() }
+    pub fn new(
+        library: Box<dyn LibraryService>, collections: Box<dyn CollectionsService>,
+        index_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            library,
+            collections,
+            index_root: index_root.into(),
+        }
     }
 
     fn open_index(&self) -> Result<LibraryIndex, IndexError> {
@@ -116,8 +119,9 @@ impl LibraryApi {
     /// # Errors
     ///
     /// Returns [`IndexError`] if the index cannot be opened or queried.
-    pub fn index_count_recently_updated(&self, now_secs: i64, window_days: u32)
-                                        -> Result<usize, IndexError> {
+    pub fn index_count_recently_updated(
+        &self, now_secs: i64, window_days: u32,
+    ) -> Result<usize, IndexError> {
         self.open_index()?
             .count_recently_updated(now_secs, window_days)
     }
@@ -169,8 +173,9 @@ impl LibraryApi {
     ///
     /// Returns a [`CollectionsServiceError`] if the underlying service call
     /// fails.
-    pub fn create_collection(&self, name: &str)
-                             -> Result<CollectionEntry, CollectionsServiceError> {
+    pub fn create_collection(
+        &self, name: &str,
+    ) -> Result<CollectionEntry, CollectionsServiceError> {
         self.collections.create_collection(name)
     }
 
@@ -199,9 +204,11 @@ mod tests {
     }
 
     fn api_at(dir: &Path) -> LibraryApi {
-        LibraryApi::new(Box::new(StubLibraryService::new(StubMode::Seeded)),
-                        Box::new(CollectionsStubService::new(CollectionsStubMode::Empty)),
-                        dir)
+        LibraryApi::new(
+            Box::new(StubLibraryService::new(StubMode::Seeded)),
+            Box::new(CollectionsStubService::new(CollectionsStubMode::Empty)),
+            dir,
+        )
     }
 
     #[test]
@@ -224,9 +231,9 @@ mod tests {
         let api = api_at(&dir);
         let catalog = stub_catalog();
         api.open_index()
-           .unwrap()
-           .replace_all_items(&catalog)
-           .unwrap();
+            .unwrap()
+            .replace_all_items(&catalog)
+            .unwrap();
 
         let listed = api.index_list_items().unwrap();
         assert_eq!(listed.len(), catalog.len());
@@ -244,16 +251,19 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let api = api_at(&dir);
         let catalog = stub_catalog();
-        let downloaded = catalog.iter()
-                                .filter(|i| i.status == ItemStatus::Downloaded)
-                                .count();
+        let downloaded = catalog
+            .iter()
+            .filter(|i| i.status == ItemStatus::Downloaded)
+            .count();
         api.open_index()
-           .unwrap()
-           .replace_all_items(&catalog)
-           .unwrap();
+            .unwrap()
+            .replace_all_items(&catalog)
+            .unwrap();
 
-        assert_eq!(api.index_count_by_status(ItemStatus::Downloaded).unwrap(),
-                   downloaded);
+        assert_eq!(
+            api.index_count_by_status(ItemStatus::Downloaded).unwrap(),
+            downloaded
+        );
         assert_eq!(api.index_count_all().unwrap(), catalog.len());
 
         let _ = std::fs::remove_dir_all(&dir);
