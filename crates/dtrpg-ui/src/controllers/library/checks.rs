@@ -17,13 +17,16 @@ impl LibraryController {
         else {
             return;
         };
+        let collection_ids = collection_ids_for_item(&item, &self.collections);
         self.verifying_downloads.insert(Arc::clone(&id));
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
               let verification = async_cx.background_executor()
                                          .spawn(async move {
-                                             find_presence_changes(&item, &StorageConfig::load())
+                                             find_presence_changes_in_collections(&item,
+                                                                   &StorageConfig::load(),
+                                                                   &collection_ids)
                                          })
                                          .await;
 

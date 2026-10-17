@@ -26,6 +26,8 @@ purchases, on macOS, Linux, and Windows. This is the latest documentation.
   items into custom collections.
 - [Downloads]({{ '/latest/downloads/' | relative_url }}) - where files go,
   concurrency, retries, and the collections-symlink option.
+- [Storage roots]({{ '/latest/storage/' | relative_url }}) - configure
+  additional download locations and placement behavior.
 
 ## Customizing
 

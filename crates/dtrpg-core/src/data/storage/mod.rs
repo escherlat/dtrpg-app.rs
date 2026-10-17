@@ -10,4 +10,6 @@ pub mod placement;
 pub mod roots;
 
 pub use config::{DEFAULT_MAX_CONCURRENT_DOWNLOADS, DEFAULT_ROOT_ID, StorageConfig, StorageError};
-pub use paths::{available_space_mb, collection_dir, publisher_dir, validate_writable};
+pub use paths::{
+    available_space_mb, collection_dir, publisher_dir, sanitize_path_component, validate_writable,
+};

@@ -10,6 +10,7 @@ use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use dtrpg_core::data::profile::ProfileConfig;
+use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
 use dtrpg_core::data::token_status::{TokenStatus, TokenStatusHandle};
 use dtrpg_core::services::LoginService;
@@ -97,6 +98,8 @@ pub struct SettingsSnapshot {
     pub is_authenticated:               bool,
     /// Resolved storage root path (override or platform default).
     pub storage_root_path:              PathBuf,
+    /// Configured download roots, including the immutable default root.
+    pub storage_roots:                  Vec<StorageRoot>,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -498,6 +501,25 @@ impl SettingsController {
         self.storage.root_path()
     }
 
+    /// Returns all configured download roots, with the default root first.
+    pub fn storage_roots(&self) -> Vec<StorageRoot> {
+        self.storage.roots()
+    }
+
+    /// Adds a named download root after validating that it is writable.
+    pub fn add_storage_root(&mut self, name: String, path: PathBuf, cx: &mut Context<Self>)
+                            -> Result<u32, StorageError> {
+        let id = self.storage.add_root(name, path)?;
+        cx.emit(SettingsChanged);
+        Ok(id)
+    }
+
+    /// Removes a non-default download root. The default root is never removed.
+    pub fn remove_storage_root(&mut self, id: u32, cx: &mut Context<Self>) {
+        self.storage.remove_root(id);
+        cx.emit(SettingsChanged);
+    }
+
     /// Validates `path` for writability and saves it as the new storage root.
     ///
     /// Emits [`SettingsChanged`] on success. Returns the validation error on
@@ -894,6 +916,7 @@ impl SettingsController {
                            file_openers: self.file_openers.entries().to_vec(),
                            is_authenticated: self.is_authenticated,
                            storage_root_path: self.storage.root_path(),
+                           storage_roots: self.storage.roots(),
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,

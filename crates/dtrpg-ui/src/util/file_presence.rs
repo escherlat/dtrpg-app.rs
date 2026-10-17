@@ -5,8 +5,11 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use dtrpg_core::data::collection::CollectionEntry;
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
-use dtrpg_core::data::storage::StorageConfig;
+use dtrpg_core::data::storage::{StorageConfig, sanitize_path_component};
+use dtrpg_core::util::matching::member_ids_contain;
+
 use crate::util::icloud_status;
 
 /// Resolves the expected on-disk path for `file` within `item`'s entry,
@@ -16,8 +19,32 @@ use crate::util::icloud_status;
 #[must_use]
 pub fn resolved_file_path(storage: &StorageConfig, item: &LibraryItem, file: &LibraryItemFile)
                           -> PathBuf {
-    storage.path_for_publisher(&item.publisher)
-           .join(file.name.as_ref())
+    resolved_file_path_in_collections(storage, item, file, &[])
+}
+
+/// Resolves a file using the configured placement rules and the item's
+/// collection memberships.
+#[must_use]
+pub fn resolved_file_path_in_collections(storage: &StorageConfig, item: &LibraryItem,
+                                         file: &LibraryItemFile, collection_ids: &[u64])
+                                         -> PathBuf {
+    let root = storage.resolve_root_for(&item.publisher, collection_ids, file.size_mb);
+    let file_name = sanitize_path_component(file.name.as_ref());
+    StorageConfig::path_for_publisher_in(&root, &item.publisher).join(file_name)
+}
+
+/// Returns the collection IDs containing `item`, matching either API identity
+/// field just as collection filtering does elsewhere in the UI.
+#[must_use]
+pub fn collection_ids_for_item(item: &LibraryItem, collections: &[CollectionEntry]) -> Vec<u64> {
+    collections.iter()
+               .filter(|collection| {
+                   member_ids_contain(&collection.member_ids,
+                                      item.order_product_id,
+                                      item.product_id)
+               })
+               .map(|collection| collection.id)
+               .collect()
 }
 
 /// A file whose on-disk presence differs from its `downloaded` flag.
@@ -52,19 +79,28 @@ pub struct ItemVerification {
 #[must_use]
 pub fn find_presence_changes(item: &LibraryItem, storage: &StorageConfig)
                              -> Option<ItemVerification> {
+    find_presence_changes_in_collections(item, storage, &[])
+}
+
+/// Checks an item against disk while applying multi-root placement rules.
+#[must_use]
+pub fn find_presence_changes_in_collections(item: &LibraryItem, storage: &StorageConfig,
+                                            collection_ids: &[u64])
+                                            -> Option<ItemVerification> {
     let changes: Vec<PresenceChange> =
         item.files
             .iter()
             .filter_map(|file| {
-                let path = resolved_file_path(storage, item, file);
+                let path = resolved_file_path_in_collections(storage, item, file, collection_ids);
                 let present = path.exists();
                 let offloaded = present && icloud_status::is_offloaded(&path);
-                (file.downloaded != present || file.offloaded != offloaded)
-                    .then(|| PresenceChange {
-                        file_name: Arc::clone(&file.name),
-                        present,
-                        offloaded,
-                    })
+                (file.downloaded != present || file.offloaded != offloaded).then(|| {
+                                                                               PresenceChange {
+                file_name: Arc::clone(&file.name),
+                present,
+                offloaded,
+            }
+                                                                           })
             })
             .collect();
 
