@@ -238,10 +238,9 @@ mod tests {
 
     #[test]
     fn missing_paths_are_reported_without_platform_commands() {
-        let state = Platform
-            .file_state(Path::new("/definitely/not/a/libri-file"))
-            .expect("state lookup should not fail for a missing path");
-
-        assert_eq!(state, FileState::Missing);
+        assert!(matches!(
+            Platform.file_state(Path::new("/definitely/not/a/libri-file")),
+            Ok(FileState::Missing)
+        ));
     }
 }
