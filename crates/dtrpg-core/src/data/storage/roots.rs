@@ -13,7 +13,7 @@ pub struct StorageRoot {
     /// removed, so a stale rule pointing at a removed root's id resolves to
     /// "no match" rather than silently matching whatever root is later
     /// assigned the same id.
-    pub id:   u32,
+    pub id: u32,
     /// Display name shown in the Settings roots list, e.g. "Internal SSD"
     /// or "External Archive".
     pub name: String,
@@ -26,7 +26,7 @@ pub struct StorageRoot {
 pub struct RootCapacity {
     /// Space already used by this root's own contents (`items/` and
     /// `collections/` combined), if it could be measured.
-    pub used_mb:      Option<f64>,
+    pub used_mb: Option<f64>,
     /// Free space remaining on the volume the root lives on, if it could
     /// be measured (e.g. an unmounted volume reports `None`).
     pub available_mb: Option<f64>,
@@ -47,19 +47,16 @@ pub fn used_space_mb(path: &std::path::Path) -> Option<f64> {
     let mut total_bytes: u64 = 0;
     let mut stack = vec![path.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir)
-        else {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
         };
         for entry in entries.flatten() {
-            let Ok(metadata) = entry.metadata()
-            else {
+            let Ok(metadata) = entry.metadata() else {
                 continue;
             };
             if metadata.is_dir() {
                 stack.push(entry.path());
-            }
-            else {
+            } else {
                 total_bytes += metadata.len();
             }
         }
@@ -71,10 +68,12 @@ pub fn used_space_mb(path: &std::path::Path) -> Option<f64> {
 /// free space on the volume it lives on.
 #[must_use]
 pub fn root_capacity(root: &StorageRoot) -> RootCapacity {
-    RootCapacity { used_mb:      used_space_mb(&root.path),
-                   available_mb:
-                       fs4::available_space(&root.path).ok()
-                                                       .map(|bytes| bytes as f64 / 1_048_576.0), }
+    RootCapacity {
+        used_mb: used_space_mb(&root.path),
+        available_mb: fs4::available_space(&root.path)
+            .ok()
+            .map(|bytes| bytes as f64 / 1_048_576.0),
+    }
 }
 
 #[cfg(test)]
@@ -112,9 +111,11 @@ mod tests {
         let dir = test_dir("capacity");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("a.txt"), vec![0u8; 1_048_576]).unwrap();
-        let root = StorageRoot { id:   1,
-                                 name: "Test".to_string(),
-                                 path: dir.clone(), };
+        let root = StorageRoot {
+            id: 1,
+            name: "Test".to_string(),
+            path: dir.clone(),
+        };
 
         let capacity = root_capacity(&root);
 
