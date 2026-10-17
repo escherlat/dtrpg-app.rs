@@ -76,6 +76,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
+    let is_offloaded = item.is_offloaded();
     let download_title = item.title.to_string();
 
     let cover_w = dtrpg_core::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH * 1.5;
@@ -165,7 +166,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                             .font_weight(gpui::FontWeight::SEMIBOLD)
                                             .text_color(text_primary),
                                     )
-                                    .child(render_status_icon(is_downloaded, is_verifying,
+                                    .child(render_status_icon(is_downloaded, is_offloaded, is_verifying,
                                                               text_secondary))
                                     .children(render_checking_indicator(is_checking)),
                             )
@@ -1176,10 +1177,13 @@ fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
 /// true (a file-presence check per `verify-downloaded-status-against-disk`
 /// is in flight), shows a distinct pending glyph and tooltip rather than a
 /// downloaded/cloud state that may be stale.
-fn render_status_icon(is_downloaded: bool, is_verifying: bool, color: gpui::Hsla)
-                      -> impl IntoElement + 'static {
+fn render_status_icon(is_downloaded: bool, is_offloaded: bool, is_verifying: bool,
+                      color: gpui::Hsla) -> impl IntoElement + 'static {
     let (glyph, tooltip_text) = if is_verifying {
         ("\u{22ef}", t!("detail.tooltip_verifying_download").to_string())
+    }
+    else if is_offloaded {
+        ("\u{2601}", t!("detail.tooltip_offloaded_download").to_string())
     }
     else if is_downloaded {
         ("\u{2713}", t!("detail.status_on_device").to_string())

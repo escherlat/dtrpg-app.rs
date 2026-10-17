@@ -365,6 +365,16 @@ mod tests {
     }
 
     #[test]
+    fn is_offloaded_requires_downloaded_status() {
+        let mut item = item_with_files(vec![downloaded_file("1", "A")]);
+        item.files[0].offloaded = true;
+
+        assert!(!item.is_offloaded());
+        item.status = ItemStatus::Downloaded;
+        assert!(item.is_offloaded());
+    }
+
+    #[test]
     fn recompute_status_is_cloud_when_no_files_downloaded() {
         let mut item = item_with_files(vec![file("1", "A"), file("2", "B")]);
 
