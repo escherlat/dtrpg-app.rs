@@ -159,7 +159,8 @@ fn load_files_for(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<Libr
                                              name:       Arc::from(row.get::<_, String>(2)?),
                                              format:     Arc::from(row.get::<_, String>(3)?),
                                              size_mb:    row.get(4)?,
-                                             downloaded: row.get(5)?, })
+                                             downloaded: row.get(5)?,
+                                             offloaded: false, })
                     })?
                     .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(files)

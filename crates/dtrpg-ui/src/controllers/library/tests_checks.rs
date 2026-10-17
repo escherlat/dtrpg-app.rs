@@ -33,7 +33,8 @@ mod item_check_tests {
                           name: format!("{id}.pdf").into(),
                           format: "PDF".into(),
                           size_mb: 1.0,
-                          downloaded }
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]

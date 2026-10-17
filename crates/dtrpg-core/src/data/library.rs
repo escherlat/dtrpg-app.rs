@@ -184,6 +184,12 @@ impl LibraryItem {
             ItemStatus::Cloud
         }
     }
+
+    /// Returns whether a downloaded file is currently offloaded by a cloud provider.
+    #[must_use]
+    pub fn is_offloaded(&self) -> bool {
+        self.status == ItemStatus::Downloaded && self.files.iter().any(|file| file.offloaded)
+    }
 }
 
 // ── LibraryItemFile
@@ -217,6 +223,9 @@ pub struct LibraryItemFile {
     /// files is.
     #[serde(default)]
     pub downloaded: bool,
+    /// Whether the downloaded file's bytes have been evicted by a cloud file provider.
+    #[serde(default)]
+    pub offloaded: bool,
 }
 
 // ── Smart section counts
@@ -295,6 +304,7 @@ mod tests {
             format: "PDF".into(),
             size_mb: 1.0,
             downloaded: false,
+                offloaded: false,
         }
     }
 

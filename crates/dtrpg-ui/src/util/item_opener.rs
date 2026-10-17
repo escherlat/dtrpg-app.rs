@@ -160,7 +160,8 @@ mod tests {
                           name:       name.into(),
                           format:     "PDF".into(),
                           size_mb:    1.0,
-                          downloaded: false, }
+                          downloaded: false,
+                offloaded: false, }
     }
 
     #[test]

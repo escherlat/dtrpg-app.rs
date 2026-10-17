@@ -98,7 +98,8 @@ mod download_queue_tests {
                           name: "File".into(),
                           format: "PDF".into(),
                           size_mb: 1.0,
-                          downloaded }
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]
@@ -172,7 +173,8 @@ mod disk_space_check_tests {
                           name: "File".into(),
                           format: "PDF".into(),
                           size_mb,
-                          downloaded }
+                          downloaded,
+                          offloaded: false }
     }
 
     fn item(id: &str, files: Vec<LibraryItemFile>) -> LibraryItem {

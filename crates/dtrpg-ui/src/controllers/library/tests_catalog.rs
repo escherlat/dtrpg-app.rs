@@ -30,7 +30,8 @@ mod reconcile_catalog_tests {
                           name: "File".into(),
                           format: "PDF".into(),
                           size_mb: 1.0,
-                          downloaded }
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]

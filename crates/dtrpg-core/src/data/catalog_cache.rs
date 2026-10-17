@@ -534,6 +534,7 @@ mod tests {
                 format: "PDF".into(),
                 size_mb: 1.0,
                 downloaded: false,
+                offloaded: false,
             },
             LibraryItemFile {
                 id: "1234".into(),
@@ -542,6 +543,7 @@ mod tests {
                 format: "PDF".into(),
                 size_mb: 1.0,
                 downloaded: false,
+                offloaded: false,
             },
         ];
         // Bypass `save_catalog_cache` (which would go through the current,

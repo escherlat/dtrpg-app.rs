@@ -206,6 +206,7 @@ fn map_files(files: &[OrderProductFile]) -> Vec<LibraryItemFile> {
                 .into(),
             size_mb: f.size as f64 / BYTES_PER_MB,
             downloaded: false,
+                offloaded: false,
         })
         .collect()
 }
