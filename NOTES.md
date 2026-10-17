@@ -216,3 +216,20 @@ cargo check --workspace --all-targets                         PASS
 cargo clippy --workspace --all-targets -- -D warnings        PASS
 cargo test --workspace                                       PASS
 ```
+
+---
+
+# ADR 0004 closure checkpoint
+
+ADR 0004 is accepted. Checkpoints on this branch:
+
+- `376c974` — added platform file availability states.
+- `3540753` — routed UI reveal, labels, and file-presence checks through the
+  core platform boundary.
+- `af28b2f` — centralized settings capability checks.
+- `d4655b4` — centralized the title-bar platform check.
+
+The platform contract is ready for the dependent tags-and-OS-projection
+feature. That feature will implement filesystem tag projection while honoring
+the SQLite index as the source of truth; it is intentionally not folded into
+this architectural boundary change.

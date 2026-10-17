@@ -1,6 +1,6 @@
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -89,3 +89,13 @@ whatever the filesystem last reported on every platform, not just Windows.
   `LibraryApi` (0002) depends on, so this ADR should land after or
   alongside 0002, not as a later refactor bolted onto a facade that already
   shipped without it.
+
+## Implementation checkpoint
+
+Accepted on 2026-10-17. The platform boundary now owns capability reporting,
+native reveal, cloud-file materialization hooks, and file availability state.
+The desktop UI routes reveal actions, platform labels, file-presence checks,
+settings capability text, and title-bar platform behavior through
+`dtrpg_core::platform`; those views no longer contain platform-selection
+branches. Filesystem tag projection remains the dependent tags feature's
+responsibility, using the source-of-truth rule defined above.
