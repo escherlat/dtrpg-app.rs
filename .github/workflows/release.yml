@@ -31,7 +31,7 @@ jobs:
       test-args: "--workspace"
       publish-to-crates-io: false
       linux-packages: >-
-        libsecret-1-dev libasound2-dev libfontconfig-dev libgit2-dev
+        libdbus-1-dev libsecret-1-dev libasound2-dev libfontconfig-dev libgit2-dev
         libglib2.0-dev libssl-dev libva-dev libvulkan1 libwayland-dev
         libx11-xcb-dev libxkbcommon-x11-dev libzstd-dev
       release-branch: master
