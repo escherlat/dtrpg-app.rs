@@ -20,10 +20,28 @@ pub struct Capabilities {
     pub reveal: bool,
 }
 
+/// Availability state reported for a local library file.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FileState {
+    /// The path is not present on the local filesystem.
+    Missing,
+    /// The path is available for immediate use.
+    Local,
+    /// The path exists as a cloud placeholder and is not yet local.
+    CloudOnly,
+    /// The platform is currently materializing the path.
+    Downloading,
+    /// The platform could not determine a more specific state.
+    Unknown,
+}
+
 /// Platform operations used by application services and presentation layers.
 pub trait PlatformIntegration: Send + Sync {
     /// Returns the operations supported by this platform implementation.
     fn capabilities(&self) -> Capabilities;
+
+    /// Returns the platform's current availability state for `path`.
+    fn file_state(&self, path: &Path) -> io::Result<FileState>;
 
     /// Reveals `path` in the native file manager.
     fn reveal(&self, path: &Path) -> io::Result<()>;
@@ -48,6 +66,10 @@ impl PlatformIntegration for Platform {
 
     fn reveal(&self, path: &Path) -> io::Result<()> {
         reveal(path)
+    }
+
+    fn file_state(&self, path: &Path) -> io::Result<FileState> {
+        file_state(path)
     }
 
     fn materialize(&self, path: &Path) -> io::Result<()> {
@@ -93,9 +115,40 @@ fn reveal(path: &Path) -> io::Result<()> {
     run_command("open", ["-R", &path.to_string_lossy()])
 }
 
+#[cfg(target_os = "macos")]
+fn file_state(path: &Path) -> io::Result<FileState> {
+    if !path.exists() {
+        return Ok(FileState::Missing);
+    }
+
+    let output = std::process::Command::new("mdls")
+        .args(["-raw", "-name", "NSURLUbiquitousItemDownloadingStatusKey"])
+        .arg(path)
+        .output()?;
+    if !output.status.success() {
+        return Ok(FileState::Unknown);
+    }
+
+    match String::from_utf8_lossy(&output.stdout).trim() {
+        "NSURLUbiquitousItemDownloadingStatusNotDownloaded" => Ok(FileState::CloudOnly),
+        "NSURLUbiquitousItemDownloadingStatusDownloaded"
+        | "NSURLUbiquitousItemDownloadingStatusCurrent" => Ok(FileState::Local),
+        _ => Ok(FileState::Unknown),
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn reveal(path: &Path) -> io::Result<()> {
     run_command("explorer", [format!("/select,{}", path.display())])
+}
+
+#[cfg(not(target_os = "macos"))]
+fn file_state(path: &Path) -> io::Result<FileState> {
+    if path.exists() {
+        Ok(FileState::Local)
+    } else {
+        Ok(FileState::Missing)
+    }
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -141,7 +194,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Capabilities, Platform, PlatformIntegration};
+    use std::path::Path;
+
+    use super::{Capabilities, FileState, Platform, PlatformIntegration};
 
     #[test]
     fn capabilities_match_the_target_contract() {
@@ -179,5 +234,14 @@ mod tests {
                 reveal: true,
             }
         );
+    }
+
+    #[test]
+    fn missing_paths_are_reported_without_platform_commands() {
+        let state = Platform
+            .file_state(Path::new("/definitely/not/a/libri-file"))
+            .expect("state lookup should not fail for a missing path");
+
+        assert_eq!(state, FileState::Missing);
     }
 }
