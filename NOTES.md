@@ -189,3 +189,30 @@ cargo test --workspace
 ```
 
 All four are clean as of commit 6fe8509.
+
+---
+
+# ADR 0002 closure checkpoint
+
+ADR 0002 is accepted on this branch. The implementation was carried through
+these checkpoints:
+
+- `806a00d` — inverted the crate graph and added the `LibraryApi` facade.
+- `e0ccf8d` — recorded the ADR 0002 implementation status.
+- `6029d4d` — added the SQLite/FTS5 index used by the core layer.
+- `906910f` — exposed index-backed reads, search, and aggregate queries through
+  `LibraryApi`.
+- `380d9ed` — made the platform test suite pass strict Clippy settings.
+
+The remaining queue consolidation, shared-runtime, and controller-state work
+is intentionally separate follow-up work. The UI keeps its in-memory catalog
+for render-path safety, while headless consumers use `LibraryApi` and the
+index.
+
+Final verification on this branch:
+
+```text
+cargo check --workspace --all-targets                         PASS
+cargo clippy --workspace --all-targets -- -D warnings        PASS
+cargo test --workspace                                       PASS
+```

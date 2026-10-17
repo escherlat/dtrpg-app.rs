@@ -1,6 +1,6 @@
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -92,7 +92,16 @@ inversion that every other goal needing headless access would hit next.
 - `LibraryApi` becomes a second public contract to keep stable, alongside
   `dtrpg-sdk`'s own API: a signature change there now has two downstream
   consumers (the desktop app, the MCP server) instead of one.
-- This ADR is the prerequisite for 0003 (SQLite index), 0004 (platform
-  integration layer), and 0006 (container format abstraction): each of
-  those assumes a headless `dtrpg-core` already exists. They should not
-  land ahead of this one.
+ - This ADR is the prerequisite for 0003 (SQLite index), 0004 (platform
+   integration layer), and 0006 (container format abstraction): each of
+   those assumes a headless `dtrpg-core` already exists. They should not
+   land ahead of this one.
+
+## Implementation checkpoint
+
+Accepted on 2026-10-17 after the crate inversion, `LibraryApi` facade, desktop
+and MCP entry-point split, SQLite index integration, and index-backed API reads
+landed and passed workspace verification. The interactive GPUI catalog
+intentionally retains its in-memory render model; controller queue
+consolidation and the shared runtime are separate follow-up changes and do not
+change this crate-boundary decision.
