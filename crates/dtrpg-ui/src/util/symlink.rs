@@ -40,6 +40,7 @@ pub fn ensure_symlink(target: &Path, link: &Path) -> io::Result<()> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[cfg(unix)]
     use super::*;
 
     #[cfg(unix)]
