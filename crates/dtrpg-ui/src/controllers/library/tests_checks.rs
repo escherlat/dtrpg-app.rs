@@ -11,34 +11,30 @@ mod item_check_tests {
     use super::super::{apply_check_result, item_check_due};
 
     fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            title,
-            "Publisher",
-            "Line",
-            "Core",
-            "PDF",
-            0,
-            0.0,
-            2020,
-            0,
-            ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        )
+        LibraryItem::new(id,
+                         title,
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     fn file(id: &str, downloaded: bool) -> LibraryItemFile {
-        LibraryItemFile {
-            id: id.into(),
-            index: 0,
-            name: format!("{id}.pdf").into(),
-            format: "PDF".into(),
-            size_mb: 1.0,
-            downloaded,
-            offloaded: false,
-        }
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: format!("{id}.pdf").into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]
@@ -100,14 +96,10 @@ mod item_check_tests {
         let mut existing = item("b1", "Still Here");
         let now = SystemTime::now();
 
-        apply_check_result(
-            &mut existing,
-            Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::NotFound,
-                "not found",
-            )),
-            now,
-        );
+        apply_check_result(&mut existing,
+                           Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound,
+                                                        "not found")),
+                           now);
 
         assert_eq!(existing.title.as_ref(), "Still Here");
         assert!(!existing.is_available);
@@ -120,14 +112,10 @@ mod item_check_tests {
         existing.is_available = true;
         let now = SystemTime::now();
 
-        apply_check_result(
-            &mut existing,
-            Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::Network,
-                "network error",
-            )),
-            now,
-        );
+        apply_check_result(&mut existing,
+                           Err(LibraryServiceError::new(LibraryServiceErrorKind::Network,
+                                                        "network error")),
+                           now);
 
         assert!(existing.is_available);
         assert_eq!(existing.availability_last_checked, None);
@@ -235,14 +223,13 @@ mod concurrency_tests {
             if thumbnail_queue_len > 0 {
                 thumbnail_queue_len -= 1;
                 active_thumbnail_fetches += 1;
-            } else if download_queue_len > 0 {
+            }
+            else if download_queue_len > 0 {
                 download_queue_len -= 1;
                 active_downloads += 1;
             }
-            assert!(
-                active_thumbnail_fetches + active_downloads <= max,
-                "active fetches exceeded max_concurrent_downloads"
-            );
+            assert!(active_thumbnail_fetches + active_downloads <= max,
+                    "active fetches exceeded max_concurrent_downloads");
         }
     }
 }
@@ -290,22 +277,20 @@ mod check_batch_tests {
     use super::super::{check_batch_cooldown_active, select_check_batch};
 
     fn item(id: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            "Title",
-            "Publisher",
-            "Line",
-            "Core",
-            "PDF",
-            0,
-            0.0,
-            2020,
-            0,
-            ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        )
+        LibraryItem::new(id,
+                         "Title",
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     #[test]
@@ -335,23 +320,17 @@ mod check_batch_tests {
         let mut checked_recently_within_cooldown = item("b3");
         checked_recently_within_cooldown.availability_last_checked = Some(SystemTime::now());
 
-        let catalog = [
-            checked_recently_within_cooldown,
-            checked_long_ago.clone(),
-            never_checked.clone(),
-        ];
+        let catalog = [checked_recently_within_cooldown,
+                       checked_long_ago.clone(),
+                       never_checked.clone()];
         let batch = select_check_batch(&catalog, 10);
 
         // The recently-checked item is within its cooldown and not due, so it's
         // excluded; the never-checked item sorts before the long-ago-checked
         // one.
-        assert_eq!(
-            batch,
-            vec![
-                Arc::clone(&never_checked.id),
-                Arc::clone(&checked_long_ago.id)
-            ]
-        );
+        assert_eq!(batch,
+                   vec![Arc::clone(&never_checked.id),
+                        Arc::clone(&checked_long_ago.id)]);
     }
 
     #[test]

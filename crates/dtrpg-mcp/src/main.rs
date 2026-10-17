@@ -10,21 +10,15 @@ use dtrpg_core::data::paths::cache_dir;
 use dtrpg_core::services::sdk::{RustSdkCollectionsService, RustSdkLibraryService};
 
 fn main() {
-    let api = LibraryApi::new(
-        Box::new(RustSdkLibraryService::unauthenticated()),
-        Box::new(RustSdkCollectionsService::unauthenticated()),
-        cache_dir(),
-    );
+    let api = LibraryApi::new(Box::new(RustSdkLibraryService::unauthenticated()),
+                              Box::new(RustSdkCollectionsService::unauthenticated()),
+                              cache_dir());
 
     match api.list_items() {
-        Ok(items) => println!(
-            "dtrpg-mcp stub: linked dtrpg-core with no GPUI dependency, \
+        Ok(items) => println!("dtrpg-mcp stub: linked dtrpg-core with no GPUI dependency, \
                                {} item(s) visible unauthenticated",
-            items.len()
-        ),
-        Err(e) => println!(
-            "dtrpg-mcp stub: linked dtrpg-core with no GPUI dependency, \
-                            list_items returned an expected unauthenticated error: {e}"
-        ),
+                              items.len()),
+        Err(e) => println!("dtrpg-mcp stub: linked dtrpg-core with no GPUI dependency, \
+                            list_items returned an expected unauthenticated error: {e}"),
     }
 }

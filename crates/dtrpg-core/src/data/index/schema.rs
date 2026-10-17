@@ -18,7 +18,7 @@ pub(super) const SCHEMA_VERSION: i64 = 2;
 pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
     let previous_version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
     conn.execute_batch(
-        "
+                       "
         CREATE TABLE IF NOT EXISTS items (
             id                TEXT PRIMARY KEY,
             numeric_id        INTEGER NOT NULL,
@@ -118,10 +118,7 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
         ",
     )?;
     if previous_version == 1 {
-        conn.execute(
-            "ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0",
-            [],
-        )?;
+        conn.execute("ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0", [])?;
     }
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())

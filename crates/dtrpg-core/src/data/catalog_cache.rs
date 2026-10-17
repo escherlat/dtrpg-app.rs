@@ -244,11 +244,10 @@ pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
     let index = LibraryIndex::open_and_migrate(root)
         .map_err(|e| warn!(root = %root.display(), error = %e, "library index not openable"))
         .ok()?;
-    index
-        .list_items()
-        .map_err(|e| warn!(root = %root.display(), error = %e, "library index query failed"))
-        .ok()
-        .filter(|items| !items.is_empty())
+    index.list_items()
+         .map_err(|e| warn!(root = %root.display(), error = %e, "library index query failed"))
+         .ok()
+         .filter(|items| !items.is_empty())
 }
 
 /// Reads the legacy JSON catalog cache directly from

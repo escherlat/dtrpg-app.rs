@@ -59,86 +59,80 @@ fn page_title(ix: usize) -> String {
 /// `focus_handle` is the settings window's root focus handle; Escape closes
 /// the window via [`SettingsController::close`].
 #[allow(clippy::too_many_arguments)]
-pub fn render_settings_panel(
-    file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot, storage_root_path: PathBuf,
-    storage_path_exists: bool, entity: Entity<SettingsController>,
-    library: Entity<LibraryController>, focus_handle: &FocusHandle, colors: &ColorTokens,
-    theme: &LibriTheme, email_input: Option<Entity<InputState>>,
-    password_input: Option<Entity<InputState>>, sign_in_in_progress: bool, sign_in_enabled: bool,
-    sign_in_error: Option<String>, storage_path_input: Option<Entity<InputState>>,
-    file_opener_extension_input: Entity<InputState>, pending_file_opener: Option<PathBuf>,
-    active_page_ix: usize, cache_counts: CacheCounts, max_concurrent_downloads: usize,
-    max_concurrent_downloads_input: Option<Entity<InputState>>, create_collections: bool,
-    recently_updated_window_days: u32, recently_updated_window_input: Option<Entity<InputState>>,
-    font_selects: AppearanceFontSelects,
-) -> AnyElement {
+pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSnapshot,
+                             storage_root_path: PathBuf, storage_path_exists: bool,
+                             entity: Entity<SettingsController>,
+                             library: Entity<LibraryController>, focus_handle: &FocusHandle,
+                             colors: &ColorTokens, theme: &LibriTheme,
+                             email_input: Option<Entity<InputState>>,
+                             password_input: Option<Entity<InputState>>,
+                             sign_in_in_progress: bool, sign_in_enabled: bool,
+                             sign_in_error: Option<String>,
+                             storage_path_input: Option<Entity<InputState>>,
+                             file_opener_extension_input: Entity<InputState>,
+                             pending_file_opener: Option<PathBuf>, active_page_ix: usize,
+                             cache_counts: CacheCounts, max_concurrent_downloads: usize,
+                             max_concurrent_downloads_input: Option<Entity<InputState>>,
+                             create_collections: bool, recently_updated_window_days: u32,
+                             recently_updated_window_input: Option<Entity<InputState>>,
+                             font_selects: AppearanceFontSelects)
+                             -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
         active_page_ix
-    } else {
+    }
+    else {
         0
     };
 
     let entity_escape = entity.clone();
 
     let sidebar_menu = SidebarMenu::new().children((0..PAGE_COUNT).map(|ix| {
-        let entity = entity.clone();
-        SidebarMenuItem::new(page_title(ix))
+                                                       let entity = entity.clone();
+                                                       SidebarMenuItem::new(page_title(ix))
             .active(ix == active_page_ix)
             .on_click(move |_, _, cx| {
                 entity.update(cx, |ctrl, cx| ctrl.set_active_page_ix(ix, cx));
             })
-    }));
-    let sidebar = Sidebar::new("settings-sidebar")
-        .w(px(160.0))
-        .border_0()
-        .collapsible(false)
-        .collapsed(false)
-        .child(sidebar_menu);
+                                                   }));
+    let sidebar = Sidebar::new("settings-sidebar").w(px(160.0))
+                                                  .border_0()
+                                                  .collapsible(false)
+                                                  .collapsed(false)
+                                                  .child(sidebar_menu);
 
     let content: AnyElement = match active_page_ix {
         1 => render_appearance_section(library, colors, theme, font_selects).into_any_element(),
-        2 => render_storage_section(
-            storage_root_path,
-            storage_path_exists,
-            entity.clone(),
-            colors,
-            storage_path_input,
-            max_concurrent_downloads,
-            max_concurrent_downloads_input,
-            create_collections,
-        )
-        .into_any_element(),
-        3 => render_file_openers_section(
-            file_openers,
-            entity.clone(),
-            colors,
-            file_opener_extension_input,
-            pending_file_opener,
-        )
-        .into_any_element(),
-        4 => render_advanced_section(
-            entity.clone(),
-            cache_counts,
-            colors,
-            &theme.fonts.label_font,
-            &theme.fonts.value_font,
-            recently_updated_window_days,
-            recently_updated_window_input,
-        )
-        .into_any_element(),
-        _ => render_account_section(
-            &auth,
-            entity.clone(),
-            colors,
-            email_input,
-            password_input,
-            sign_in_in_progress,
-            sign_in_enabled,
-            sign_in_error,
-            &theme.fonts.label_font,
-            &theme.fonts.mono_font,
-        ),
+        2 => render_storage_section(storage_root_path,
+                                    storage_path_exists,
+                                    entity.clone(),
+                                    colors,
+                                    storage_path_input,
+                                    max_concurrent_downloads,
+                                    max_concurrent_downloads_input,
+                                    create_collections).into_any_element(),
+        3 => render_file_openers_section(file_openers,
+                                         entity.clone(),
+                                         colors,
+                                         file_opener_extension_input,
+                                         pending_file_opener).into_any_element(),
+        4 => render_advanced_section(entity.clone(),
+                                     cache_counts,
+                                     colors,
+                                     &theme.fonts.label_font,
+                                     &theme.fonts.value_font,
+                                     recently_updated_window_days,
+                                     recently_updated_window_input).into_any_element(),
+        _ => render_account_section(&auth,
+                                    entity.clone(),
+                                    colors,
+                                    email_input,
+                                    password_input,
+                                    sign_in_in_progress,
+                                    sign_in_enabled,
+                                    sign_in_error,
+                                    &theme.fonts.label_font,
+                                    &theme.fonts.mono_font),
     };
 
     // Reserves vertical clearance for the macOS traffic light buttons, which
@@ -151,60 +145,50 @@ pub fn render_settings_panel(
     // `title_bar_view::render_title_bar`. Shorter than that view's 44px bar
     // since there's no account button/wordmark to balance here — just the
     // centered title.
-    let drag_region = div()
-        .id("settings-drag-region")
-        .h(px(28.0))
-        .flex_none()
-        .flex()
-        .items_center()
-        .justify_center()
-        .text_base()
-        .line_height(px(28.0))
-        .font_weight(gpui::FontWeight::BOLD)
-        .text_color(colors.text_primary)
-        .child(t!("settings.title").to_string())
-        .on_mouse_down(MouseButton::Left, |_, window, _| {
-            window.start_window_move();
-        });
+    let drag_region = div().id("settings-drag-region")
+                           .h(px(28.0))
+                           .flex_none()
+                           .flex()
+                           .items_center()
+                           .justify_center()
+                           .text_base()
+                           .line_height(px(28.0))
+                           .font_weight(gpui::FontWeight::BOLD)
+                           .text_color(colors.text_primary)
+                           .child(t!("settings.title").to_string())
+                           .on_mouse_down(MouseButton::Left, |_, window, _| {
+                               window.start_window_move();
+                           });
 
-    div()
-        .id("settings-window-root")
-        .track_focus(focus_handle)
-        .on_key_down(move |event, _window, cx| {
-            if event.keystroke.key == "escape" {
-                entity_escape.update(cx, |ctrl, cx| ctrl.close(cx));
-            }
-        })
-        .size_full()
-        .bg(surface)
-        .flex()
-        .flex_col()
-        .child(drag_region)
-        .child(
-            div()
-                .flex_1()
-                .min_h_0()
-                .flex()
-                .flex_row()
-                .child(sidebar)
-                // `overflow_y_scrollbar()` wraps this element in
-                // `Scrollable`, whose `render` only copies the `size`
-                // style field onto its own outer wrapper — `flex_1()`/
-                // `min_w_0()`/`min_h_0()` set here would be silently
-                // dropped. Those sizing properties live on this plain
-                // outer div instead; the inner div just needs
-                // `size_full()` to fill it, which `Scrollable` already
-                // applies on its own.
-                .child(
-                    div().flex_1().min_w_0().min_h_0().child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .size_full()
-                            .overflow_y_scrollbar()
-                            .child(content),
-                    ),
-                ),
-        )
-        .into_any_element()
+    div().id("settings-window-root")
+         .track_focus(focus_handle)
+         .on_key_down(move |event, _window, cx| {
+             if event.keystroke.key == "escape" {
+                 entity_escape.update(cx, |ctrl, cx| ctrl.close(cx));
+             }
+         })
+         .size_full()
+         .bg(surface)
+         .flex()
+         .flex_col()
+         .child(drag_region)
+         .child(div().flex_1()
+                     .min_h_0()
+                     .flex()
+                     .flex_row()
+                     .child(sidebar)
+                     // `overflow_y_scrollbar()` wraps this element in
+                     // `Scrollable`, whose `render` only copies the `size`
+                     // style field onto its own outer wrapper — `flex_1()`/
+                     // `min_w_0()`/`min_h_0()` set here would be silently
+                     // dropped. Those sizing properties live on this plain
+                     // outer div instead; the inner div just needs
+                     // `size_full()` to fill it, which `Scrollable` already
+                     // applies on its own.
+                     .child(div().flex_1().min_w_0().min_h_0().child(div().flex()
+                                                                          .flex_col()
+                                                                          .size_full()
+                                                                          .overflow_y_scrollbar()
+                                                                          .child(content))))
+         .into_any_element()
 }

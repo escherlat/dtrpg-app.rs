@@ -11,11 +11,9 @@ impl LibraryController {
     /// Thumbnail and download slots draw from the same aggregate limit (see
     /// `thumbnail-queue-concurrency`'s "shared limit" requirement).
     pub(super) fn available_slots(&self) -> usize {
-        remaining_slots(
-            self.max_concurrent_downloads,
-            self.active_thumbnail_fetches,
-            self.active_downloads,
-        )
+        remaining_slots(self.max_concurrent_downloads,
+                        self.active_thumbnail_fetches,
+                        self.active_downloads)
     }
 
     /// Updates the shared thumbnail/download concurrency limit and drains

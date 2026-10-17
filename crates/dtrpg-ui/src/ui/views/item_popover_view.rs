@@ -38,10 +38,10 @@ use crate::util::datetime::{format_absolute, format_relative};
 /// are responsible for computing it (see
 /// `catalog_view::popover_anchor_point`) so the popover sits beside the
 /// catalog entry rather than over it.
-pub fn render_item_popover(
-    item: &LibraryItem, position: Point<Pixels>, entity: Entity<LibraryController>,
-    tabs: Entity<TabsController>, colors: &ColorTokens, is_checking: bool, is_verifying: bool,
-) -> AnyElement {
+pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
+                           entity: Entity<LibraryController>, tabs: Entity<TabsController>,
+                           colors: &ColorTokens, is_checking: bool, is_verifying: bool)
+                           -> AnyElement {
     let surface = colors.surface;
     let border = colors.border;
     let text_primary = colors.text_primary;
@@ -258,14 +258,10 @@ pub fn render_item_popover(
                 ),
         );
 
-    deferred(
-        anchored()
-            .snap_to_window_with_margin(px(ITEM_POPOVER_MARGIN))
-            .position(position)
-            .child(content),
-    )
-    .with_priority(1)
-    .into_any_element()
+    deferred(anchored().snap_to_window_with_margin(px(ITEM_POPOVER_MARGIN))
+                       .position(position)
+                       .child(content)).with_priority(1)
+                                       .into_any_element()
 }
 
 /// Returns the icon for the popover's download action button: a checkmark
@@ -273,7 +269,8 @@ pub fn render_item_popover(
 fn download_button_icon(is_downloaded: bool) -> IconName {
     if is_downloaded {
         IconName::CircleCheck
-    } else {
+    }
+    else {
         IconName::ArrowDown
     }
 }

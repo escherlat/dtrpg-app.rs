@@ -23,30 +23,23 @@ impl LibraryController {
     /// [`crate::util::file_info::compute_file_info`]; returns
     /// [`FileInfo::None`] immediately for undownloaded files or an unknown
     /// entry/row without touching the cache.
-    pub fn file_info(
-        &mut self, entry_id: &Arc<str>, row_ix: usize, entry_dir: &Path,
-    ) -> crate::util::file_info::FileInfo {
-        let Some((downloaded, path, format)) = self
-            .item_by_id(entry_id)
-            .and_then(|item| item.files.get(row_ix))
-            .map(|file| {
-                (
-                    file.downloaded,
-                    entry_dir.join(file.name.as_ref()),
-                    file.format.clone(),
-                )
-            })
+    pub fn file_info(&mut self, entry_id: &Arc<str>, row_ix: usize, entry_dir: &Path)
+                     -> crate::util::file_info::FileInfo {
+        let Some((downloaded, path, format)) =
+            self.item_by_id(entry_id)
+                .and_then(|item| item.files.get(row_ix))
+                .map(|file| {
+                    (file.downloaded, entry_dir.join(file.name.as_ref()), file.format.clone())
+                })
         else {
             return crate::util::file_info::FileInfo::None;
         };
-        cached_file_info(
-            &mut self.file_info_cache,
-            entry_id,
-            row_ix,
-            downloaded,
-            &path,
-            &format,
-        )
+        cached_file_info(&mut self.file_info_cache,
+                         entry_id,
+                         row_ix,
+                         downloaded,
+                         &path,
+                         &format)
     }
 
     /// Opens (or moves) the hover preview to `entry_id`'s file row `row_ix`,
@@ -57,10 +50,8 @@ impl LibraryController {
     /// re-read the archive or re-notify every frame.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn hover_zip_preview(
-        &mut self, entry_id: Arc<str>, row_ix: usize, anchor_pos: Point<Pixels>,
-        cx: &mut Context<Self>,
-    ) {
+    pub fn hover_zip_preview(&mut self, entry_id: Arc<str>, row_ix: usize,
+                             anchor_pos: Point<Pixels>, cx: &mut Context<Self>) {
         if let Some(existing) = &self.zip_preview {
             if existing.pinned && (existing.entry_id != entry_id || existing.row_ix != row_ix) {
                 return;
@@ -69,12 +60,10 @@ impl LibraryController {
                 return;
             }
         }
-        self.zip_preview = Some(ZipPreviewState {
-            entry_id,
-            row_ix,
-            anchor_pos,
-            pinned: false,
-        });
+        self.zip_preview = Some(ZipPreviewState { entry_id,
+                                                  row_ix,
+                                                  anchor_pos,
+                                                  pinned: false });
         cx.emit(LibraryChanged);
     }
 
@@ -83,13 +72,13 @@ impl LibraryController {
     /// is the active preview.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn clear_hover_zip_preview(
-        &mut self, entry_id: &str, row_ix: usize, cx: &mut Context<Self>,
-    ) {
-        let should_clear = self
-            .zip_preview
-            .as_ref()
-            .is_some_and(|p| !p.pinned && p.entry_id.as_ref() == entry_id && p.row_ix == row_ix);
+    pub fn clear_hover_zip_preview(&mut self, entry_id: &str, row_ix: usize,
+                                   cx: &mut Context<Self>) {
+        let should_clear = self.zip_preview.as_ref().is_some_and(|p| {
+                                                        !p.pinned
+                                                        && p.entry_id.as_ref() == entry_id
+                                                        && p.row_ix == row_ix
+                                                    });
         if should_clear {
             self.zip_preview = None;
             cx.emit(LibraryChanged);
@@ -101,23 +90,20 @@ impl LibraryController {
     /// click, or clears it entirely on a second click of the same row.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn toggle_zip_preview_pin(
-        &mut self, entry_id: Arc<str>, row_ix: usize, anchor_pos: Point<Pixels>,
-        cx: &mut Context<Self>,
-    ) {
-        let already_pinned = self
-            .zip_preview
-            .as_ref()
-            .is_some_and(|p| p.pinned && p.entry_id == entry_id && p.row_ix == row_ix);
+    pub fn toggle_zip_preview_pin(&mut self, entry_id: Arc<str>, row_ix: usize,
+                                  anchor_pos: Point<Pixels>, cx: &mut Context<Self>) {
+        let already_pinned =
+            self.zip_preview
+                .as_ref()
+                .is_some_and(|p| p.pinned && p.entry_id == entry_id && p.row_ix == row_ix);
         self.zip_preview = if already_pinned {
             None
-        } else {
-            Some(ZipPreviewState {
-                entry_id,
-                row_ix,
-                anchor_pos,
-                pinned: true,
-            })
+        }
+        else {
+            Some(ZipPreviewState { entry_id,
+                                   row_ix,
+                                   anchor_pos,
+                                   pinned: true })
         };
         cx.emit(LibraryChanged);
     }
@@ -127,10 +113,9 @@ impl LibraryController {
     ///
     /// Emits [`LibraryChanged`].
     pub fn close_zip_preview(&mut self, entry_id: &str, cx: &mut Context<Self>) {
-        if self
-            .zip_preview
-            .as_ref()
-            .is_some_and(|p| p.entry_id.as_ref() == entry_id)
+        if self.zip_preview
+               .as_ref()
+               .is_some_and(|p| p.entry_id.as_ref() == entry_id)
         {
             self.zip_preview = None;
             cx.emit(LibraryChanged);
@@ -201,10 +186,8 @@ impl LibraryController {
     ///
     /// Emits [`LibraryChanged`].
     pub fn set_detail_panel_width(&mut self, width: f32, cx: &mut Context<Self>) {
-        self.detail_panel_width = width.clamp(
-            dtrpg_core::data::constants::DETAIL_PANEL_MIN_WIDTH,
-            dtrpg_core::data::constants::DETAIL_PANEL_MAX_WIDTH,
-        );
+        self.detail_panel_width = width.clamp(dtrpg_core::data::constants::DETAIL_PANEL_MIN_WIDTH,
+                                              dtrpg_core::data::constants::DETAIL_PANEL_MAX_WIDTH);
         cx.emit(LibraryChanged);
     }
 }

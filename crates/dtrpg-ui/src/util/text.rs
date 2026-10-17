@@ -99,10 +99,8 @@ mod tests {
 
     #[test]
     fn escape_markdown_escapes_headings_and_links() {
-        assert_eq!(
-            escape_markdown("# [Title](url)"),
-            "\\# \\[Title\\]\\(url\\)"
-        );
+        assert_eq!(escape_markdown("# [Title](url)"),
+                   "\\# \\[Title\\]\\(url\\)");
     }
 
     #[test]

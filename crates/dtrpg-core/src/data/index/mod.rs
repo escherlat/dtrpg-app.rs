@@ -139,9 +139,8 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the query fails.
-    pub fn count_recently_updated(
-        &self, now_secs: i64, window_days: u32,
-    ) -> Result<usize, IndexError> {
+    pub fn count_recently_updated(&self, now_secs: i64, window_days: u32)
+                                  -> Result<usize, IndexError> {
         items::count_recently_updated(&self.conn, now_secs, window_days)
     }
 
@@ -151,9 +150,8 @@ impl LibraryIndex {
     /// # Errors
     ///
     /// Returns [`IndexError::Sqlite`] if the write fails.
-    pub fn replace_all_collections(
-        &mut self, entries: &[CollectionEntry],
-    ) -> Result<(), IndexError> {
+    pub fn replace_all_collections(&mut self, entries: &[CollectionEntry])
+                                   -> Result<(), IndexError> {
         collections::replace_all_collections(&mut self.conn, entries)
     }
 
@@ -176,31 +174,27 @@ mod tests {
     use crate::data::library::LibraryItemFile;
 
     fn item(id: &str, title: &str, publisher: &str, desc: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            title,
-            publisher,
-            "",
-            "Core",
-            "PDF",
-            100,
-            10.0,
-            2024,
-            0,
-            ItemStatus::Cloud,
-            "#1C2A44",
-            desc,
-            Some(1_700_000_000),
-        )
+        LibraryItem::new(id,
+                         title,
+                         publisher,
+                         "",
+                         "Core",
+                         "PDF",
+                         100,
+                         10.0,
+                         2024,
+                         0,
+                         ItemStatus::Cloud,
+                         "#1C2A44",
+                         desc,
+                         Some(1_700_000_000))
     }
 
     #[test]
     fn replace_then_list_round_trips() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
-        let items = vec![
-            item("a1", "Moria", "Free League", "A classic."),
-            item("a2", "Vaesen", "Free League", "Nordic horror."),
-        ];
+        let items = vec![item("a1", "Moria", "Free League", "A classic."),
+                         item("a2", "Vaesen", "Free League", "Nordic horror."),];
 
         index.replace_all_items(&items).unwrap();
         let loaded = index.list_items().unwrap();
@@ -213,13 +207,11 @@ mod tests {
     #[test]
     fn replace_all_items_overwrites_the_previous_catalog() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
-        index
-            .replace_all_items(&[item("a1", "Moria", "Free League", "")])
-            .unwrap();
+        index.replace_all_items(&[item("a1", "Moria", "Free League", "")])
+             .unwrap();
 
-        index
-            .replace_all_items(&[item("b1", "Vaesen", "Free League", "")])
-            .unwrap();
+        index.replace_all_items(&[item("b1", "Vaesen", "Free League", "")])
+             .unwrap();
         let loaded = index.list_items().unwrap();
 
         assert_eq!(loaded.len(), 1);
@@ -230,15 +222,13 @@ mod tests {
     fn get_item_finds_an_existing_item_and_its_files() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
         let mut moria = item("a1", "Moria", "Free League", "");
-        moria.files = vec![LibraryItemFile {
-            id: Arc::from("f1"),
-            index: 0,
-            name: Arc::from("Moria.pdf"),
-            format: Arc::from("PDF"),
-            size_mb: 12.0,
-            downloaded: true,
-            offloaded: false,
-        }];
+        moria.files = vec![LibraryItemFile { id:         Arc::from("f1"),
+                                             index:      0,
+                                             name:       Arc::from("Moria.pdf"),
+                                             format:     Arc::from("PDF"),
+                                             size_mb:    12.0,
+                                             downloaded: true,
+                                             offloaded: false, }];
         index.replace_all_items(&[moria]).unwrap();
 
         let loaded = index.get_item("a1").unwrap().unwrap();
@@ -258,12 +248,9 @@ mod tests {
     #[test]
     fn search_matches_title() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
-        index
-            .replace_all_items(&[
-                item("a1", "Moria", "Free League", ""),
-                item("a2", "Vaesen", "Free League", ""),
-            ])
-            .unwrap();
+        index.replace_all_items(&[item("a1", "Moria", "Free League", ""),
+                                  item("a2", "Vaesen", "Free League", "")])
+             .unwrap();
 
         let results = index.search("Moria").unwrap();
 
@@ -274,12 +261,9 @@ mod tests {
     #[test]
     fn search_matches_description() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
-        index
-            .replace_all_items(&[
-                item("a1", "Moria", "Free League", "A classic dungeon crawl."),
-                item("a2", "Vaesen", "Free League", "Nordic horror."),
-            ])
-            .unwrap();
+        index.replace_all_items(&[item("a1", "Moria", "Free League", "A classic dungeon crawl."),
+                                  item("a2", "Vaesen", "Free League", "Nordic horror.")])
+             .unwrap();
 
         let results = index.search("dungeon").unwrap();
 
@@ -290,9 +274,8 @@ mod tests {
     #[test]
     fn search_finds_nothing_for_an_unmatched_term() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
-        index
-            .replace_all_items(&[item("a1", "Moria", "Free League", "")])
-            .unwrap();
+        index.replace_all_items(&[item("a1", "Moria", "Free League", "")])
+             .unwrap();
 
         assert!(index.search("nonexistentterm").unwrap().is_empty());
     }
@@ -300,12 +283,9 @@ mod tests {
     #[test]
     fn count_all_reflects_the_full_catalog() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
-        index
-            .replace_all_items(&[
-                item("a1", "Moria", "Free League", ""),
-                item("a2", "Vaesen", "Free League", ""),
-            ])
-            .unwrap();
+        index.replace_all_items(&[item("a1", "Moria", "Free League", ""),
+                                  item("a2", "Vaesen", "Free League", "")])
+             .unwrap();
 
         assert_eq!(index.count_all().unwrap(), 2);
     }
@@ -339,12 +319,10 @@ mod tests {
     #[test]
     fn collections_round_trip_with_members() {
         let mut index = LibraryIndex::open_in_memory().unwrap();
-        let entries = vec![CollectionEntry {
-            id: 1,
-            name: Arc::from("Favorites"),
-            member_ids: Arc::from([10u64, 20u64]),
-            created_at: 1_700_000_000,
-        }];
+        let entries = vec![CollectionEntry { id:         1,
+                                             name:       Arc::from("Favorites"),
+                                             member_ids: Arc::from([10u64, 20u64]),
+                                             created_at: 1_700_000_000, }];
 
         index.replace_all_collections(&entries).unwrap();
         let loaded = index.list_collections().unwrap();

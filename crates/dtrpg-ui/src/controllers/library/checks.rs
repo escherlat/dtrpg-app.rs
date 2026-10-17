@@ -13,28 +13,30 @@ impl LibraryController {
     /// the item, and a local `Path::exists()` call per file is cheap enough
     /// that gating it adds complexity without a real cost problem to solve.
     pub(super) fn verify_selected_item_download(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(item) = self.item_by_id(&id).cloned() else {
+        let Some(item) = self.item_by_id(&id).cloned()
+        else {
             return;
         };
         self.verifying_downloads.insert(Arc::clone(&id));
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
-            let verification = async_cx
-                .background_executor()
-                .spawn(async move { find_presence_changes(&item, &StorageConfig::load()) })
-                .await;
+              let verification = async_cx.background_executor()
+                                         .spawn(async move {
+                                             find_presence_changes(&item, &StorageConfig::load())
+                                         })
+                                         .await;
 
-            this.update(async_cx, |ctrl, cx| {
-                ctrl.verifying_downloads.remove(&id);
-                if let Some(verification) = verification {
-                    ctrl.apply_verifications(&[verification]);
-                }
-                cx.emit(LibraryChanged);
-            })
-            .ok();
-        })
-        .detach();
+              this.update(async_cx, |ctrl, cx| {
+                      ctrl.verifying_downloads.remove(&id);
+                      if let Some(verification) = verification {
+                          ctrl.apply_verifications(&[verification]);
+                      }
+                      cx.emit(LibraryChanged);
+                  })
+                  .ok();
+          })
+          .detach();
     }
 
     /// Applies disk-check results to the live catalog and, if any file flag
@@ -48,10 +50,9 @@ impl LibraryController {
     pub(super) fn apply_verifications(&mut self, verifications: &[ItemVerification]) -> bool {
         let mut changed = false;
         for verification in verifications {
-            if let Some(item) = self
-                .catalog
-                .iter_mut()
-                .find(|i| i.id == verification.item_id)
+            if let Some(item) = self.catalog
+                                    .iter_mut()
+                                    .find(|i| i.id == verification.item_id)
             {
                 changed |= apply_presence_changes(item, &verification.changes);
             }
@@ -83,11 +84,10 @@ impl LibraryController {
     /// render paths. Items missing from the map are idle.
     #[must_use]
     pub fn item_activity_snapshot(&self) -> HashMap<Arc<str>, ItemActivity> {
-        let downloading = self
-            .download_queue
-            .iter()
-            .map(|(id, ..)| id)
-            .chain(self.download_activity_ids.keys().map(|(id, _)| id));
+        let downloading = self.download_queue
+                              .iter()
+                              .map(|(id, ..)| id)
+                              .chain(self.download_activity_ids.keys().map(|(id, _)| id));
         item_activity_map(&self.verifying_downloads, downloading)
     }
 
@@ -122,7 +122,8 @@ impl LibraryController {
     /// popover via [`Self::select_item`], or an expanded detail tab — see
     /// each `open_detail_tab` call site).
     pub fn maybe_check_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(item) = self.item_by_id(&id) else {
+        let Some(item) = self.item_by_id(&id)
+        else {
             return;
         };
         if !item_check_due(item.availability_last_checked) {
@@ -147,32 +148,29 @@ impl LibraryController {
         let service_arc = self.vm.service_arc();
 
         cx.spawn(async move |this, async_cx| {
-            let result = async_cx
-                .background_executor()
-                .spawn(async move { service_arc.get_item(numeric_id) })
-                .await;
+            let result = async_cx.background_executor()
+                                 .spawn(async move { service_arc.get_item(numeric_id) })
+                                 .await;
             if let Err(e) = &result
-                && e.kind != LibraryServiceErrorKind::NotFound
+               && e.kind != LibraryServiceErrorKind::NotFound
             {
                 // Transient failure: not evidence of removal, leave the item
                 // and its flag entirely unchanged.
                 tracing::warn!(id = %id, error = %e, "item availability check failed transiently");
             }
             this.update(async_cx, |ctrl, cx| {
-                if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
-                    apply_check_result(existing, result, std::time::SystemTime::now());
-                    ctrl.section_counts = section_counts(
-                        &ctrl.catalog,
-                        now_secs(),
-                        ctrl.recently_updated_window_days,
-                    );
-                    ctrl.invalidate_cache();
-                }
-                ctrl.checking_items.remove(&id);
-                cx.emit(LibraryChanged);
-                ctrl.drain_check_queue(cx);
-            })
-            .ok();
+                    if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
+                        apply_check_result(existing, result, std::time::SystemTime::now());
+                        ctrl.section_counts = section_counts(&ctrl.catalog,
+                                                             now_secs(),
+                                                             ctrl.recently_updated_window_days);
+                        ctrl.invalidate_cache();
+                    }
+                    ctrl.checking_items.remove(&id);
+                    cx.emit(LibraryChanged);
+                    ctrl.drain_check_queue(cx);
+                })
+                .ok();
         })
         .detach();
     }
@@ -200,7 +198,8 @@ impl LibraryController {
         if !self.checking_items.is_empty() {
             return;
         }
-        let Some(id) = self.check_queue.pop_front() else {
+        let Some(id) = self.check_queue.pop_front()
+        else {
             return;
         };
         self.start_item_check(id, cx);
@@ -221,18 +220,15 @@ impl LibraryController {
         let root = cache_dir();
         let last_batch_secs = load_cache_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
         let now = std::time::SystemTime::now();
-        let now_secs = now
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or_default();
+        let now_secs = now.duration_since(std::time::UNIX_EPOCH)
+                          .map(|d| d.as_secs())
+                          .unwrap_or_default();
         if check_batch_cooldown_active(last_batch_secs, now_secs) {
             return;
         }
 
-        let ids = select_check_batch(
-            &self.catalog,
-            dtrpg_core::data::constants::ITEM_CHECK_BATCH_SIZE,
-        );
+        let ids = select_check_batch(&self.catalog,
+                                     dtrpg_core::data::constants::ITEM_CHECK_BATCH_SIZE);
         if let Err(e) = save_check_batch_timestamp(&root, now_secs) {
             tracing::warn!(error = %e, "failed to persist check-batch cooldown timestamp");
         }

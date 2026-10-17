@@ -19,15 +19,13 @@ use crate::util::text::truncate_with_ellipsis;
 
 /// Renders the tab strip: the non-closable catalog tab followed by any open,
 /// closable expanded detail tabs.
-pub fn render_tab_strip(
-    tabs: Entity<TabsController>, cx: &gpui::App,
-) -> impl IntoElement + 'static {
+pub fn render_tab_strip(tabs: Entity<TabsController>, cx: &gpui::App)
+                        -> impl IntoElement + 'static {
     let snap = tabs.read(cx).snapshot();
-    let selected_index = snap
-        .open_tabs
-        .iter()
-        .position(|t| *t == snap.active)
-        .unwrap_or(0);
+    let selected_index = snap.open_tabs
+                             .iter()
+                             .position(|t| *t == snap.active)
+                             .unwrap_or(0);
 
     let mut bar = TabBar::new("main-tab-strip").segmented().menu(true);
 
@@ -35,11 +33,10 @@ pub fn render_tab_strip(
         let label: SharedString = match target {
             TabTarget::Catalog => t!("tabs.catalog_tab").to_string().into(),
             TabTarget::Detail(id) => {
-                let title = snap
-                    .titles
-                    .get(id)
-                    .cloned()
-                    .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
+                let title = snap.titles
+                                .get(id)
+                                .cloned()
+                                .unwrap_or_else(|| t!("tabs.detail_tab_fallback").to_string());
                 // The tab strip has no fixed per-tab width, so a long catalog
                 // item title otherwise stretches its tab — and the whole
                 // strip — rather than eliding.
@@ -66,14 +63,13 @@ pub fn render_tab_strip(
 
     let tabs_for_click = tabs.clone();
     let open_tabs = snap.open_tabs.clone();
-    bar = bar
-        .selected_index(selected_index)
-        .on_click(move |ix, _, cx| {
-            if let Some(target) = open_tabs.get(*ix) {
-                let target = target.clone();
-                tabs_for_click.update(cx, |ctrl, cx| ctrl.activate(target, cx));
-            }
-        });
+    bar = bar.selected_index(selected_index)
+             .on_click(move |ix, _, cx| {
+                 if let Some(target) = open_tabs.get(*ix) {
+                     let target = target.clone();
+                     tabs_for_click.update(cx, |ctrl, cx| ctrl.activate(target, cx));
+                 }
+             });
 
     div().flex_none().child(bar)
 }

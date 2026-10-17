@@ -43,10 +43,9 @@ pub fn init_globals(cx: &mut App) {
 /// whichever selections aren't being changed.
 fn initial_theme(cx: &App) -> LibriTheme {
     let prefs = UiPreferences::load();
-    let key = prefs
-        .theme_key()
-        .and_then(ThemeKey::from_persisted_key)
-        .unwrap_or_default();
+    let key = prefs.theme_key()
+                   .and_then(ThemeKey::from_persisted_key)
+                   .unwrap_or_default();
 
     let installed = cx.text_system().all_font_names();
     let body_font = resolve_installed_font(&installed, prefs.body_font_name(), DEFAULT_BODY_FONT);
@@ -60,22 +59,19 @@ fn initial_theme(cx: &App) -> LibriTheme {
     let text_scale = prefs.text_scale().unwrap_or(1.0);
     let ui_text_size = px(text_scale * DEFAULT_UI_TEXT_SIZE);
 
-    let fonts = FontSelections {
-        body_font,
-        value_font,
-        label_font,
-        mono_font,
-        ui_text_size,
-    };
+    let fonts = FontSelections { body_font,
+                                 value_font,
+                                 label_font,
+                                 mono_font,
+                                 ui_text_size };
     LibriTheme::new(key, Density::default(), fonts)
 }
 
 /// Resolves a persisted font family name against `installed` (the system's
 /// actually-available font names), falling back to `default` if the
 /// persisted name is `None` or no longer installed.
-fn resolve_installed_font(
-    installed: &[String], persisted: Option<&str>, default: &'static str,
-) -> SharedString {
+fn resolve_installed_font(installed: &[String], persisted: Option<&str>, default: &'static str)
+                          -> SharedString {
     match persisted {
         Some(name) if installed.iter().any(|f| f == name) => SharedString::from(name.to_string()),
         _ => SharedString::from(default),

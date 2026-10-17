@@ -93,15 +93,13 @@ mod download_queue_tests {
     use super::super::{dequeue_file, missing_file_indices};
 
     fn file(downloaded: bool) -> LibraryItemFile {
-        LibraryItemFile {
-            id: "f".into(),
-            index: 0,
-            name: "File".into(),
-            format: "PDF".into(),
-            size_mb: 1.0,
-            downloaded,
-            offloaded: false,
-        }
+        LibraryItemFile { id: "f".into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]
@@ -127,10 +125,9 @@ mod download_queue_tests {
 
     #[test]
     fn dequeue_file_removes_only_the_matching_entry() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> = VecDeque::from([
-            (Arc::from("entry-a"), 0, "File 0".to_string()),
-            (Arc::from("entry-a"), 1, "File 1".to_string()),
-        ]);
+        let mut queue: VecDeque<(Arc<str>, u32, String)> =
+            VecDeque::from([(Arc::from("entry-a"), 0, "File 0".to_string()),
+                            (Arc::from("entry-a"), 1, "File 1".to_string())]);
 
         let removed = dequeue_file(&mut queue, "entry-a", 0);
 
@@ -141,10 +138,9 @@ mod download_queue_tests {
 
     #[test]
     fn dequeue_file_leaves_other_entries_untouched() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> = VecDeque::from([
-            (Arc::from("entry-a"), 0, "A".to_string()),
-            (Arc::from("entry-b"), 0, "B".to_string()),
-        ]);
+        let mut queue: VecDeque<(Arc<str>, u32, String)> =
+            VecDeque::from([(Arc::from("entry-a"), 0, "A".to_string()),
+                            (Arc::from("entry-b"), 0, "B".to_string())]);
 
         dequeue_file(&mut queue, "entry-a", 0);
 
@@ -172,34 +168,30 @@ mod disk_space_check_tests {
     use super::super::{missing_files_size_mb, missing_files_size_mb_for_items};
 
     fn file(size_mb: f64, downloaded: bool) -> LibraryItemFile {
-        LibraryItemFile {
-            id: "f".into(),
-            index: 0,
-            name: "File".into(),
-            format: "PDF".into(),
-            size_mb,
-            downloaded,
-            offloaded: false,
-        }
+        LibraryItemFile { id: "f".into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb,
+                          downloaded,
+                          offloaded: false }
     }
 
     fn item(id: &str, files: Vec<LibraryItemFile>) -> LibraryItem {
-        let mut item = LibraryItem::new(
-            id,
-            "Title",
-            "Pub",
-            "Line",
-            "Core",
-            "PDF",
-            0,
-            0.0,
-            2020,
-            0,
-            ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        );
+        let mut item = LibraryItem::new(id,
+                                        "Title",
+                                        "Pub",
+                                        "Line",
+                                        "Core",
+                                        "PDF",
+                                        0,
+                                        0.0,
+                                        2020,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
         item.files = files;
         item
     }
@@ -220,11 +212,9 @@ mod disk_space_check_tests {
 
     #[test]
     fn missing_files_size_mb_for_items_sums_across_matching_items_only() {
-        let catalog = vec![
-            item("a", vec![file(10.0, false), file(5.0, true)]),
-            item("b", vec![file(3.0, false)]),
-            item("c", vec![file(100.0, false)]),
-        ];
+        let catalog = vec![item("a", vec![file(10.0, false), file(5.0, true)]),
+                           item("b", vec![file(3.0, false)]),
+                           item("c", vec![file(100.0, false)]),];
 
         let total = missing_files_size_mb_for_items(&catalog, ["a", "b"].into_iter());
 
@@ -271,10 +261,8 @@ mod file_info_cache_tests {
         let info = cached_file_info(&mut cache, &entry_id, 0, true, path, "TXT");
 
         assert_eq!(info, FileInfo::None);
-        assert_eq!(
-            cache.get(&(Arc::clone(&entry_id), 0)),
-            Some(&FileInfo::None)
-        );
+        assert_eq!(cache.get(&(Arc::clone(&entry_id), 0)),
+                   Some(&FileInfo::None));
     }
 
     #[test]
@@ -324,25 +312,22 @@ mod bulk_download_target_tests {
         collection_download_targets, filter_download_targets, publisher_download_targets,
     };
 
-    fn item(
-        id: &str, title: &str, publisher: &str, order_product_id: u64, product_id: u64,
-    ) -> LibraryItem {
-        let mut item = LibraryItem::new(
-            id,
-            title,
-            publisher,
-            "Line",
-            "Core",
-            "PDF",
-            0,
-            0.0,
-            2020,
-            0,
-            ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        );
+    fn item(id: &str, title: &str, publisher: &str, order_product_id: u64, product_id: u64)
+            -> LibraryItem {
+        let mut item = LibraryItem::new(id,
+                                        title,
+                                        publisher,
+                                        "Line",
+                                        "Core",
+                                        "PDF",
+                                        0,
+                                        0.0,
+                                        2020,
+                                        0,
+                                        ItemStatus::Cloud,
+                                        "#000000",
+                                        "",
+                                        None);
         item.order_product_id = order_product_id;
         item.product_id = product_id;
         item
@@ -350,11 +335,9 @@ mod bulk_download_target_tests {
 
     #[test]
     fn collection_download_targets_includes_every_member() {
-        let catalog = vec![
-            item("b1", "Book One", "Pub", 1, 0),
-            item("b2", "Book Two", "Pub", 2, 0),
-            item("b3", "Not A Member", "Pub", 3, 0),
-        ];
+        let catalog = vec![item("b1", "Book One", "Pub", 1, 0),
+                           item("b2", "Book Two", "Pub", 2, 0),
+                           item("b3", "Not A Member", "Pub", 3, 0),];
 
         let targets = collection_download_targets(&catalog, &[1, 2]);
 
@@ -384,11 +367,9 @@ mod bulk_download_target_tests {
 
     #[test]
     fn publisher_download_targets_includes_every_matching_item() {
-        let catalog = vec![
-            item("b1", "Book One", "Acme", 1, 0),
-            item("b2", "Book Two", "Acme", 2, 0),
-            item("b3", "Other Publisher", "Other Co", 3, 0),
-        ];
+        let catalog = vec![item("b1", "Book One", "Acme", 1, 0),
+                           item("b2", "Book Two", "Acme", 2, 0),
+                           item("b3", "Other Publisher", "Other Co", 3, 0),];
 
         let targets = publisher_download_targets(&catalog, "Acme");
 
@@ -408,10 +389,8 @@ mod bulk_download_target_tests {
 
     #[test]
     fn filter_download_targets_all_titles_includes_every_item() {
-        let catalog = vec![
-            item("b1", "Book One", "Acme", 1, 0),
-            item("b2", "Book Two", "Other Co", 2, 0),
-        ];
+        let catalog = vec![item("b1", "Book One", "Acme", 1, 0),
+                           item("b2", "Book Two", "Other Co", 2, 0),];
 
         let targets =
             filter_download_targets(&catalog, &SidebarFilter::AllTitles, &HashSet::new(), 0, 30);
@@ -421,18 +400,14 @@ mod bulk_download_target_tests {
 
     #[test]
     fn filter_download_targets_publisher_matches_only_that_publisher() {
-        let catalog = vec![
-            item("b1", "Book One", "Acme", 1, 0),
-            item("b2", "Other Publisher", "Other Co", 2, 0),
-        ];
+        let catalog = vec![item("b1", "Book One", "Acme", 1, 0),
+                           item("b2", "Other Publisher", "Other Co", 2, 0),];
 
-        let targets = filter_download_targets(
-            &catalog,
-            &SidebarFilter::Publisher(Arc::from("Acme")),
-            &HashSet::new(),
-            0,
-            30,
-        );
+        let targets = filter_download_targets(&catalog,
+                                              &SidebarFilter::Publisher(Arc::from("Acme")),
+                                              &HashSet::new(),
+                                              0,
+                                              30);
 
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].0.as_ref(), "b1");

@@ -30,16 +30,16 @@ pub struct TabsSnapshot {
     /// Open tabs, catalog first, in tab-strip order.
     pub open_tabs: Vec<TabTarget>,
     /// The currently active tab.
-    pub active: TabTarget,
+    pub active:    TabTarget,
     /// Display titles for open detail tabs, keyed by item id.
-    pub titles: HashMap<Arc<str>, String>,
+    pub titles:    HashMap<Arc<str>, String>,
 }
 
 /// Owns the set of open tabs and which one is active.
 pub struct TabsController {
-    open_tabs: Vec<TabTarget>,
-    active: TabTarget,
-    titles: HashMap<Arc<str>, String>,
+    open_tabs:        Vec<TabTarget>,
+    active:           TabTarget,
+    titles:           HashMap<Arc<str>, String>,
     /// Per-entry item list `TableState`, keyed by entry id. Gives the
     /// expanded detail tab's item list a persistent home so column widths
     /// and selection survive re-renders of the tab — see
@@ -52,22 +52,18 @@ impl TabsController {
     /// Creates a new controller with only the catalog tab open and active.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            open_tabs: vec![TabTarget::Catalog],
-            active: TabTarget::Catalog,
-            titles: HashMap::new(),
-            item_list_tables: HashMap::new(),
-        }
+        Self { open_tabs:        vec![TabTarget::Catalog],
+               active:           TabTarget::Catalog,
+               titles:           HashMap::new(),
+               item_list_tables: HashMap::new(), }
     }
 
     /// Returns a snapshot of the current tab state.
     #[must_use]
     pub fn snapshot(&self) -> TabsSnapshot {
-        TabsSnapshot {
-            open_tabs: self.open_tabs.clone(),
-            active: self.active.clone(),
-            titles: self.titles.clone(),
-        }
+        TabsSnapshot { open_tabs: self.open_tabs.clone(),
+                       active:    self.active.clone(),
+                       titles:    self.titles.clone(), }
     }
 
     /// Opens (or activates, if already open) an expanded detail tab for `id`.
@@ -94,9 +90,9 @@ impl TabsController {
     pub fn close_detail_tab(&mut self, id: &str, cx: &mut Context<Self>) {
         let before = self.open_tabs.len();
         self.open_tabs.retain(|t| match t {
-            TabTarget::Detail(open_id) => open_id.as_ref() != id,
-            TabTarget::Catalog => true,
-        });
+                          TabTarget::Detail(open_id) => open_id.as_ref() != id,
+                          TabTarget::Catalog => true,
+                      });
         if self.open_tabs.len() != before {
             self.titles.remove(id);
             self.item_list_tables.remove(id);
@@ -116,52 +112,49 @@ impl TabsController {
 /// controller already has a selection recorded for this entry (e.g. the tab
 /// was closed and reopened after a cache eviction) — restores the visual
 /// selection once via `TableState::set_selected_row`.
-pub(crate) fn item_list_table(
-    tabs: &Entity<TabsController>, controller: &Entity<LibraryController>, entry_id: &Arc<str>,
-    entry_dir: PathBuf, window: &mut Window, cx: &mut App,
-) -> Entity<TableState<ItemListDelegate>> {
+pub(crate) fn item_list_table(tabs: &Entity<TabsController>,
+                              controller: &Entity<LibraryController>, entry_id: &Arc<str>,
+                              entry_dir: PathBuf, window: &mut Window, cx: &mut App)
+                              -> Entity<TableState<ItemListDelegate>> {
     if let Some(table) = tabs.read(cx).item_list_tables.get(entry_id) {
         return table.clone();
     }
 
     let cols = item_list_columns();
     let col_count = cols.len();
-    let delegate = ItemListDelegate {
-        controller: controller.clone(),
-        entry_id: Arc::clone(entry_id),
-        columns: cols,
-        user_widths: vec![None; col_count],
-        entry_dir,
-        table_width: None,
-    };
+    let delegate = ItemListDelegate { controller: controller.clone(),
+                                      entry_id: Arc::clone(entry_id),
+                                      columns: cols,
+                                      user_widths: vec![None; col_count],
+                                      entry_dir,
+                                      table_width: None };
     let table = cx.new(|cx| {
-        TableState::new(delegate, window, cx)
-            .row_selectable(true)
-            .col_resizable(true)
-            .sortable(false)
-    });
+                      TableState::new(delegate, window, cx).row_selectable(true)
+                                                           .col_resizable(true)
+                                                           .sortable(false)
+                  });
 
     if let Some(selected_ix) = controller.read(cx).selected_item_file(entry_id) {
         table.update(cx, |state, cx| state.set_selected_row(selected_ix, cx));
     }
 
     cx.subscribe(&table, {
-        let controller = controller.clone();
-        let entry_id = Arc::clone(entry_id);
-        move |_table, event: &TableEvent, cx| {
-            if let TableEvent::SelectRow(row_ix) = event {
-                let row_ix = *row_ix;
-                let entry_id = Arc::clone(&entry_id);
-                controller.update(cx, |ctrl, cx| ctrl.select_item_file(entry_id, row_ix, cx));
-            }
-        }
-    })
-    .detach();
+          let controller = controller.clone();
+          let entry_id = Arc::clone(entry_id);
+          move |_table, event: &TableEvent, cx| {
+              if let TableEvent::SelectRow(row_ix) = event {
+                  let row_ix = *row_ix;
+                  let entry_id = Arc::clone(&entry_id);
+                  controller.update(cx, |ctrl, cx| ctrl.select_item_file(entry_id, row_ix, cx));
+              }
+          }
+      })
+      .detach();
 
     tabs.update(cx, |t, _cx| {
-        t.item_list_tables
-            .insert(Arc::clone(entry_id), table.clone());
-    });
+            t.item_list_tables
+             .insert(Arc::clone(entry_id), table.clone());
+        });
 
     table
 }

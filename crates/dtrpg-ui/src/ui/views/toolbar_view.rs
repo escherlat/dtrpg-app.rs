@@ -45,48 +45,46 @@ pub(crate) fn section_title_for(filter: &SidebarFilter) -> String {
 /// catalog total; every other filter (smart sections, collections) shows
 /// `filter_count` since the filter itself already narrows the result set below
 /// the catalog total.
-fn count_label_for(
-    filter: &SidebarFilter, filter_count: usize, matched_count: usize, total_count: usize,
-    has_search: bool,
-) -> String {
+fn count_label_for(filter: &SidebarFilter, filter_count: usize, matched_count: usize,
+                   total_count: usize, has_search: bool)
+                   -> String {
     if matches!(filter, SidebarFilter::Publisher(_)) {
-        let base = format!(
-            "{}, {}",
-            pluralize(
-                filter_count,
-                "count.publisher_item",
-                "count.publisher_items"
-            ),
-            pluralize(total_count, "count.total_item", "count.total_items"),
-        );
+        let base = format!("{}, {}",
+                           pluralize(filter_count,
+                                     "count.publisher_item",
+                                     "count.publisher_items"),
+                           pluralize(total_count, "count.total_item", "count.total_items"),);
         return if has_search {
             format!("{base}{}", t!("toolbar.filtered_suffix", n = matched_count))
-        } else {
+        }
+        else {
             base
         };
     }
 
     let base_count = if matches!(filter, SidebarFilter::AllTitles) {
         total_count
-    } else {
+    }
+    else {
         filter_count
     };
     let base = pluralize(base_count, "count.item", "count.items");
     if has_search {
         format!("{base}{}", t!("toolbar.filtered_suffix", n = matched_count))
-    } else {
+    }
+    else {
         base
     }
 }
 
 /// Renders the toolbar row above the catalog.
 #[allow(clippy::too_many_arguments)]
-pub fn render_toolbar(
-    filter: &SidebarFilter, filter_count: usize, matched_count: usize, total_count: usize,
-    search_query: &str, search_input: Entity<InputState>, sort: SortMethod,
-    sort_direction: SortDirection, grouped: bool, presentation: CatalogPresentation,
-    selection_mode: bool, entity: Entity<LibraryController>, colors: &ColorTokens,
-) -> impl IntoElement + 'static + use<> {
+pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count: usize,
+                      total_count: usize, search_query: &str, search_input: Entity<InputState>,
+                      sort: SortMethod, sort_direction: SortDirection, grouped: bool,
+                      presentation: CatalogPresentation, selection_mode: bool,
+                      entity: Entity<LibraryController>, colors: &ColorTokens)
+                      -> impl IntoElement + 'static + use<> {
     let surface = colors.surface;
     let border = colors.border;
     let text_primary = colors.text_primary;
@@ -96,74 +94,53 @@ pub fn render_toolbar(
     let has_search = !search_query.is_empty();
     let count_label = count_label_for(filter, filter_count, matched_count, total_count, has_search);
 
-    div()
-        .h(px(57.0))
-        .flex_none()
-        .flex()
-        .items_center()
-        .gap(px(16.0))
-        .px(px(18.0))
-        .border_b_1()
-        .border_color(border)
-        .bg(surface)
-        // ── Title + count ─────────────────────────────────────────────────
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(1.0))
-                .flex_shrink_0()
-                .max_w(px(560.0))
-                .child(
-                    div()
-                        .text_color(text_primary)
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .text_lg()
-                        .truncate()
-                        .child(title),
-                )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(text_tertiary)
-                        .whitespace_nowrap()
-                        .child(count_label),
-                ),
-        )
-        // ── Spacer / drag region ──────────────────────────────────────────
-        .child(
-            div()
-                .id("toolbar-drag-region")
-                .flex_1()
-                .h_full()
-                .on_mouse_down(MouseButton::Left, |_, window, _| {
-                    window.start_window_move();
-                }),
-        )
-        // ── Controls ──────────────────────────────────────────────────────
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap(px(10.0))
-                .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
-                .child(render_sort_selector(
-                    sort,
-                    sort_direction,
-                    grouped,
-                    entity.clone(),
-                ))
-                .child(render_layout_switcher(presentation, entity.clone()))
-                .child(render_selection_mode_toggle(selection_mode, entity)),
-        )
+    div().h(px(57.0))
+         .flex_none()
+         .flex()
+         .items_center()
+         .gap(px(16.0))
+         .px(px(18.0))
+         .border_b_1()
+         .border_color(border)
+         .bg(surface)
+         // ── Title + count ─────────────────────────────────────────────────
+         .child(div().flex()
+                     .flex_col()
+                     .gap(px(1.0))
+                     .flex_shrink_0()
+                     .max_w(px(560.0))
+                     .child(div().text_color(text_primary)
+                                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                                 .text_lg()
+                                 .truncate()
+                                 .child(title))
+                     .child(div().text_xs()
+                                 .text_color(text_tertiary)
+                                 .whitespace_nowrap()
+                                 .child(count_label)))
+         // ── Spacer / drag region ──────────────────────────────────────────
+         .child(div().id("toolbar-drag-region")
+                     .flex_1()
+                     .h_full()
+                     .on_mouse_down(MouseButton::Left, |_, window, _| {
+                         window.start_window_move();
+                     }))
+         // ── Controls ──────────────────────────────────────────────────────
+         .child(div().flex()
+                     .items_center()
+                     .gap(px(10.0))
+                     .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
+                     .child(render_sort_selector(sort, sort_direction, grouped, entity.clone()))
+                     .child(render_layout_switcher(presentation, entity.clone()))
+                     .child(render_selection_mode_toggle(selection_mode, entity)))
 }
 
 // ── Sort selector
 // ─────────────────────────────────────────────────────────────
 
-fn render_sort_selector(
-    current: SortMethod, direction: SortDirection, grouped: bool, entity: Entity<LibraryController>,
-) -> impl IntoElement + 'static {
+fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: bool,
+                        entity: Entity<LibraryController>)
+                        -> impl IntoElement + 'static {
     let label = match current {
         SortMethod::Title => t!("toolbar.sort_title"),
         SortMethod::Publisher => t!("toolbar.sort_publisher"),
@@ -174,21 +151,20 @@ fn render_sort_selector(
 
     let is_custom = matches!(current, SortMethod::Custom { .. });
 
-    Button::new("sort-selector")
-        .icon(Icon::empty().path("icons/arrow-down-up.svg"))
-        .label(label)
-        .ghost()
-        .dropdown_caret(true)
-        .tooltip(t!("toolbar.sort_by"))
-        .dropdown_menu(move |menu, _, _| {
-            let e = entity.clone();
-            let e2 = entity.clone();
-            let e3 = entity.clone();
-            let e4 = entity.clone();
-            let e5 = entity.clone();
-            let e6 = entity.clone();
-            let e7 = entity.clone();
-            let mut m = menu
+    Button::new("sort-selector").icon(Icon::empty().path("icons/arrow-down-up.svg"))
+                                .label(label)
+                                .ghost()
+                                .dropdown_caret(true)
+                                .tooltip(t!("toolbar.sort_by"))
+                                .dropdown_menu(move |menu, _, _| {
+                                    let e = entity.clone();
+                                    let e2 = entity.clone();
+                                    let e3 = entity.clone();
+                                    let e4 = entity.clone();
+                                    let e5 = entity.clone();
+                                    let e6 = entity.clone();
+                                    let e7 = entity.clone();
+                                    let mut m = menu
                 .item(
                     PopupMenuItem::new(t!("toolbar.sort_title"))
                         .checked(current == SortMethod::Title)
@@ -217,14 +193,14 @@ fn render_sort_selector(
                             e4.update(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
                         }),
                 );
-            if is_custom {
-                m = m.item(
+                                    if is_custom {
+                                        m = m.item(
                     PopupMenuItem::new(t!("toolbar.sort_custom"))
                         .checked(true)
                         .disabled(true),
                 );
-            }
-            m.separator()
+                                    }
+                                    m.separator()
                 .item(
                     PopupMenuItem::new(t!("toolbar.sort_ascending"))
                         .checked(direction == SortDirection::Ascending)
@@ -251,31 +227,30 @@ fn render_sort_selector(
                             e7.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
                         }),
                 )
-        })
+                                })
 }
 
 // ── Selection mode toggle
 // ──────────────────────────────────────────────
 
-fn render_selection_mode_toggle(
-    active: bool, entity: Entity<LibraryController>,
-) -> impl IntoElement + 'static {
-    Button::new("selection-mode-toggle")
-        .icon(Icon::empty().path("icons/square-check.svg"))
-        .ghost()
-        .selected(active)
-        .tooltip(t!("toolbar.select_items"))
-        .on_click(move |_, _, cx| {
-            entity.update(cx, |ctrl, cx| ctrl.toggle_bulk_selection_mode(cx));
-        })
+fn render_selection_mode_toggle(active: bool, entity: Entity<LibraryController>)
+                                -> impl IntoElement + 'static {
+    Button::new("selection-mode-toggle").icon(Icon::empty().path("icons/square-check.svg"))
+                                        .ghost()
+                                        .selected(active)
+                                        .tooltip(t!("toolbar.select_items"))
+                                        .on_click(move |_, _, cx| {
+                                            entity.update(cx, |ctrl, cx| {
+                                                      ctrl.toggle_bulk_selection_mode(cx)
+                                                  });
+                                        })
 }
 
 // ── Layout switcher
 // ───────────────────────────────────────────────────────────
 
-fn render_layout_switcher(
-    current: CatalogPresentation, entity: Entity<LibraryController>,
-) -> impl IntoElement + 'static {
+fn render_layout_switcher(current: CatalogPresentation, entity: Entity<LibraryController>)
+                          -> impl IntoElement + 'static {
     let selected = match current {
         CatalogPresentation::List => 0usize,
         CatalogPresentation::Thumbs => 1,
@@ -324,19 +299,15 @@ mod tests {
     #[test]
     fn publisher_filter_includes_name() {
         let title = section_title_for(&SidebarFilter::Publisher("Kobold Press".into()));
-        assert!(
-            title.contains("Kobold Press"),
-            "publisher name must appear in label"
-        );
+        assert!(title.contains("Kobold Press"),
+                "publisher name must appear in label");
     }
 
     #[test]
     fn collection_filter_includes_name() {
         let title = section_title_for(&SidebarFilter::Collection(42, "My Shelf".into()));
-        assert!(
-            title.contains("My Shelf"),
-            "collection name must appear in label"
-        );
+        assert!(title.contains("My Shelf"),
+                "collection name must appear in label");
     }
 
     #[test]
@@ -346,14 +317,10 @@ mod tests {
         // filter changes and made the count text look unresponsive).
         let filter = SidebarFilter::Collection(42, "My Shelf".into());
         let label = count_label_for(&filter, 3, 3, 500, false);
-        assert!(
-            label.contains('3'),
-            "expected collection filter count (3) in label, got: {label}"
-        );
-        assert!(
-            !label.contains("500"),
-            "collection label must not show the whole-catalog total, got: {label}"
-        );
+        assert!(label.contains('3'),
+                "expected collection filter count (3) in label, got: {label}");
+        assert!(!label.contains("500"),
+                "collection label must not show the whole-catalog total, got: {label}");
     }
 
     #[test]
@@ -379,12 +346,11 @@ mod tests {
 
     #[test]
     fn non_dynamic_filters_return_nonempty_string() {
-        for filter in [
-            SidebarFilter::AllTitles,
-            SidebarFilter::RecentlyUpdated,
-            SidebarFilter::OnDevice,
-            SidebarFilter::InCloud,
-        ] {
+        for filter in [SidebarFilter::AllTitles,
+                       SidebarFilter::RecentlyUpdated,
+                       SidebarFilter::OnDevice,
+                       SidebarFilter::InCloud]
+        {
             assert!(!section_title_for(&filter).is_empty());
         }
     }

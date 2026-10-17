@@ -25,9 +25,9 @@ use crate::util::datetime::{format_absolute, format_relative};
 /// Renders the alert history panel's content. The caller (the status bar's
 /// `Popover` wrapping the notification button) is responsible for anchoring and
 /// positioning this content relative to the trigger button.
-pub fn render_alert_history_panel(
-    snap: &AlertHistorySnapshot, entity: Entity<ActivityController>, colors: &ColorTokens,
-) -> AnyElement {
+pub fn render_alert_history_panel(snap: &AlertHistorySnapshot,
+                                  entity: Entity<ActivityController>, colors: &ColorTokens)
+                                  -> AnyElement {
     let border = colors.border;
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -40,36 +40,28 @@ pub fn render_alert_history_panel(
     // No bg/border/shadow/rounding here — the enclosing `Popover` content
     // wrapper already supplies that framing (see `popover_style` in
     // `gpui-kit`); adding our own on top produced a nested double frame.
-    div()
-        .occlude()
-        .w(px(340.0))
-        .flex()
-        .flex_col()
-        // ── Header ────────────────────────────────────────────────────────
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .justify_between()
-                .gap(px(8.0))
-                .px(px(14.0))
-                .py(px(8.0))
-                .border_b_1()
-                .border_color(border)
-                .child(
-                    div()
-                        .text_sm()
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .text_color(text_primary)
-                        .child(t!("alert_history.title")),
-                )
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(px(10.0))
-                        .children(has_entries.then(|| {
-                            div()
+    div().occlude()
+         .w(px(340.0))
+         .flex()
+         .flex_col()
+         // ── Header ────────────────────────────────────────────────────────
+         .child(div().flex()
+                     .items_center()
+                     .justify_between()
+                     .gap(px(8.0))
+                     .px(px(14.0))
+                     .py(px(8.0))
+                     .border_b_1()
+                     .border_color(border)
+                     .child(div().text_sm()
+                                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                                 .text_color(text_primary)
+                                 .child(t!("alert_history.title")))
+                     .child(div().flex()
+                                 .items_center()
+                                 .gap(px(10.0))
+                                 .children(has_entries.then(|| {
+                                                          div()
                                 .id("alert-history-clear")
                                 .text_xs()
                                 .text_color(text_tertiary)
@@ -78,74 +70,65 @@ pub fn render_alert_history_panel(
                                 .on_click(move |_, _, cx| {
                                     clear_entity.update(cx, |a, cx| a.clear_alert_log(cx));
                                 })
-                        }))
-                        .child(
-                            div()
-                                .id("alert-history-close")
-                                .text_xs()
-                                .text_color(text_tertiary)
-                                .cursor_pointer()
-                                .child("x")
-                                .on_click(move |_, _, cx| {
-                                    close_entity.update(cx, |a, cx| a.toggle_alert_panel(cx));
-                                }),
-                        ),
-                ),
-        )
-        // ── Entry list ────────────────────────────────────────────────────
-        .child(if snap.entries.is_empty() {
-            render_empty(text_primary, text_tertiary)
-        } else {
-            div()
-                .flex()
-                .flex_col()
-                .max_h(px(400.0))
-                .overflow_y_scrollbar()
-                .children(
-                    snap.entries.iter().map(|entry| {
-                        render_entry_row(entry, text_secondary, text_tertiary, border)
-                    }),
-                )
-                .into_any_element()
-        })
-        .into_any_element()
+                                                      }))
+                                 .child(div().id("alert-history-close")
+                                             .text_xs()
+                                             .text_color(text_tertiary)
+                                             .cursor_pointer()
+                                             .child("x")
+                                             .on_click(move |_, _, cx| {
+                                                 close_entity.update(cx, |a, cx| {
+                                                                 a.toggle_alert_panel(cx)
+                                                             });
+                                             }))))
+         // ── Entry list ────────────────────────────────────────────────────
+         .child(if snap.entries.is_empty() {
+                    render_empty(text_primary, text_tertiary)
+                }
+                else {
+                    div().flex()
+                         .flex_col()
+                         .max_h(px(400.0))
+                         .overflow_y_scrollbar()
+                         .children(snap.entries.iter().map(|entry| {
+                                                          render_entry_row(entry,
+                                                                           text_secondary,
+                                                                           text_tertiary,
+                                                                           border)
+                                                      }))
+                         .into_any_element()
+                })
+         .into_any_element()
 }
 
 fn render_empty(text_primary: gpui::Hsla, text_tertiary: gpui::Hsla) -> AnyElement {
-    div()
-        .flex()
-        .flex_col()
-        .items_center()
-        .justify_center()
-        .py(px(24.0))
-        .gap(px(6.0))
-        .child(div().text_2xl().text_color(text_tertiary).child("!"))
-        .child(
-            div()
-                .text_sm()
-                .text_color(text_primary)
-                .child(t!("alert_history.empty")),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(text_tertiary)
-                .child(t!("alert_history.empty_hint")),
-        )
-        .into_any_element()
+    div().flex()
+         .flex_col()
+         .items_center()
+         .justify_center()
+         .py(px(24.0))
+         .gap(px(6.0))
+         .child(div().text_2xl().text_color(text_tertiary).child("!"))
+         .child(div().text_sm()
+                     .text_color(text_primary)
+                     .child(t!("alert_history.empty")))
+         .child(div().text_xs()
+                     .text_color(text_tertiary)
+                     .child(t!("alert_history.empty_hint")))
+         .into_any_element()
 }
 
 /// Converts a `SystemTime` to a Unix timestamp in seconds, saturating to 0 for
 /// timestamps before the epoch (should not occur in practice).
 fn unix_secs(t: SystemTime) -> i64 {
     t.duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
+     .map(|d| d.as_secs() as i64)
+     .unwrap_or(0)
 }
 
-fn render_entry_row(
-    entry: &AlertEntry, text_color: gpui::Hsla, text_tertiary: gpui::Hsla, border: gpui::Hsla,
-) -> impl IntoElement + 'static + use<> {
+fn render_entry_row(entry: &AlertEntry, text_color: gpui::Hsla, text_tertiary: gpui::Hsla,
+                    border: gpui::Hsla)
+                    -> impl IntoElement + 'static + use<> {
     let ts = unix_secs(entry.occurred_at);
     let relative_label = format_relative(ts);
     let absolute_label = format_absolute(ts);
@@ -198,9 +181,8 @@ fn render_entry_row(
 /// panel's fixed width instead of overflowing past it — a flex item's default
 /// min-width is its content's intrinsic width, which for a long unwrapped
 /// error string is wider than the 340px panel.
-fn render_copyable_message(
-    entry_id: u64, message: String, text_tertiary: gpui::Hsla,
-) -> impl IntoElement + 'static {
+fn render_copyable_message(entry_id: u64, message: String, text_tertiary: gpui::Hsla)
+                           -> impl IntoElement + 'static {
     div()
         .id(("alert-history-message-row", entry_id))
         .flex()

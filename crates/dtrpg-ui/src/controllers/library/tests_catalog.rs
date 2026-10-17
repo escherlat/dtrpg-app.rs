@@ -8,34 +8,30 @@ mod reconcile_catalog_tests {
     use super::super::reconcile_catalog;
 
     fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            title,
-            "Publisher",
-            "Line",
-            "Core",
-            "PDF",
-            0,
-            0.0,
-            2020,
-            0,
-            ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        )
+        LibraryItem::new(id,
+                         title,
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     fn file(id: &str, downloaded: bool) -> LibraryItemFile {
-        LibraryItemFile {
-            id: id.into(),
-            index: 0,
-            name: "File".into(),
-            format: "PDF".into(),
-            size_mb: 1.0,
-            downloaded,
-            offloaded: false,
-        }
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: "File".into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]
@@ -122,11 +118,10 @@ mod reconcile_catalog_tests {
 
         let reconciled = reconcile_catalog(vec![local], vec![live]);
 
-        let f2_downloaded = reconciled[0]
-            .files
-            .iter()
-            .find(|f| f.id.as_ref() == "f2")
-            .map(|f| f.downloaded);
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
         assert_eq!(f2_downloaded, Some(false));
     }
 
@@ -140,16 +135,14 @@ mod reconcile_catalog_tests {
 
         let reconciled = reconcile_catalog(vec![local], vec![live]);
 
-        let f1_downloaded = reconciled[0]
-            .files
-            .iter()
-            .find(|f| f.id.as_ref() == "f1")
-            .map(|f| f.downloaded);
-        let f2_downloaded = reconciled[0]
-            .files
-            .iter()
-            .find(|f| f.id.as_ref() == "f2")
-            .map(|f| f.downloaded);
+        let f1_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f1")
+                                         .map(|f| f.downloaded);
+        let f2_downloaded = reconciled[0].files
+                                         .iter()
+                                         .find(|f| f.id.as_ref() == "f2")
+                                         .map(|f| f.downloaded);
         assert_eq!(f1_downloaded, Some(true));
         assert_eq!(f2_downloaded, Some(false));
         assert_eq!(reconciled[0].status, ItemStatus::Cloud);
@@ -163,13 +156,11 @@ mod reload_cooldown_tests {
     use super::super::reload_cooldown_active;
 
     fn meta(saved_at_secs: u64) -> CacheMetadata {
-        CacheMetadata {
-            saved_at_secs,
-            item_count: 10,
-            schema_version: 2,
-            last_item_check_batch_secs: None,
-            last_fresh_install_request_secs: None,
-        }
+        CacheMetadata { saved_at_secs,
+                        item_count: 10,
+                        schema_version: 2,
+                        last_item_check_batch_secs: None,
+                        last_fresh_install_request_secs: None }
     }
 
     #[test]
@@ -227,22 +218,20 @@ mod partial_fetch_tests {
     use super::super::{merge_partial_fetch, partial_fetch_since, should_attempt_partial_fetch};
 
     fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            title,
-            "Publisher",
-            "Line",
-            "Core",
-            "PDF",
-            0,
-            0.0,
-            2020,
-            0,
-            ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        )
+        LibraryItem::new(id,
+                         title,
+                         "Publisher",
+                         "Line",
+                         "Core",
+                         "PDF",
+                         0,
+                         0.0,
+                         2020,
+                         0,
+                         ItemStatus::Cloud,
+                         "#000000",
+                         "",
+                         None)
     }
 
     #[test]
@@ -268,10 +257,8 @@ mod partial_fetch_tests {
         let refreshed_a = item("b1", "New Title");
         let new_c = item("b3", "Brand New");
 
-        let merged = merge_partial_fetch(
-            vec![existing_a, existing_b.clone()],
-            vec![refreshed_a, new_c],
-        );
+        let merged = merge_partial_fetch(vec![existing_a, existing_b.clone()],
+                                         vec![refreshed_a, new_c]);
 
         assert_eq!(merged.len(), 3);
         match merged.iter().find(|i| i.id.as_ref() == "b1") {

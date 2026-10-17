@@ -5,21 +5,19 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::util::icloud_status;
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
 use dtrpg_core::data::storage::StorageConfig;
+use crate::util::icloud_status;
 
 /// Resolves the expected on-disk path for `file` within `item`'s entry,
 /// matching `dispatch_download`'s destination computation so both the
 /// download path and this verification path agree on "where does this file
 /// live."
 #[must_use]
-pub fn resolved_file_path(
-    storage: &StorageConfig, item: &LibraryItem, file: &LibraryItemFile,
-) -> PathBuf {
-    storage
-        .path_for_publisher(&item.publisher)
-        .join(file.name.as_ref())
+pub fn resolved_file_path(storage: &StorageConfig, item: &LibraryItem, file: &LibraryItemFile)
+                          -> PathBuf {
+    storage.path_for_publisher(&item.publisher)
+           .join(file.name.as_ref())
 }
 
 /// A file whose on-disk presence differs from its `downloaded` flag.
@@ -28,7 +26,7 @@ pub struct PresenceChange {
     /// The file's display name, which is also its on-disk name.
     pub file_name: Arc<str>,
     /// Whether the file is actually on disk.
-    pub present: bool,
+    pub present:   bool,
     /// Whether a cloud provider has evicted the file's local bytes.
     pub offloaded: bool,
 }
@@ -52,31 +50,29 @@ pub struct ItemVerification {
 /// has moved on since the check started (for example a download that finished
 /// in the meantime) without overwriting that newer state.
 #[must_use]
-pub fn find_presence_changes(
-    item: &LibraryItem, storage: &StorageConfig,
-) -> Option<ItemVerification> {
-    let changes: Vec<PresenceChange> = item
-        .files
-        .iter()
-        .filter_map(|file| {
-            let path = resolved_file_path(storage, item, file);
-            let present = path.exists();
-            let offloaded = present && icloud_status::is_offloaded(&path);
-            (file.downloaded != present || file.offloaded != offloaded).then(|| PresenceChange {
-                file_name: Arc::clone(&file.name),
-                present,
-                offloaded,
+pub fn find_presence_changes(item: &LibraryItem, storage: &StorageConfig)
+                             -> Option<ItemVerification> {
+    let changes: Vec<PresenceChange> =
+        item.files
+            .iter()
+            .filter_map(|file| {
+                let path = resolved_file_path(storage, item, file);
+                let present = path.exists();
+                let offloaded = present && icloud_status::is_offloaded(&path);
+                (file.downloaded != present || file.offloaded != offloaded)
+                    .then(|| PresenceChange {
+                        file_name: Arc::clone(&file.name),
+                        present,
+                        offloaded,
+                    })
             })
-        })
-        .collect();
+            .collect();
 
     if changes.is_empty() && item.computed_status() == item.status {
         return None;
     }
-    Some(ItemVerification {
-        item_id: Arc::clone(&item.id),
-        changes,
-    })
+    Some(ItemVerification { item_id: Arc::clone(&item.id),
+                            changes })
 }
 
 /// Applies `changes` to `item`'s files, matched by file name, then recomputes
@@ -138,34 +134,30 @@ mod tests {
     }
 
     fn make_item(id: &str, publisher: &str) -> LibraryItem {
-        LibraryItem::new(
-            id,
-            "Test Title",
-            publisher,
-            "",
-            "Core",
-            "PDF",
-            100,
-            10.0,
-            2024,
-            1,
-            ItemStatus::Cloud,
-            "#1C2A44",
-            "Desc.",
-            None,
-        )
+        LibraryItem::new(id,
+                         "Test Title",
+                         publisher,
+                         "",
+                         "Core",
+                         "PDF",
+                         100,
+                         10.0,
+                         2024,
+                         1,
+                         ItemStatus::Cloud,
+                         "#1C2A44",
+                         "Desc.",
+                         None)
     }
 
     fn make_file(id: &str, name: &str, downloaded: bool) -> LibraryItemFile {
-        LibraryItemFile {
-            id: id.into(),
-            index: 0,
-            name: name.into(),
-            format: "PDF".into(),
-            size_mb: 1.0,
-            downloaded,
-            offloaded: false,
-        }
+        LibraryItemFile { id: id.into(),
+                          index: 0,
+                          name: name.into(),
+                          format: "PDF".into(),
+                          size_mb: 1.0,
+                          downloaded,
+                          offloaded: false }
     }
 
     #[test]
@@ -220,10 +212,8 @@ mod tests {
         let dir = test_dir("mixed");
         let storage = storage_at(&dir);
         let mut it = make_item("verify-4", "Presence Publisher");
-        it.files = vec![
-            make_file("f1", "Present.pdf", false),
-            make_file("f2", "Missing.pdf", true),
-        ];
+        it.files = vec![make_file("f1", "Present.pdf", false),
+                        make_file("f2", "Missing.pdf", true),];
 
         let dest_dir = storage.path_for_publisher(&it.publisher);
         std::fs::create_dir_all(&dest_dir).unwrap();
@@ -265,11 +255,9 @@ mod tests {
         let dir = test_dir("find-differ");
         let storage = storage_at(&dir);
         let mut it = make_item("verify-6", "Presence Publisher");
-        it.files = vec![
-            make_file("f1", "Gone.pdf", true),
-            make_file("f2", "Here.pdf", false),
-            make_file("f3", "Unchanged.pdf", false),
-        ];
+        it.files = vec![make_file("f1", "Gone.pdf", true),
+                        make_file("f2", "Here.pdf", false),
+                        make_file("f3", "Unchanged.pdf", false),];
         let dest_dir = storage.path_for_publisher(&it.publisher);
         std::fs::create_dir_all(&dest_dir).unwrap();
         std::fs::write(dest_dir.join("Here.pdf"), b"pdf").unwrap();
@@ -277,21 +265,13 @@ mod tests {
         let verification = find_presence_changes(&it, &storage).unwrap();
 
         assert_eq!(verification.item_id, it.id);
-        assert_eq!(
-            verification.changes,
-            vec![
-                PresenceChange {
-                    file_name: "Gone.pdf".into(),
-                    present: false,
-                    offloaded: false,
-                },
-                PresenceChange {
-                    file_name: "Here.pdf".into(),
-                    present: true,
-                    offloaded: false,
-                },
-            ]
-        );
+        assert_eq!(verification.changes,
+                   vec![PresenceChange { file_name: "Gone.pdf".into(),
+                                         present:   false,
+                                         offloaded: false, },
+                        PresenceChange { file_name: "Here.pdf".into(),
+                                         present:   true,
+                                         offloaded: false, },]);
 
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -332,10 +312,8 @@ mod tests {
         let dir = test_dir("race");
         let storage = storage_at(&dir);
         let mut snapshot = make_item("verify-9", "Presence Publisher");
-        snapshot.files = vec![
-            make_file("f1", "Finishing.pdf", false),
-            make_file("f2", "AlreadyThere.pdf", false),
-        ];
+        snapshot.files = vec![make_file("f1", "Finishing.pdf", false),
+                              make_file("f2", "AlreadyThere.pdf", false),];
         let dest_dir = storage.path_for_publisher(&snapshot.publisher);
         std::fs::create_dir_all(&dest_dir).unwrap();
         std::fs::write(dest_dir.join("AlreadyThere.pdf"), b"pdf").unwrap();
@@ -349,10 +327,8 @@ mod tests {
 
         apply_presence_changes(&mut live, &verification.changes);
 
-        assert!(
-            live.files[0].downloaded,
-            "the finished download was reverted"
-        );
+        assert!(live.files[0].downloaded,
+                "the finished download was reverted");
         assert!(live.files[1].downloaded);
         assert_eq!(live.status, ItemStatus::Downloaded);
 

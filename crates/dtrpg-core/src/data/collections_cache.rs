@@ -48,11 +48,10 @@ pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
     let index = LibraryIndex::open_and_migrate(root)
         .map_err(|e| warn!(root = %root.display(), error = %e, "library index not openable"))
         .ok()?;
-    index
-        .list_collections()
-        .map_err(|e| warn!(root = %root.display(), error = %e, "library index query failed"))
-        .ok()
-        .filter(|entries| !entries.is_empty())
+    index.list_collections()
+         .map_err(|e| warn!(root = %root.display(), error = %e, "library index query failed"))
+         .ok()
+         .filter(|entries| !entries.is_empty())
 }
 
 /// Reads the legacy JSON collections cache directly from
@@ -91,9 +90,8 @@ pub(crate) fn legacy_load_collections_cache_json(root: &Path) -> Option<Vec<Coll
 ///
 /// Returns [`CollectionsCacheError::Index`] if the index cannot be opened or
 /// written.
-pub fn save_collections_cache(
-    root: &Path, entries: &[CollectionEntry],
-) -> Result<(), CollectionsCacheError> {
+pub fn save_collections_cache(root: &Path, entries: &[CollectionEntry])
+                              -> Result<(), CollectionsCacheError> {
     let mut index = LibraryIndex::open_and_migrate(root)?;
     index.replace_all_collections(entries)?;
     Ok(())
@@ -113,12 +111,10 @@ mod tests {
     }
 
     fn make_entry(id: u64, name: &str) -> CollectionEntry {
-        CollectionEntry {
-            id,
-            name: Arc::from(name),
-            member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
-            created_at: 1_700_000_000,
-        }
+        CollectionEntry { id,
+                          name: Arc::from(name),
+                          member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
+                          created_at: 1_700_000_000 }
     }
 
     #[test]
