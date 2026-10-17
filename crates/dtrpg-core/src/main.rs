@@ -1,7 +1,6 @@
 mod app;
 mod constants;
 mod logging;
-pub mod platform;
 mod services;
 
 fn main() {
