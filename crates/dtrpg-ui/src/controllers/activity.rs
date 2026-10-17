@@ -5,12 +5,12 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use gpui::Context;
-
-use crate::data::activity::{
+use dtrpg_core::data::activity::{
     ActivityItem, ActivitySnapshot, ActivityStatus, AlertEntry, AlertHistorySnapshot,
 };
-use crate::data::constants::{ALERT_LOG_CAP, ERROR_EXPIRY_SECS, EXPIRY_SECS, RECENT_CAP};
+use dtrpg_core::data::constants::{ALERT_LOG_CAP, ERROR_EXPIRY_SECS, EXPIRY_SECS, RECENT_CAP};
+use gpui::Context;
+
 use crate::data::events::{ActivityChanged, DownloadComplete, DownloadError};
 
 /// Owns the activity item list and panel open/close state.

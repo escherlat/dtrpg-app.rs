@@ -6,6 +6,7 @@
 //! `TabBar` overflow menu so tabs beyond the available width remain
 //! reachable through a "more" menu.
 
+use dtrpg_core::data::constants::DETAIL_TAB_TITLE_MAX_CHARS;
 use gpui::prelude::*;
 use gpui::{Entity, IntoElement, SharedString, div};
 use gpui_kit::component::IconName;
@@ -14,7 +15,6 @@ use gpui_kit::component::tab::{Tab, TabBar};
 use rust_i18n::t;
 
 use crate::controllers::tabs::{TabTarget, TabsController};
-use crate::data::constants::DETAIL_TAB_TITLE_MAX_CHARS;
 use crate::util::text::truncate_with_ellipsis;
 
 /// Renders the tab strip: the non-closable catalog tab followed by any open,

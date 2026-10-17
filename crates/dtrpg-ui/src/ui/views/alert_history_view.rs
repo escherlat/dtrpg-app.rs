@@ -9,6 +9,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use dtrpg_core::data::activity::{AlertEntry, AlertHistorySnapshot};
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
 use gpui_kit::component::clipboard::Clipboard;
@@ -17,7 +18,6 @@ use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
-use crate::data::activity::{AlertEntry, AlertHistorySnapshot};
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
 use crate::util::datetime::{format_absolute, format_relative};

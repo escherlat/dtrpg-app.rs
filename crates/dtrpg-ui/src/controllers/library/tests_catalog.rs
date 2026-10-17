@@ -2,9 +2,10 @@
 
 #[cfg(test)]
 mod reconcile_catalog_tests {
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+
     use super::super::reconcile_catalog;
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::{LibraryItem, LibraryItemFile};
 
     fn item(id: &str, title: &str) -> LibraryItem {
         LibraryItem::new(id,
@@ -149,8 +150,9 @@ mod reconcile_catalog_tests {
 
 #[cfg(test)]
 mod reload_cooldown_tests {
+    use dtrpg_core::data::catalog_cache::CacheMetadata;
+
     use super::super::reload_cooldown_active;
-    use crate::data::catalog_cache::CacheMetadata;
 
     fn meta(saved_at_secs: u64) -> CacheMetadata {
         CacheMetadata { saved_at_secs,
@@ -209,9 +211,10 @@ mod fresh_install_gating_tests {
 
 #[cfg(test)]
 mod partial_fetch_tests {
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::LibraryItem;
+
     use super::super::{merge_partial_fetch, partial_fetch_since, should_attempt_partial_fetch};
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
 
     fn item(id: &str, title: &str) -> LibraryItem {
         LibraryItem::new(id,

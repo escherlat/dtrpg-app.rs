@@ -1,7 +1,7 @@
 //! Platform-native, best-effort symlink creation.
 //!
 //! Used to mirror downloaded files under `{root}/collections/{collection
-//! name}/` — see [`crate::data::storage::collection_dir`]. Failures are
+//! name}/` — see [`dtrpg_core::data::storage::collection_dir`]. Failures are
 //! logged by the caller and never propagate into the download's own
 //! success/failure outcome.
 

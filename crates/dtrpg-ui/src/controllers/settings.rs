@@ -3,25 +3,26 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use dtrpg_core::credentials::{Credential, CredentialStore, KeyringCredentialStore};
+use dtrpg_core::data::avatar::{avatar_cached, fetch_avatar_bytes};
+use dtrpg_core::data::catalog_cache::load_cache_metadata;
+use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
+use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
+use dtrpg_core::data::profile::ProfileConfig;
+use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
+use dtrpg_core::data::token_status::{TokenStatus, TokenStatusHandle};
+use dtrpg_core::services::LoginService;
 use gpui::{Context, Entity, EventEmitter};
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::select::SelectState;
 use rust_i18n::t;
 
-use crate::credentials::{Credential, CredentialStore, KeyringCredentialStore};
-use crate::data::avatar::{avatar_cached, fetch_avatar_bytes};
-use crate::data::catalog_cache::load_cache_metadata;
-use crate::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use crate::data::events::{
     CacheCleared, LogoutRequested, SettingsChanged, SignInSucceeded, StartupAuthBegun,
     StartupAuthFailed,
 };
-use crate::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
-use crate::data::paths::{app_cache_dir, cache_dir, covers_dir};
-use crate::data::profile::ProfileConfig;
-use crate::data::storage::{StorageConfig, StorageError, validate_writable};
-use crate::data::token_status::{TokenStatus, TokenStatusHandle};
-use crate::services::LoginService;
+use crate::data::token_status_global::TokenStatusGlobal;
 
 /// State for one Appearance-page font picker: a searchable list of every
 /// font name installed on the user's system (see
@@ -190,8 +191,8 @@ pub struct SettingsController {
     pending_file_opener:            Option<PathBuf>,
     /// Index of the currently active settings page.
     ///
-    /// Persisted to [`crate::data::ui_state::UiState`] so the settings window
-    /// reopens on the same page it was closed on, rather than always
+    /// Persisted to [`dtrpg_core::data::ui_state::UiState`] so the settings
+    /// window reopens on the same page it was closed on, rather than always
     /// resetting to the first page — gpui-kit's `Settings` widget
     /// tracks page selection in its own per-window state with no way to read
     /// it back, so this is tracked here instead and used to drive our own
@@ -296,13 +297,13 @@ impl SettingsController {
                               storage_path_draft,
                               storage_path_input: None,
                               api_key_hint: None,
-                              token_status: cx.try_global::<TokenStatusHandle>()
-                                              .cloned()
+                              token_status: cx.try_global::<TokenStatusGlobal>()
+                                              .map(|g| g.0.clone())
                                               .unwrap_or_default(),
                               pending_file_opener: None,
                               active_page_ix:
-                                  crate::data::ui_state::UiState::load().settings_page_ix()
-                                                                        .unwrap_or(0),
+                                  dtrpg_core::data::ui_state::UiState::load().settings_page_ix()
+                                                                             .unwrap_or(0),
                               cache_counts: CacheCounts::default(),
                               focus_email_pending: false,
                               recently_updated_window_input: None,
@@ -414,7 +415,7 @@ impl SettingsController {
     pub fn set_active_page_ix(&mut self, ix: usize, cx: &mut Context<Self>) {
         self.active_page_ix = ix;
         self.refresh_cache_counts();
-        crate::data::ui_state::UiState::load().save_settings_page_ix(ix);
+        dtrpg_core::data::ui_state::UiState::load().save_settings_page_ix(ix);
         cx.notify();
     }
 
@@ -966,10 +967,10 @@ fn mask_api_key(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use dtrpg_core::services::{LoginError, LoginTokens};
     use gpui::{AppContext, TestAppContext};
 
     use super::*;
-    use crate::services::{LoginError, LoginTokens};
 
     #[test]
     fn mask_api_key_long_key() {

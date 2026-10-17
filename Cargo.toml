@@ -1,8 +1,15 @@
 [workspace]
-default-members = ["crates/dtrpg-core", "crates/dtrpg-ui"]
+default-members = [
+    "crates/dtrpg-core",
+    "crates/dtrpg-ui",
+    "crates/dtrpg-desktop",
+    "crates/dtrpg-mcp",
+]
 members = [
     "crates/dtrpg-core",
     "crates/dtrpg-ui",
+    "crates/dtrpg-desktop",
+    "crates/dtrpg-mcp",
 ]
 resolver = "2"
 
@@ -32,6 +39,7 @@ rfd = "0.17"
 keyring = { version = "3", features = ["apple-native"] }
 thiserror = "2"
 tracing = "0.1"
+dtrpg-core = { path = "crates/dtrpg-core" }
 dtrpg-ui = { path = "crates/dtrpg-ui" }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 # gpui-kit forks zed-industries/zed's gpui under its own package family

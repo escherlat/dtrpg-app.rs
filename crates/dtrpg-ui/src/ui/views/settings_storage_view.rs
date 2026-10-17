@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::storage::validate_writable;
 use gpui::{AnyElement, Element, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -11,7 +12,6 @@ use gpui_kit::component::switch::Switch;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
-use crate::data::storage::validate_writable;
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
 

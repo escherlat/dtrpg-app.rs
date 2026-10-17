@@ -6,9 +6,13 @@
 //! Font/theme changes apply immediately via `LibraryController`'s
 //! `set_body_font`/`set_value_font`/`set_label_font`/`set_mono_font`/
 //! `set_ui_text_size`/`set_theme`, which also persist the selection through
-//! `crate::data::ui_preferences::UiPreferences` — see
+//! `dtrpg_core::data::ui_preferences::UiPreferences` — see
 //! `settings-appearance-fonts`.
 
+use dtrpg_core::data::constants::{
+    BODY_FONT_SIZE_PT, DEFAULT_UI_TEXT_SIZE, LABEL_MONO_FONT_SIZE_PT, MAX_UI_TEXT_SCALE,
+    MIN_UI_TEXT_SCALE, UI_TEXT_SCALE_STEP, VALUE_FONT_SIZE_RATIO,
+};
 use gpui::{
     Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
@@ -21,10 +25,6 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::FontSelectState;
-use crate::data::constants::{
-    BODY_FONT_SIZE_PT, DEFAULT_UI_TEXT_SIZE, LABEL_MONO_FONT_SIZE_PT, MAX_UI_TEXT_SCALE,
-    MIN_UI_TEXT_SCALE, UI_TEXT_SCALE_STEP, VALUE_FONT_SIZE_RATIO,
-};
 use crate::data::theme::{ColorTokens, LibriTheme, ThemeKey};
 use crate::ui::widgets::small_caps_text;
 

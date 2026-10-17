@@ -2,10 +2,10 @@
 //! HTTP-backed gateway and a stub used when no credentials are available.
 
 use dtrpg_sdk::{LibraryItemsParams, OrderProductItemResponse, OrderProductListResponse};
-use dtrpg_ui::{data::token_status::TokenStatusHandle, services::LibraryServiceError};
 
 use super::super::connection::{self, SdkConnection};
 use super::errors::{map_client_error, map_connection_error};
+use crate::{data::token_status::TokenStatusHandle, services::LibraryServiceError};
 
 /// SDK operation boundary used by the Rust library service adapter.
 pub trait SdkLibraryGateway: Send + Sync {
@@ -14,8 +14,9 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] on network or session failures.
-    fn list_order_products(&self, params: LibraryItemsParams)
-                           -> Result<OrderProductListResponse, LibraryServiceError>;
+    fn list_order_products(
+        &self, params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError>;
 
     /// Loads an ordered product detail by its numeric id.
     ///
@@ -31,8 +32,9 @@ pub trait SdkLibraryGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`LibraryServiceError`] on network or session failures.
-    fn prepare_download(&self, order_product_id: u64, index: u32)
-                        -> Result<serde_json::Value, LibraryServiceError>;
+    fn prepare_download(
+        &self, order_product_id: u64, index: u32,
+    ) -> Result<serde_json::Value, LibraryServiceError>;
 }
 
 pub(super) struct HttpSdkLibraryGateway {
@@ -42,9 +44,9 @@ pub(super) struct HttpSdkLibraryGateway {
 impl HttpSdkLibraryGateway {
     /// Reads only the API key from the keyring and uses the provided in-memory
     /// tokens.
-    pub(super) fn from_keyring_with_tokens(tokens: dtrpg_ui::services::LoginTokens,
-                                           token_status: TokenStatusHandle)
-                                           -> Result<Self, LibraryServiceError> {
+    pub(super) fn from_keyring_with_tokens(
+        tokens: crate::services::LoginTokens, token_status: TokenStatusHandle,
+    ) -> Result<Self, LibraryServiceError> {
         let connection = connection::connect_from_keyring_with_tokens(tokens, token_status)
             .map_err(map_connection_error)?;
         Ok(Self { connection })
@@ -59,8 +61,9 @@ impl HttpSdkLibraryGateway {
 }
 
 impl SdkLibraryGateway for HttpSdkLibraryGateway {
-    fn list_order_products(&self, params: LibraryItemsParams)
-                           -> Result<OrderProductListResponse, LibraryServiceError> {
+    fn list_order_products(
+        &self, params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError> {
         let params = &params;
         self.connection
             .run(|client| async move { client.list_order_products(copy_params(params)).await })
@@ -73,8 +76,9 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
             .map_err(map_client_error)
     }
 
-    fn prepare_download(&self, order_product_id: u64, index: u32)
-                        -> Result<serde_json::Value, LibraryServiceError> {
+    fn prepare_download(
+        &self, order_product_id: u64, index: u32,
+    ) -> Result<serde_json::Value, LibraryServiceError> {
         self.connection
             .run(|client| async move { client.prepare_download(order_product_id, index).await })
             .map_err(map_client_error)
@@ -84,13 +88,15 @@ impl SdkLibraryGateway for HttpSdkLibraryGateway {
 /// `LibraryItemsParams` is not `Clone`, and a retried request needs a fresh
 /// copy.
 fn copy_params(params: &LibraryItemsParams) -> LibraryItemsParams {
-    LibraryItemsParams { page:               params.page,
-                         page_size:          params.page_size,
-                         get_checksum:       params.get_checksum,
-                         get_filters:        params.get_filters,
-                         library:            params.library,
-                         archived:           params.archived,
-                         updated_date_after: params.updated_date_after.clone(), }
+    LibraryItemsParams {
+        page: params.page,
+        page_size: params.page_size,
+        get_checksum: params.get_checksum,
+        get_filters: params.get_filters,
+        library: params.library,
+        archived: params.archived,
+        updated_date_after: params.updated_date_after.clone(),
+    }
 }
 
 pub(super) struct UnavailableSdkGateway {
@@ -104,8 +110,9 @@ impl UnavailableSdkGateway {
 }
 
 impl SdkLibraryGateway for UnavailableSdkGateway {
-    fn list_order_products(&self, _params: LibraryItemsParams)
-                           -> Result<OrderProductListResponse, LibraryServiceError> {
+    fn list_order_products(
+        &self, _params: LibraryItemsParams,
+    ) -> Result<OrderProductListResponse, LibraryServiceError> {
         Err(self.error.clone())
     }
 
@@ -113,8 +120,9 @@ impl SdkLibraryGateway for UnavailableSdkGateway {
         Err(self.error.clone())
     }
 
-    fn prepare_download(&self, _order_product_id: u64, _index: u32)
-                        -> Result<serde_json::Value, LibraryServiceError> {
+    fn prepare_download(
+        &self, _order_product_id: u64, _index: u32,
+    ) -> Result<serde_json::Value, LibraryServiceError> {
         Err(self.error.clone())
     }
 }

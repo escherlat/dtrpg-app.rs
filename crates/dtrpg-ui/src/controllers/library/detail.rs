@@ -186,8 +186,8 @@ impl LibraryController {
     ///
     /// Emits [`LibraryChanged`].
     pub fn set_detail_panel_width(&mut self, width: f32, cx: &mut Context<Self>) {
-        self.detail_panel_width = width.clamp(crate::data::constants::DETAIL_PANEL_MIN_WIDTH,
-                                              crate::data::constants::DETAIL_PANEL_MAX_WIDTH);
+        self.detail_panel_width = width.clamp(dtrpg_core::data::constants::DETAIL_PANEL_MIN_WIDTH,
+                                              dtrpg_core::data::constants::DETAIL_PANEL_MAX_WIDTH);
         cx.emit(LibraryChanged);
     }
 }

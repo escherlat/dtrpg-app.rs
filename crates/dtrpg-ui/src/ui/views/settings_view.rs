@@ -8,10 +8,11 @@
 //! the active page to the first one every time the settings window is closed
 //! and reopened (a new window has its own state). Driving the active page
 //! from `SettingsController::active_page_ix` instead lets it persist across
-//! close/reopen (see `crate::data::ui_state::UiState`).
+//! close/reopen (see `dtrpg_core::data::ui_state::UiState`).
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::file_openers::FileOpenerEntry;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, FocusHandle, IntoElement, MouseButton, ParentElement, Styled, div, px,
@@ -23,7 +24,6 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
-use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,

@@ -139,9 +139,10 @@ impl LibraryController {
     /// Gates [`Self::enqueue_download`] behind a free-disk-space check.
     ///
     /// Computes the entry's aggregate missing-file size and compares it to
-    /// [`crate::data::storage::available_space_mb`]. If space is sufficient
-    /// or can't be determined, queues immediately; otherwise stashes the
-    /// request and emits [`LowDiskSpaceWarning`] instead of queuing anything.
+    /// [`dtrpg_core::data::storage::available_space_mb`]. If space is
+    /// sufficient or can't be determined, queues immediately; otherwise
+    /// stashes the request and emits [`LowDiskSpaceWarning`] instead of
+    /// queuing anything.
     pub fn request_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
         let title = title.into();
         let Some(needed_mb) = self.catalog
@@ -252,7 +253,7 @@ impl LibraryController {
     /// storage root; `None` if space is sufficient or can't be determined
     /// (fail open — see `download-disk-space-check`).
     pub(super) fn warn_if_insufficient_space(needed_mb: f64) -> Option<f64> {
-        let free_mb = crate::data::storage::available_space_mb()?;
+        let free_mb = dtrpg_core::data::storage::available_space_mb()?;
         (needed_mb > free_mb).then_some(free_mb)
     }
 
@@ -363,7 +364,7 @@ pub(crate) fn create_collections_symlinks(dest: &Path, order_product_id: u64, pr
         if !member_ids_contain(&collection.member_ids, order_product_id, product_id) {
             continue;
         }
-        let link_dir = crate::data::storage::collection_dir(&root, &collection.name);
+        let link_dir = dtrpg_core::data::storage::collection_dir(&root, &collection.name);
         if let Err(e) = std::fs::create_dir_all(&link_dir) {
             tracing::warn!(dir = %link_dir.display(), error = %e,
                            "failed to create collections symlink directory");

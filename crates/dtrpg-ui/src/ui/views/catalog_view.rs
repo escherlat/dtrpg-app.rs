@@ -4,6 +4,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use dtrpg_core::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
+use dtrpg_core::data::enums::CatalogPresentation;
+use dtrpg_core::data::enums::*;
+use dtrpg_core::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
+use dtrpg_core::util::matching::collection_member_id;
+use dtrpg_core::util::sort::{SortDirection, SortMethod};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Bounds, ClickEvent, Context, Entity, FontWeight, Hsla, Image, IntoElement,
@@ -28,20 +34,14 @@ use rust_i18n::t;
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::controllers::tabs::TabsController;
-use crate::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
-use crate::data::enums::CatalogPresentation;
-use crate::data::enums::*;
 use crate::data::events::LibraryChanged;
-use crate::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::item_popover_view::render_item_popover;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::util::matching::collection_member_id;
 use crate::util::publisher::{PublisherGroup, group_by_publisher};
 use crate::util::reveal::reveal_in_file_manager;
-use crate::util::sort::{SortDirection, SortMethod};
 
 #[derive(Clone, Copy)]
 enum EmptyReason {
@@ -407,7 +407,7 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
         7 => {
             if item.status == ItemStatus::Downloaded {
                 let item_open_path =
-                    crate::data::storage::publisher_dir(storage_root, &item.publisher);
+                    dtrpg_core::data::storage::publisher_dir(storage_root, &item.publisher);
                 let open_elem_id: Arc<str> = Arc::from(format!("open-row-{}", &*item.id));
                 let item_for_open = item.clone();
                 let tabs_for_open = tabs.clone();
@@ -543,7 +543,7 @@ impl TableDelegate for CatalogListDelegate {
         let menu = match status {
             ItemStatus::Downloaded => {
                 let item_path =
-                    crate::data::storage::publisher_dir(&self.storage_root, &item.publisher);
+                    dtrpg_core::data::storage::publisher_dir(&self.storage_root, &item.publisher);
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
                 let item_path_reveal = item_path.clone();
@@ -752,7 +752,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
         let menu = match status {
             ItemStatus::Downloaded => {
                 let item_path =
-                    crate::data::storage::publisher_dir(&self.storage_root, &item.publisher);
+                    dtrpg_core::data::storage::publisher_dir(&self.storage_root, &item.publisher);
                 let entity_remove = entity.clone();
                 let remove_id = Arc::clone(&id);
                 let item_path_reveal = item_path.clone();
@@ -1753,7 +1753,7 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                              text_sm_size(window),
                                              FontWeight::MEDIUM,
                                              title_available_w);
-    let ctx_path = crate::data::storage::publisher_dir(&storage_root_path, &publisher);
+    let ctx_path = dtrpg_core::data::storage::publisher_dir(&storage_root_path, &publisher);
 
     let cover: AnyElement = if let Some(image) = cover_image {
         img(image).w(px(thumb_w))
@@ -2066,7 +2066,7 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
     let ctx_tabs = tabs.clone();
     let bounds_entity = entity.clone();
     let bounds_id = Arc::clone(&id);
-    let ctx_path = crate::data::storage::publisher_dir(&storage_root_path, &publisher);
+    let ctx_path = dtrpg_core::data::storage::publisher_dir(&storage_root_path, &publisher);
     let drag_payload = DraggedLibraryItem { title:      title.clone().into(),
                                             member_id:  collection_member_id(item),
                                             product_id: item.product_id, };

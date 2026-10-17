@@ -4,10 +4,11 @@
 mod item_check_tests {
     use std::time::{Duration, SystemTime};
 
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+    use dtrpg_core::services::{LibraryServiceError, LibraryServiceErrorKind};
+
     use super::super::{apply_check_result, item_check_due};
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::{LibraryItem, LibraryItemFile};
-    use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
 
     fn item(id: &str, title: &str) -> LibraryItem {
         LibraryItem::new(id,
@@ -269,9 +270,10 @@ mod check_batch_tests {
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
 
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::LibraryItem;
+
     use super::super::{check_batch_cooldown_active, select_check_batch};
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
 
     fn item(id: &str) -> LibraryItem {
         LibraryItem::new(id,
@@ -345,8 +347,9 @@ mod item_activity_tests {
     use std::collections::HashSet;
     use std::sync::Arc;
 
+    use dtrpg_core::data::enums::ItemActivity;
+
     use super::super::item_activity_map;
-    use crate::data::enums::ItemActivity;
 
     fn ids(names: &[&str]) -> Vec<Arc<str>> {
         names.iter().map(|n| Arc::<str>::from(*n)).collect()

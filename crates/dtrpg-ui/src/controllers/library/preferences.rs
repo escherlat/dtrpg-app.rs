@@ -7,8 +7,8 @@ impl LibraryController {
     // ──────────────────
 
     /// Applies a new theme key (updates the GPUI global) and persists it via
-    /// [`crate::data::ui_preferences::UiPreferences`] so it survives a restart
-    /// instead of always resetting to Parchment.
+    /// [`dtrpg_core::data::ui_preferences::UiPreferences`] so it survives a
+    /// restart instead of always resetting to Parchment.
     ///
     /// Also re-syncs `gpui_kit::component::Theme`'s colors (see
     /// [`crate::data::theme::apply_theme_colors`]) so buttons, inputs,
@@ -23,7 +23,7 @@ impl LibraryController {
         cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
               apply_theme_colors(theme, &colors);
           });
-        crate::data::ui_preferences::UiPreferences::load().save_theme_key(key.as_str());
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_theme_key(key.as_str());
         cx.notify();
     }
 
@@ -36,11 +36,11 @@ impl LibraryController {
     }
 
     /// Switches the active locale (updates `rust_i18n`'s global state) and
-    /// persists it via [`crate::data::ui_preferences::UiPreferences`] so it
-    /// takes precedence over OS-locale detection on the next launch.
+    /// persists it via [`dtrpg_core::data::ui_preferences::UiPreferences`] so
+    /// it takes precedence over OS-locale detection on the next launch.
     pub fn set_locale(&self, locale: crate::i18n::Locale, cx: &mut Context<Self>) {
         rust_i18n::set_locale(locale.code());
-        crate::data::ui_preferences::UiPreferences::load().save_locale(locale.code());
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_locale(locale.code());
         cx.notify();
     }
 
@@ -48,7 +48,7 @@ impl LibraryController {
     /// system, not a curated list — see `settings_appearance_view`), updating
     /// the GPUI global, `gpui_kit`'s `Theme.font_family`, and
     /// persisting the selection via
-    /// [`crate::data::ui_preferences::UiPreferences`].
+    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
     pub fn set_body_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -59,12 +59,12 @@ impl LibraryController {
         cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
               theme.font_family = font.clone();
           });
-        crate::data::ui_preferences::UiPreferences::load().save_body_font_name(&font);
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_body_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new value font family and persists the selection via
-    /// [`crate::data::ui_preferences::UiPreferences`].
+    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
     pub fn set_value_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -72,12 +72,12 @@ impl LibraryController {
         fonts.value_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_preferences::UiPreferences::load().save_value_font_name(&font);
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_value_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new label font family and persists the selection via
-    /// [`crate::data::ui_preferences::UiPreferences`].
+    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
     pub fn set_label_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -85,12 +85,12 @@ impl LibraryController {
         fonts.label_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_preferences::UiPreferences::load().save_label_font_name(&font);
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_label_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new monospace font family and persists the selection via
-    /// [`crate::data::ui_preferences::UiPreferences`].
+    /// [`dtrpg_core::data::ui_preferences::UiPreferences`].
     pub fn set_mono_font(&self, font: impl Into<SharedString>, cx: &mut Context<Self>) {
         let font = font.into();
         let current = cx.global::<LibriTheme>();
@@ -98,12 +98,12 @@ impl LibraryController {
         fonts.mono_font = font.clone();
         let new_theme = LibriTheme::new(current.key, current.density, fonts);
         cx.set_global(new_theme);
-        crate::data::ui_preferences::UiPreferences::load().save_mono_font_name(&font);
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_mono_font_name(&font);
         cx.notify();
     }
 
     /// Applies a new shared UI text size (see [`FontSelections::ui_text_size`])
-    /// and persists it via [`crate::data::ui_preferences::UiPreferences`].
+    /// and persists it via [`dtrpg_core::data::ui_preferences::UiPreferences`].
     /// Applied to each window via `Window::set_rem_size` in
     /// `LibraryRootView::render` and `SettingsWindowView::render`, so every
     /// `rems(...)`-based size utility scales together, like zooming a page.
@@ -116,8 +116,8 @@ impl LibraryController {
         // Persisted as the scale multiplier shown in Settings > Appearance
         // (e.g. 1.1), not the derived absolute pixel size, so the file's
         // stored value matches what the UI displays.
-        let scale = size.as_f32() / crate::data::constants::DEFAULT_UI_TEXT_SIZE;
-        crate::data::ui_preferences::UiPreferences::load().save_text_scale(scale);
+        let scale = size.as_f32() / dtrpg_core::data::constants::DEFAULT_UI_TEXT_SIZE;
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_text_scale(scale);
         cx.notify();
     }
 

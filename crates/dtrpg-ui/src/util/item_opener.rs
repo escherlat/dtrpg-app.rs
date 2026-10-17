@@ -3,9 +3,8 @@
 
 use std::path::Path;
 
+use dtrpg_core::data::library::LibraryItemFile;
 use thiserror::Error;
-
-use crate::data::library::LibraryItemFile;
 
 /// Errors that can occur when attempting to open an item.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]

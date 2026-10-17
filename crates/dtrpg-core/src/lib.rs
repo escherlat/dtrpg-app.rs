@@ -1,7 +1,17 @@
-//! Headless application services shared by Libri entry points.
+//! GPUI-free core: domain models, persistence, service traits and their SDK
+//! implementations, and the credential store. See
+//! `docs/adr/0002-invert-crate-graph-and-add-library-facade.md`.
 //!
-//! The desktop binary still owns the current GPUI bootstrap. This library
-//! target is the incremental seam required by ADR 0002: headless consumers can
-//! depend on platform capabilities without linking the UI binary modules.
+//! No module here may depend on `gpui`. `dtrpg-ui` depends on this crate, not
+//! the other way round; the desktop app (`dtrpg-desktop`) and the MCP server
+//! (`dtrpg-mcp`) are both thin binaries on top of it.
 
+pub mod api;
+pub mod constants;
+pub mod credentials;
+pub mod data;
+pub mod logging;
+pub mod models;
 pub mod platform;
+pub mod services;
+pub mod util;

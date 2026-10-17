@@ -6,6 +6,11 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::constants::BULK_ACTION_CONFIRM_THRESHOLD;
+use dtrpg_core::data::enums::SelectionField;
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::util::matching::member_ids_contain;
 use gpui::{App, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -14,12 +19,7 @@ use gpui_kit::component::menu::{DropdownMenu, PopupMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
-use crate::data::collection::CollectionEntry;
-use crate::data::constants::BULK_ACTION_CONFIRM_THRESHOLD;
-use crate::data::enums::SelectionField;
-use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
-use crate::util::matching::member_ids_contain;
 
 /// Runs `dispatch` immediately for a selection at or below
 /// [`BULK_ACTION_CONFIRM_THRESHOLD`]; for a larger selection, asks for
@@ -172,7 +172,7 @@ fn render_bulk_actions(bulk_selection_count: usize, bulk_selected_ids: &HashSet<
                             .filter(|i| bulk_selected_ids.contains(&i.id))
                             .any(|i| {
                                 member_ids_contain(&c.member_ids,
-                                                   crate::util::matching::collection_member_id(i),
+                                                   dtrpg_core::util::matching::collection_member_id(i),
                                                    i.product_id)
                             })
                    })

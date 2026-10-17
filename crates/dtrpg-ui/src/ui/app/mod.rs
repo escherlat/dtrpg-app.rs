@@ -1,3 +1,11 @@
+use dtrpg_core::credentials::{CredentialStore, KeyringCredentialStore};
+use dtrpg_core::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
+use dtrpg_core::data::enums::CatalogPresentation;
+use dtrpg_core::data::ui_state::{UiState, WindowBoundsPref};
+use dtrpg_core::services::{
+    LibraryService, LoginService, LoginTokens, collections::CollectionsService,
+};
+use dtrpg_core::util::sort::{SortDirection, SortMethod};
 use gpui::*;
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::{Root, init};
@@ -6,17 +14,11 @@ use tracing::{debug, warn};
 
 use crate::controllers::settings::SettingsController;
 use crate::controllers::tabs::{TabTarget, TabsController, TabsSnapshot};
-use crate::credentials::{CredentialStore, KeyringCredentialStore};
-use crate::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
-use crate::data::enums::CatalogPresentation;
-use crate::data::ui_state::{UiState, WindowBoundsPref};
-use crate::services::{LibraryService, LoginService, LoginTokens, collections::CollectionsService};
 use crate::ui::actions::*;
 use crate::ui::views::about_window_view::AboutWindowView;
 use crate::ui::views::root_view::LibraryRootView;
 use crate::ui::views::settings_window_view::SettingsWindowView;
 use crate::util::init::init_globals;
-use crate::util::sort::{SortDirection, SortMethod};
 use crate::util::text::truncate_with_ellipsis;
 
 /// Snapshot of catalog view state needed to render checkmarks in the native

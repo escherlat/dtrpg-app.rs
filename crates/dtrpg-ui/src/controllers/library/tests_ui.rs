@@ -88,8 +88,9 @@ mod download_queue_tests {
     use std::collections::VecDeque;
     use std::sync::Arc;
 
+    use dtrpg_core::data::library::LibraryItemFile;
+
     use super::super::{dequeue_file, missing_file_indices};
-    use crate::data::library::LibraryItemFile;
 
     fn file(downloaded: bool) -> LibraryItemFile {
         LibraryItemFile { id: "f".into(),
@@ -160,9 +161,10 @@ mod download_queue_tests {
 
 #[cfg(test)]
 mod disk_space_check_tests {
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+
     use super::super::{missing_files_size_mb, missing_files_size_mb_for_items};
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::{LibraryItem, LibraryItemFile};
 
     fn file(size_mb: f64, downloaded: bool) -> LibraryItemFile {
         LibraryItemFile { id: "f".into(),
@@ -300,12 +302,13 @@ mod bulk_download_target_tests {
     use std::collections::HashSet;
     use std::sync::Arc;
 
+    use dtrpg_core::data::enums::ItemStatus;
+    use dtrpg_core::data::library::LibraryItem;
+    use dtrpg_core::util::filter::SidebarFilter;
+
     use super::super::{
         collection_download_targets, filter_download_targets, publisher_download_targets,
     };
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
-    use crate::util::filter::SidebarFilter;
 
     fn item(id: &str, title: &str, publisher: &str, order_product_id: u64, product_id: u64)
             -> LibraryItem {

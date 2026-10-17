@@ -110,16 +110,16 @@ impl LibraryController {
                     {
                         return Ok(bytes);
                     }
-                    if !network_monitor.check_endpoint(crate::data::constants::DTRPG_API_HOST) {
+                    if !network_monitor.check_endpoint(dtrpg_core::data::constants::DTRPG_API_HOST) {
                         return Err(ThumbnailFetchError {
                             message: "DriveThruRPG API endpoint unreachable".to_string(),
                             retry_after: None,
                         });
                     }
                     let config = retry::RetryConfig {
-                        max_attempts: crate::data::constants::IMAGE_CACHE_MAX_ATTEMPTS,
-                        base_secs: crate::data::constants::IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
-                        max_secs: crate::data::constants::IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
+                        max_attempts: dtrpg_core::data::constants::IMAGE_CACHE_MAX_ATTEMPTS,
+                        base_secs: dtrpg_core::data::constants::IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+                        max_secs: dtrpg_core::data::constants::IMAGE_CACHE_RETRY_MAX_DELAY_SECS,
                     };
                     let mut on_retry =
                         |attempt: u32, delay: std::time::Duration, reason: &ThumbnailFetchError| {

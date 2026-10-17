@@ -9,6 +9,9 @@
 
 use std::sync::Arc;
 
+use dtrpg_core::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
+use dtrpg_core::data::enums::ItemStatus;
+use dtrpg_core::data::library::LibraryItem;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, SharedString, Styled, anchored,
@@ -24,9 +27,6 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::tabs::TabsController;
-use crate::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
-use crate::data::enums::ItemStatus;
-use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
 use crate::util::datetime::{format_absolute, format_relative};
 

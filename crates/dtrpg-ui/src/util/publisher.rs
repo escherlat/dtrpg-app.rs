@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::data::library::LibraryItem;
+use dtrpg_core::data::library::LibraryItem;
 
 // ── Publisher aggregation
 // ─────────────────────────────────────────────────────
@@ -78,8 +78,9 @@ pub fn format_total_size(items: &[LibraryItem]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use dtrpg_core::data::library::LibraryItem;
+
     use super::*;
-    use crate::data::library::LibraryItem;
 
     fn item(publisher: &str) -> LibraryItem {
         LibraryItem::new("id",
@@ -92,7 +93,7 @@ mod tests {
                          0.0,
                          2020,
                          0,
-                         crate::data::enums::ItemStatus::Cloud,
+                         dtrpg_core::data::enums::ItemStatus::Cloud,
                          "#000000",
                          "",
                          None)

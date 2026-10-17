@@ -9,29 +9,23 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+dtrpg-core.workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
 gpui-kit = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-toml = { workspace = true }
-keyring = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-dirs = { workspace = true }
 rfd = { workspace = true }
-md5 = { workspace = true }
 reqwest = { workspace = true }
 rust-i18n = { workspace = true }
 chrono = { workspace = true }
-base64 = { workspace = true }
 sys-locale = { workspace = true }
 open = { workspace = true }
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 lopdf = { version = "0.45.0", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
-fs4 = { version = "1.1.0", default-features = false, features = ["sync"] }
 
 [dev-dependencies]
 pretty_assertions = "1"

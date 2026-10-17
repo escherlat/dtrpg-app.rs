@@ -4,6 +4,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use dtrpg_core::data::enums::ItemStatus;
+use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+use dtrpg_core::util::matching::{collection_member_id, member_ids_contain};
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AnyElement, App, ClickEvent, Context, Entity, Image, InteractiveElement, IntoElement,
@@ -30,15 +33,12 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::tabs::{TabsController, item_list_table};
-use crate::data::enums::ItemStatus;
-use crate::data::library::{LibraryItem, LibraryItemFile};
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
-use crate::util::matching::{collection_member_id, member_ids_contain};
 use crate::util::reveal::reveal_in_file_manager;
 
 /// Renders the expanded detail tab's content: a large cover, title,
@@ -77,7 +77,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let is_downloaded = item.status == ItemStatus::Downloaded;
     let download_title = item.title.to_string();
 
-    let cover_w = crate::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH * 1.5;
+    let cover_w = dtrpg_core::data::constants::DETAIL_PANEL_COVER_MAX_WIDTH * 1.5;
     let cover_h = cover_w * 10.0 / 7.0;
     let cover: AnyElement = if let Some(image) = cover_image {
         img(image).w(px(cover_w))
@@ -186,7 +186,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             .gap(px(8.0))
                             .child({
                                 let read_path =
-                                    crate::data::storage::publisher_dir(&storage_root_path,
+                                    dtrpg_core::data::storage::publisher_dir(&storage_root_path,
                                                                         &item.publisher);
                                 Button::new("detail-tab-read")
                                     .primary()
@@ -284,7 +284,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             )
                             .when(is_downloaded, |row| {
                                 let item_path =
-                                    crate::data::storage::publisher_dir(&storage_root_path,
+                                    dtrpg_core::data::storage::publisher_dir(&storage_root_path,
                                                                         &item.publisher);
                                 row.child(
                                     Button::new("detail-tab-reveal")
@@ -655,7 +655,7 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                     -> impl IntoElement + 'static {
     let entry_id = Arc::clone(&item.id);
     let selected_ix = entity.read(cx).selected_item_file(&entry_id);
-    let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
+    let entry_dir = dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
 
     let table = item_list_table(tabs, &entity, &entry_id, entry_dir, window, cx);
     let table_for_prepaint = table.clone();
@@ -699,7 +699,7 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
         Some((row_ix, anchor_pos, _pinned)) => match item.files.get(row_ix) {
             Some(file) => {
                 let file_path =
-                    crate::data::storage::publisher_dir(storage_root_path, &item.publisher)
+                    dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher)
                         .join(file.name.as_ref());
                 crate::ui::views::zip_preview_popover::render_zip_preview_popover(
                     Arc::clone(&entry_id),
@@ -761,7 +761,8 @@ fn render_item_metadata(item: &LibraryItem, file: &LibraryItemFile, row_ix: usiz
                                     &value_font_family);
 
     let file_size_value = {
-        let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
+        let entry_dir =
+            dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
         let on_disk = crate::util::file_size::on_disk_file_size(&entry_dir, file.name.as_ref());
         crate::util::file_size::prefer_on_disk_size(format!("{:.1} {}",
                                                             file.size_mb,
@@ -868,8 +869,8 @@ fn render_file_other_details(ctx: FileOtherDetailsContext<'_>, file: &LibraryIte
                       .child(t!("detail.other_details_heading").to_string());
 
     let path_value = if is_downloaded {
-        crate::data::storage::publisher_dir(storage_root_path, publisher).display()
-                                                                         .to_string()
+        dtrpg_core::data::storage::publisher_dir(storage_root_path, publisher).display()
+                                                                              .to_string()
     }
     else {
         value_or_dash("")
@@ -1233,7 +1234,8 @@ fn render_metadata_table(item: &LibraryItem, storage_root_path: &Path, label_fon
             catalog_str
         }
         else {
-            let entry_dir = crate::data::storage::publisher_dir(storage_root_path, &item.publisher);
+            let entry_dir =
+                dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher);
             let downloaded_count = item.files.iter().filter(|f| f.downloaded).count();
             let resolved: Vec<u64> =
                 item.files

@@ -1,0 +1,80 @@
+[package]
+name = "dtrpg-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+# Disables the implicit `src/main.rs` binary target (which would otherwise be
+# named after `[package] name`, "dtrpg-desktop") so the `[[bin]]` below is the
+# only binary this package produces.
+autobins = false
+
+[lints]
+workspace = true
+
+# Named "Libri" (not the default "dtrpg-desktop", derived from `[package] name`)
+# so the process name macOS shows in the Application menu's bold title matches
+# the product name in dev builds too, not just packaged ones (cargo-packager
+# already sets `product-name = "Libri"` below for packaged artifacts).
+[[bin]]
+name = "Libri"
+path = "src/main.rs"
+
+[dependencies]
+dtrpg-core.workspace = true
+dtrpg-ui.workspace = true
+gpui_platform.workspace = true
+gpui.workspace = true
+gpui-kit.workspace = true
+tracing = { workspace = true }
+rust-embed = { workspace = true }
+
+[features]
+# Enables Sentry crash/error reporting in dtrpg-core. Compiled in only for
+# CI-built release artifacts; source builds (`cargo build`/`cargo test`/
+# `cargo run` with no explicit feature flags) never pull in the Sentry
+# dependency.
+sentry = ["dtrpg-core/sentry"]
+
+# cargo-packager configuration (`cargo install cargo-packager`). Invoked in CI as
+# `cargo packager --release -p dtrpg-desktop --formats <fmt>`; the binary is
+# auto-detected from this package's `[[bin]]` target.
+#
+# Icon paths are relative to this manifest's directory: cargo-packager `cd`s
+# to the directory of the Cargo.toml it read `[package.metadata.packager]`
+# from before resolving any relative paths in the config. Source assets:
+# pilgrimagesoftware/dtrpg-design `app-icons/`.
+[package.metadata.packager]
+name = "libri"
+product-name = "Libri"
+identifier = "com.pilgrimagesoftware.dtrpg"
+description = "DriveThruRPG desktop frontend"
+homepage = "https://github.com/pilgrimagesoftware/dtrpg-app.rs"
+authors = ["Paul Schifferer <paul@schifferers.net>"]
+publisher = "Pilgrimage Software"
+license_file = "../../LICENSE.md"
+copyright = "Copyright (c) 2026 Pilgrimage Software"
+category = "Utility"
+before-packaging-command = "cargo build --release --package dtrpg-desktop --features sentry"
+icons = ["../../assets/icon/icon.png", "../../assets/icon/icon.icns", "../../assets/icon/icon.ico"]
+
+[package.metadata.packager.macos]
+# Ad-hoc by default; package.yml's Package step substitutes a Developer ID
+# identity here at build time when APPLE_SIGNING_IDENTITY is set.
+signing-identity = "-"
+
+[package.metadata.packager.deb]
+depends = ["libsecret-1-0"]
+
+[package.metadata.packager.appimage]
+libs = ["libsecret-1.so.0"]
+
+[package.metadata.packager.dmg]
+window-size = { width = 660, height = 400 }
+
+[package.metadata.packager.nsis]
+installer-mode = "currentUser"
+
+[package.metadata.packager.wix]
+# Uses the default WiX-generated GUIDs; upgrade-code intentionally unset here
+# since this is the first packaged release (no prior MSI to upgrade from).

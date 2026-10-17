@@ -1,13 +1,13 @@
 //! Notification banner view: renders persistent auth-related notices below the
 //! toolbar.
 
+use dtrpg_core::data::notification::{Notice, NoticeKind};
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_kit::component::alert::Alert;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use rust_i18n::t;
 
 use crate::controllers::auth_state::AuthStateController;
-use crate::data::notification::{Notice, NoticeKind};
 use crate::data::theme::ColorTokens;
 use crate::ui::views::root_view::LibraryRootView;
 

@@ -3,6 +3,17 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use dtrpg_core::{
+    credentials::{CredentialStore, KeyringCredentialStore},
+    data::{
+        auth_state::AuthState,
+        constants::{KEYRING_API_KEY, KEYRING_SERVICE},
+        enums::{CatalogPresentation, SelectionField},
+        ui_state::UiState,
+    },
+    services::{LibraryService, collections::CollectionsService},
+    util::sort::{SortDirection, SortMethod},
+};
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, ClipboardItem, Context, Entity, FocusHandle, Focusable,
@@ -54,11 +65,7 @@ use crate::{
         settings::SettingsController,
         tabs::{TabTarget, TabsController, TabsSnapshot},
     },
-    credentials::{CredentialStore, KeyringCredentialStore},
     data::{
-        auth_state::AuthState,
-        constants::{KEYRING_API_KEY, KEYRING_SERVICE},
-        enums::{CatalogPresentation, SelectionField},
         events::{
             ActivityChanged, AuthStateChanged, CacheCleared, CollectionCreateFailed,
             CollectionMemberAddFailed, CollectionMemberAlreadyPresent,
@@ -68,10 +75,7 @@ use crate::{
             ThumbnailRefreshNoOp, ThumbnailRefreshStarted,
         },
         theme::LibriTheme,
-        ui_state::UiState,
     },
-    services::{LibraryService, collections::CollectionsService},
-    util::sort::{SortDirection, SortMethod},
 };
 
 /// Type-tag used to identify the startup-auth toast notification.
@@ -233,7 +237,7 @@ impl LibraryRootView {
         settings.update(cx, |ctrl, _cx| ctrl.set_password_input(password_input));
 
         let storage_path_placeholder = {
-            use crate::data::storage::StorageConfig;
+            use dtrpg_core::data::storage::StorageConfig;
             StorageConfig::load().root_path()
                                  .to_string_lossy()
                                  .into_owned()
@@ -256,17 +260,17 @@ impl LibraryRootView {
                 });
 
         let recently_updated_window_days_initial = {
-            use crate::data::storage::StorageConfig;
+            use dtrpg_core::data::storage::StorageConfig;
             StorageConfig::load().recently_updated_window_days()
         };
         let recently_updated_window_input = cx.new(|cx| {
                                                   InputState::new(window, cx)
                 .default_value(recently_updated_window_days_initial.to_string())
                 .min(f64::from(
-                    crate::data::constants::RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+                    dtrpg_core::data::constants::RECENTLY_UPDATED_WINDOW_MIN_DAYS,
                 ))
                 .max(f64::from(
-                    crate::data::constants::RECENTLY_UPDATED_WINDOW_MAX_DAYS,
+                    dtrpg_core::data::constants::RECENTLY_UPDATED_WINDOW_MAX_DAYS,
                 ))
                                               });
         let settings_for_window = settings.clone();
@@ -315,7 +319,7 @@ impl LibraryRootView {
                 });
 
         let max_concurrent_downloads_initial = {
-            use crate::data::storage::StorageConfig;
+            use dtrpg_core::data::storage::StorageConfig;
             StorageConfig::load().max_concurrent_downloads()
         };
         let max_concurrent_downloads_input = cx.new(|cx| {
