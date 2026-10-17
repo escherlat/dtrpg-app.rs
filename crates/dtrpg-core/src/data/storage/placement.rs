@@ -34,7 +34,7 @@ impl PlacementCondition {
 /// One ordered placement rule: route matching items to `target_root_id`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlacementRule {
-    pub condition:      PlacementCondition,
+    pub condition: PlacementCondition,
     pub target_root_id: u32,
 }
 
@@ -42,12 +42,13 @@ pub struct PlacementRule {
 /// condition matches, or `None` if no rule matches -- callers fall back to
 /// the configured default root in that case.
 #[must_use]
-pub fn resolve_root_id(rules: &[PlacementRule], publisher: &str, collection_ids: &[u64],
-                       size_mb: f64)
-                       -> Option<u32> {
-    rules.iter()
-         .find(|rule| rule.condition.matches(publisher, collection_ids, size_mb))
-         .map(|rule| rule.target_root_id)
+pub fn resolve_root_id(
+    rules: &[PlacementRule], publisher: &str, collection_ids: &[u64], size_mb: f64,
+) -> Option<u32> {
+    rules
+        .iter()
+        .find(|rule| rule.condition.matches(publisher, collection_ids, size_mb))
+        .map(|rule| rule.target_root_id)
 }
 
 #[cfg(test)]
@@ -79,30 +80,41 @@ mod tests {
 
     #[test]
     fn resolve_root_id_returns_none_when_nothing_matches() {
-        let rules = vec![PlacementRule { condition:
-                                             PlacementCondition::Publisher("Chaosium".to_string()),
-                                         target_root_id: 2, }];
+        let rules = vec![PlacementRule {
+            condition: PlacementCondition::Publisher("Chaosium".to_string()),
+            target_root_id: 2,
+        }];
         assert_eq!(resolve_root_id(&rules, "Free League", &[], 0.0), None);
     }
 
     #[test]
     fn resolve_root_id_returns_the_first_matching_rule() {
-        let rules = vec![PlacementRule { condition:
-                                     PlacementCondition::Publisher("Free League".to_string()),
-                                 target_root_id: 2, },
-                 PlacementRule { condition:      PlacementCondition::SizeAtLeastMb(100.0),
-                                 target_root_id: 3, },];
+        let rules = vec![
+            PlacementRule {
+                condition: PlacementCondition::Publisher("Free League".to_string()),
+                target_root_id: 2,
+            },
+            PlacementRule {
+                condition: PlacementCondition::SizeAtLeastMb(100.0),
+                target_root_id: 3,
+            },
+        ];
         // Matches both rules; the first in list order wins.
         assert_eq!(resolve_root_id(&rules, "Free League", &[], 200.0), Some(2));
     }
 
     #[test]
     fn resolve_root_id_falls_through_to_a_later_matching_rule() {
-        let rules = vec![PlacementRule { condition:
-                                             PlacementCondition::Publisher("Chaosium".to_string()),
-                                         target_root_id: 2, },
-                         PlacementRule { condition:      PlacementCondition::SizeAtLeastMb(100.0),
-                                         target_root_id: 3, },];
+        let rules = vec![
+            PlacementRule {
+                condition: PlacementCondition::Publisher("Chaosium".to_string()),
+                target_root_id: 2,
+            },
+            PlacementRule {
+                condition: PlacementCondition::SizeAtLeastMb(100.0),
+                target_root_id: 3,
+            },
+        ];
         assert_eq!(resolve_root_id(&rules, "Free League", &[], 200.0), Some(3));
     }
 }
