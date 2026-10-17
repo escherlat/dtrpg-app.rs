@@ -20,6 +20,7 @@ impl LibraryController {
         {
             for file in &mut item.files {
                 file.downloaded = false;
+                file.offloaded = false;
             }
             item.recompute_status();
             self.section_counts =

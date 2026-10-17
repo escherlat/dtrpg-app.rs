@@ -36,7 +36,8 @@ use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use crate::util::file_presence::{
-    ItemVerification, apply_presence_changes, find_presence_changes, resolved_file_path,
+    ItemVerification, apply_presence_changes, collection_ids_for_item,
+    find_presence_changes_in_collections, resolved_file_path_in_collections,
 };
 use crate::util::publisher::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};

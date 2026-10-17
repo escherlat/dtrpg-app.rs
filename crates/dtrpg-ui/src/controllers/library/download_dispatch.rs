@@ -41,7 +41,13 @@ impl LibraryController {
                         .find(|i| i.id == item_id)
                         .and_then(|item| {
                             item.files.get(index as usize).map(|file| {
-                    let dest = resolved_file_path(&StorageConfig::load(), item, file);
+                    let collection_ids = collection_ids_for_item(item, &self.collections);
+                    let dest = resolved_file_path_in_collections(
+                        &StorageConfig::load(),
+                        item,
+                        file,
+                        &collection_ids,
+                    );
                     (item.order_product_id, file.name.to_string(), dest)
                 })
                         });
@@ -141,6 +147,7 @@ impl LibraryController {
                                   if outcome.is_ok() {
                                       if let Some(file) = item.files.get_mut(index as usize) {
                                           file.downloaded = true;
+                                          file.offloaded = false;
                                       }
                                       ctrl.file_info_cache
                                           .remove(&(task_item_id.clone(), index as usize));

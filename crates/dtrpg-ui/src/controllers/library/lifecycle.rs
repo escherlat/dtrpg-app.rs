@@ -178,20 +178,24 @@ impl LibraryController {
     /// running must not be reverted to `Cloud` by a snapshot that predates it.
     pub(super) fn verify_catalog_downloads(&mut self, cx: &mut Context<Self>) {
         let catalog = self.catalog.clone();
+        let collections = self.collections.clone();
         let ids: HashSet<Arc<str>> = catalog.iter().map(|i| Arc::clone(&i.id)).collect();
         self.verifying_downloads.extend(ids.iter().cloned());
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
-              let verifications =
-                  async_cx.background_executor()
-                          .spawn(async move {
-                              let storage = StorageConfig::load();
-                              catalog.iter()
-                                     .filter_map(|item| find_presence_changes(item, &storage))
-                                     .collect::<Vec<_>>()
-                          })
-                          .await;
+              let verifications = async_cx.background_executor()
+                                          .spawn(async move {
+                                              let storage = StorageConfig::load();
+                                              catalog
+                        .iter()
+                        .filter_map(|item| {
+                            let collection_ids = collection_ids_for_item(item, &collections);
+                            find_presence_changes_in_collections(item, &storage, &collection_ids)
+                        })
+                        .collect::<Vec<_>>()
+                                          })
+                                          .await;
 
               this.update(async_cx, |ctrl, cx| {
                       for id in &ids {
