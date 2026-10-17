@@ -1,4 +1,14 @@
-//! Catalog cache: read and write the catalog to/from a JSON file on disk.
+//! Catalog persistence: the library index (`data::index`) is the source of
+//! truth for catalog items; this module is the staleness-tracking sidecar
+//! that gates the live API refetch, plus the legacy JSON reader used only
+//! to migrate an existing install into the index on first launch.
+//!
+//! Before `libri-library-index`, this file *was* the catalog's on-disk
+//! format (a JSON file written and read whole). `load_catalog_cache` and
+//! `save_catalog_cache` keep their names and signatures -- every caller in
+//! `controllers/library/` goes through them unchanged -- but now delegate
+//! to [`crate::data::index::LibraryIndex`] instead of reading or writing
+//! `catalog_cache.json` directly.
 
 use std::fs;
 use std::path::Path;
@@ -9,9 +19,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::warn;
 
-use crate::data::constants::{
-    CATALOG_CACHE_FILE, CATALOG_CACHE_METADATA_FILE, CATALOG_CACHE_TMP, STALE_SECS,
-};
+use crate::data::constants::{CATALOG_CACHE_FILE, CATALOG_CACHE_METADATA_FILE, STALE_SECS};
+use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;
 
 /// Bump whenever a change to `LibraryItem`'s cached fields means existing
@@ -210,22 +219,46 @@ pub fn save_fresh_install_request_timestamp(
 /// Errors that can occur when writing the catalog cache.
 #[derive(Debug, Error)]
 pub enum CatalogCacheError {
-    /// An I/O error occurred while reading or writing the cache file.
+    /// An I/O error occurred while reading or writing the cache metadata
+    /// sidecar.
     #[error("catalog cache I/O error: {0}")]
     Io(#[from] std::io::Error),
-    /// The catalog data could not be serialized to JSON.
+    /// The cache metadata sidecar could not be serialized to JSON.
     #[error("catalog cache JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    /// The library index could not be opened or written.
+    #[error("catalog cache index error: {0}")]
+    Index(#[from] IndexError),
 }
 
 // ── load_catalog_cache
 // ────────────────────────────────────────────────────────
 
-/// Reads the catalog cache from `{root}/catalog_cache.json`.
+/// Reads the catalog from the library index at `root`, migrating it from
+/// `{root}/catalog_cache.json` first if the index doesn't exist yet.
 ///
-/// Returns `None` on any error (missing file, malformed JSON) so callers
-/// can fall through to the live API fetch without surfacing errors to the user.
+/// Returns `None` on any error (including a missing cache and no index) so
+/// callers can fall through to the live API fetch without surfacing errors
+/// to the user.
 pub fn load_catalog_cache(root: &Path) -> Option<Vec<LibraryItem>> {
+    let index = LibraryIndex::open_and_migrate(root)
+        .map_err(|e| warn!(root = %root.display(), error = %e, "library index not openable"))
+        .ok()?;
+    index.list_items()
+         .map_err(|e| warn!(root = %root.display(), error = %e, "library index query failed"))
+         .ok()
+         .filter(|items| !items.is_empty())
+}
+
+/// Reads the legacy JSON catalog cache directly from
+/// `{root}/catalog_cache.json`, without touching the index.
+///
+/// Used only by [`crate::data::index::LibraryIndex::open_and_migrate`] to
+/// seed a newly created index from an existing install's cache; no other
+/// caller should read the JSON file directly once the index exists.
+///
+/// Returns `None` on any error (missing file, malformed JSON).
+pub(crate) fn legacy_load_catalog_cache_json(root: &Path) -> Option<Vec<LibraryItem>> {
     let path = root.join(CATALOG_CACHE_FILE);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
@@ -276,21 +309,30 @@ fn dedupe_items(items: Vec<LibraryItem>) -> Vec<LibraryItem> {
 // ── save_catalog_cache
 // ────────────────────────────────────────────────────────
 
-/// Writes `items` to `{root}/catalog_cache.json` atomically via a `.tmp`
-/// rename.
+/// Writes `items` to the library index at `root`, replacing the entire
+/// catalog, and updates the staleness-tracking metadata sidecar.
+///
+/// Applies the same defensive id/product-id deduplication the legacy JSON
+/// reader used to apply on load (see [`dedupe_items`] and
+/// [`LibraryItem::dedupe_files`]) before writing, since the index's `id`
+/// primary key rejects a duplicate outright rather than silently collapsing
+/// it the way overwriting a JSON file did.
 ///
 /// # Errors
 ///
-/// Returns [`CatalogCacheError::Io`] if the directory cannot be created or the
-/// file cannot be written or renamed. Returns [`CatalogCacheError::Json`] if
-/// serialization fails.
+/// Returns [`CatalogCacheError::Index`] if the index cannot be opened or
+/// written. Returns [`CatalogCacheError::Io`] or
+/// [`CatalogCacheError::Json`] if the metadata sidecar cannot be updated.
 pub fn save_catalog_cache(root: &Path, items: &[LibraryItem]) -> Result<(), CatalogCacheError> {
-    fs::create_dir_all(root)?;
-    let tmp = root.join(CATALOG_CACHE_TMP);
-    let json = serde_json::to_string(items)?;
-    fs::write(&tmp, &json)?;
-    fs::rename(&tmp, root.join(CATALOG_CACHE_FILE))?;
-    save_cache_metadata(root, items.len())?;
+    let mut deduped: Vec<LibraryItem> = items.to_vec();
+    for item in &mut deduped {
+        item.dedupe_files();
+    }
+    let deduped = dedupe_items(deduped);
+
+    let mut index = LibraryIndex::open_and_migrate(root)?;
+    index.replace_all_items(&deduped)?;
+    save_cache_metadata(root, deduped.len())?;
     Ok(())
 }
 
@@ -337,6 +379,7 @@ mod tests {
     #[test]
     fn load_malformed_json_returns_none() {
         let dir = test_dir("malformed");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(CATALOG_CACHE_FILE), b"not valid json { ").unwrap();
         let result = load_catalog_cache(&dir);
@@ -409,6 +452,7 @@ mod tests {
     #[test]
     fn save_cache_writes_metadata() {
         let dir = test_dir("metadata_roundtrip");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let items = vec![make_item("b1"), make_item("b2"), make_item("b3")];
         save_catalog_cache(&dir, &items).unwrap();
@@ -425,6 +469,7 @@ mod tests {
     fn ensure_cache_metadata_exists_writes_a_stale_default_when_missing() {
         let dir = test_dir("ensure_metadata_missing");
         let _ = fs::remove_dir_all(&dir);
+        let _ = fs::remove_dir_all(&dir);
 
         ensure_cache_metadata_exists(&dir);
         let meta = load_cache_metadata(&dir);
@@ -438,6 +483,7 @@ mod tests {
     #[test]
     fn ensure_cache_metadata_exists_leaves_a_real_file_untouched() {
         let dir = test_dir("ensure_metadata_present");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let items = vec![make_item("b1")];
         save_catalog_cache(&dir, &items).unwrap();
@@ -454,6 +500,7 @@ mod tests {
     #[test]
     fn save_then_load_round_trips() {
         let dir = test_dir("roundtrip");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let items = vec![make_item("a1"), make_item("a2")];
         save_catalog_cache(&dir, &items).unwrap();
@@ -476,6 +523,7 @@ mod tests {
         use crate::data::library::LibraryItemFile;
 
         let dir = test_dir("dedupe_on_load");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let mut item = make_item("b1");
         item.files = vec![
@@ -522,6 +570,7 @@ mod tests {
         // repeated launches. Loading an already-bloated cache must collapse
         // it back down rather than requiring a manual cache wipe.
         let dir = test_dir("dedupe_whole_items_on_load");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let item = make_item("c1");
         fs::write(
@@ -546,6 +595,7 @@ mod tests {
         // the stale and the new id for the same product must collapse to
         // one entry, keeping the first occurrence.
         let dir = test_dir("dedupe_by_product_id_on_load");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let mut old_item = make_item("old-id");
         old_item.product_id = 42;
@@ -571,6 +621,7 @@ mod tests {
         // identity — two distinct items that both happen to have it must
         // not collapse into one just because their product ids match.
         let dir = test_dir("no_dedupe_unknown_product_id");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let item_a = make_item("a1");
         let item_b = make_item("a2");

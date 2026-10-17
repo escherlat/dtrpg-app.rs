@@ -8,6 +8,7 @@ pub mod constants;
 pub mod cover_cache;
 pub mod enums;
 pub mod file_openers;
+pub mod index;
 pub mod library;
 pub mod notification;
 pub mod paths;

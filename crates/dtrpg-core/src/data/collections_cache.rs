@@ -1,5 +1,11 @@
-//! Collections cache: read and write the collection list to/from a JSON file on
-//! disk.
+//! Collections persistence: the library index (`data::index`) is the
+//! source of truth for collections; this module is now only the legacy
+//! JSON reader used to migrate an existing install into the index on first
+//! launch. `load_collections_cache` and `save_collections_cache` keep their
+//! names and signatures -- every caller in `controllers/library/` goes
+//! through them unchanged -- but delegate to
+//! [`crate::data::index::LibraryIndex`] instead of reading or writing
+//! `collections_cache.json` directly.
 
 use std::fs;
 use std::path::Path;
@@ -8,7 +14,8 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::data::collection::CollectionEntry;
-use crate::data::constants::{COLLECTIONS_CACHE_FILE, COLLECTIONS_CACHE_TMP};
+use crate::data::constants::COLLECTIONS_CACHE_FILE;
+use crate::data::index::{IndexError, LibraryIndex};
 
 // ── CollectionsCacheError
 // ─────────────────────────────────────────────────────
@@ -22,16 +29,40 @@ pub enum CollectionsCacheError {
     /// The collection data could not be serialized to JSON.
     #[error("collections cache JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    /// The library index could not be opened or written.
+    #[error("collections cache index error: {0}")]
+    Index(#[from] IndexError),
 }
 
 // ── load_collections_cache
 // ────────────────────────────────────────────────────
 
-/// Reads the collections cache from `{root}/collections_cache.json`.
+/// Reads the collection list from the library index at `root`, migrating it
+/// from `{root}/collections_cache.json` first if the index doesn't exist
+/// yet.
 ///
-/// Returns `None` on any error (missing file, malformed JSON) so callers
-/// can fall through to the live API fetch without surfacing errors to the user.
+/// Returns `None` on any error (including nothing cached and no index) so
+/// callers can fall through to the live API fetch without surfacing errors
+/// to the user.
 pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
+    let index = LibraryIndex::open_and_migrate(root)
+        .map_err(|e| warn!(root = %root.display(), error = %e, "library index not openable"))
+        .ok()?;
+    index.list_collections()
+         .map_err(|e| warn!(root = %root.display(), error = %e, "library index query failed"))
+         .ok()
+         .filter(|entries| !entries.is_empty())
+}
+
+/// Reads the legacy JSON collections cache directly from
+/// `{root}/collections_cache.json`, without touching the index.
+///
+/// Used only by [`crate::data::index::LibraryIndex::open_and_migrate`] to
+/// seed a newly created index from an existing install's cache; no other
+/// caller should read the JSON file directly once the index exists.
+///
+/// Returns `None` on any error (missing file, malformed JSON).
+pub(crate) fn legacy_load_collections_cache_json(root: &Path) -> Option<Vec<CollectionEntry>> {
     let path = root.join(COLLECTIONS_CACHE_FILE);
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
@@ -52,22 +83,17 @@ pub fn load_collections_cache(root: &Path) -> Option<Vec<CollectionEntry>> {
 // ── save_collections_cache
 // ────────────────────────────────────────────────────
 
-/// Writes `entries` to `{root}/collections_cache.json` atomically via a `.tmp`
-/// rename.
+/// Writes `entries` to the library index at `root`, replacing the entire
+/// collection list.
 ///
 /// # Errors
 ///
-/// Returns [`CollectionsCacheError::Io`] if the directory cannot be created or
-/// the file cannot be written or renamed. Returns
-/// [`CollectionsCacheError::Json`] if serialization fails.
-pub fn save_collections_cache(
-    root: &Path, entries: &[CollectionEntry],
-) -> Result<(), CollectionsCacheError> {
-    fs::create_dir_all(root)?;
-    let tmp = root.join(COLLECTIONS_CACHE_TMP);
-    let json = serde_json::to_string(entries)?;
-    fs::write(&tmp, &json)?;
-    fs::rename(&tmp, root.join(COLLECTIONS_CACHE_FILE))?;
+/// Returns [`CollectionsCacheError::Index`] if the index cannot be opened or
+/// written.
+pub fn save_collections_cache(root: &Path, entries: &[CollectionEntry])
+                              -> Result<(), CollectionsCacheError> {
+    let mut index = LibraryIndex::open_and_migrate(root)?;
+    index.replace_all_collections(entries)?;
     Ok(())
 }
 
@@ -85,12 +111,10 @@ mod tests {
     }
 
     fn make_entry(id: u64, name: &str) -> CollectionEntry {
-        CollectionEntry {
-            id,
-            name: Arc::from(name),
-            member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
-            created_at: 1_700_000_000,
-        }
+        CollectionEntry { id,
+                          name: Arc::from(name),
+                          member_ids: Arc::from(vec![1u64, 2u64].as_slice()),
+                          created_at: 1_700_000_000 }
     }
 
     #[test]
@@ -102,6 +126,7 @@ mod tests {
     #[test]
     fn load_malformed_json_returns_none() {
         let dir = test_dir("malformed");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(COLLECTIONS_CACHE_FILE), b"not valid json { ").unwrap();
         let result = load_collections_cache(&dir);
@@ -112,6 +137,7 @@ mod tests {
     #[test]
     fn save_then_load_round_trips() {
         let dir = test_dir("roundtrip");
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let entries = vec![make_entry(1, "Favorites"), make_entry(2, "Wishlist")];
         save_collections_cache(&dir, &entries).unwrap();

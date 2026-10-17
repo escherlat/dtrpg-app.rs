@@ -27,6 +27,7 @@ md5 = { workspace = true }
 base64 = { workspace = true }
 fs4 = { version = "1.1.0", default-features = false, features = ["sync"] }
 reqwest = { workspace = true }
+rusqlite = { version = "0.40.0", default-features = false, features = ["bundled"] }
 
 [features]
 # Enables Sentry crash/error reporting. Compiled in only for CI-built release
