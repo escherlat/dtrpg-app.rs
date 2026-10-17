@@ -238,12 +238,14 @@ fn render_create_collections_toggle(create_collections: bool,
 /// Developer Mode caveat only when running on Windows — it does not apply
 /// to macOS or Linux, where symlink creation needs no elevated privilege.
 fn create_collections_note() -> String {
-    #[cfg(target_os = "windows")]
-    return format!("{} {}",
-                   t!("settings.create_collections_note"),
-                   t!("settings.create_collections_note_windows"));
-    #[cfg(not(target_os = "windows"))]
-    t!("settings.create_collections_note").to_string()
+    if Platform.kind() == PlatformKind::Windows {
+        format!("{} {}",
+                t!("settings.create_collections_note"),
+                t!("settings.create_collections_note_windows"))
+    }
+    else {
+        t!("settings.create_collections_note").to_string()
+    }
 }
 
 /// Renders the "Max concurrent downloads" row: a label/note pair and an
