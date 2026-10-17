@@ -8,6 +8,7 @@ use dtrpg_core::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
 use dtrpg_core::data::enums::CatalogPresentation;
 use dtrpg_core::data::enums::*;
 use dtrpg_core::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::util::matching::collection_member_id;
 use dtrpg_core::util::sort::{SortDirection, SortMethod};
 use gpui::prelude::*;
@@ -1697,12 +1698,11 @@ fn thumbnail_menu_item(item: &LibraryItem, entity: &Entity<LibraryController>) -
 // ─────────────────────────────────────────────────────────────
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
-    #[cfg(target_os = "macos")]
-    return t!("catalog.action_show_in_finder");
-    #[cfg(target_os = "windows")]
-    return t!("catalog.action_show_in_explorer");
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    return t!("catalog.action_show_in_files");
+    match Platform.kind() {
+        PlatformKind::MacOs => t!("catalog.action_show_in_finder"),
+        PlatformKind::Windows => t!("catalog.action_show_in_explorer"),
+        PlatformKind::Linux => t!("catalog.action_show_in_files"),
+    }
 }
 
 // ── Thumbs layout

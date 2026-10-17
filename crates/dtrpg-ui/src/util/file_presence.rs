@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
 use dtrpg_core::data::storage::StorageConfig;
+use dtrpg_core::platform::{FileState, Platform, PlatformIntegration};
 
 /// Resolves the expected on-disk path for `file` within `item`'s entry,
 /// matching `dispatch_download`'s destination computation so both the
@@ -53,7 +54,9 @@ pub fn find_presence_changes(item: &LibraryItem, storage: &StorageConfig)
         item.files
             .iter()
             .filter_map(|file| {
-                let present = resolved_file_path(storage, item, file).exists();
+                let state = Platform.file_state(&resolved_file_path(storage, item, file))
+                                    .unwrap_or(FileState::Unknown);
+                let present = matches!(state, FileState::Local);
                 (file.downloaded != present).then(|| PresenceChange { file_name:
                                                                           Arc::clone(&file.name),
                                                                       present })

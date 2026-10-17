@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use dtrpg_core::data::enums::ItemStatus;
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::util::matching::{collection_member_id, member_ids_contain};
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
@@ -1161,12 +1162,11 @@ fn styled_value(value: impl Into<SharedString>, value_font_family: &str) -> AnyE
 }
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
-    #[cfg(target_os = "macos")]
-    return t!("detail.show_in_finder");
-    #[cfg(target_os = "windows")]
-    return t!("detail.show_in_explorer");
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    return t!("detail.show_in_files");
+    match Platform.kind() {
+        PlatformKind::MacOs => t!("detail.show_in_finder"),
+        PlatformKind::Windows => t!("detail.show_in_explorer"),
+        PlatformKind::Linux => t!("detail.show_in_files"),
+    }
 }
 
 /// Renders a small status icon next to the item title: a checkmark when

@@ -20,6 +20,17 @@ pub struct Capabilities {
     pub reveal: bool,
 }
 
+/// Operating-system family used for platform-specific presentation text.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PlatformKind {
+    /// Apple macOS and Finder.
+    MacOs,
+    /// Microsoft Windows and Explorer.
+    Windows,
+    /// Linux and other Unix-like desktop targets.
+    Linux,
+}
+
 /// Availability state reported for a local library file.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileState {
@@ -37,6 +48,9 @@ pub enum FileState {
 
 /// Platform operations used by application services and presentation layers.
 pub trait PlatformIntegration: Send + Sync {
+    /// Returns the operating-system family for this implementation.
+    fn kind(&self) -> PlatformKind;
+
     /// Returns the operations supported by this platform implementation.
     fn capabilities(&self) -> Capabilities;
 
@@ -60,6 +74,10 @@ pub trait PlatformIntegration: Send + Sync {
 pub struct Platform;
 
 impl PlatformIntegration for Platform {
+    fn kind(&self) -> PlatformKind {
+        kind()
+    }
+
     fn capabilities(&self) -> Capabilities {
         capabilities()
     }
@@ -75,6 +93,21 @@ impl PlatformIntegration for Platform {
     fn materialize(&self, path: &Path) -> io::Result<()> {
         materialize(path)
     }
+}
+
+#[cfg(target_os = "macos")]
+fn kind() -> PlatformKind {
+    PlatformKind::MacOs
+}
+
+#[cfg(target_os = "windows")]
+fn kind() -> PlatformKind {
+    PlatformKind::Windows
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn kind() -> PlatformKind {
+    PlatformKind::Linux
 }
 
 /// Returns the native capabilities for the current target.
@@ -133,6 +166,7 @@ fn file_state(path: &Path) -> io::Result<FileState> {
         "NSURLUbiquitousItemDownloadingStatusNotDownloaded" => Ok(FileState::CloudOnly),
         "NSURLUbiquitousItemDownloadingStatusDownloaded"
         | "NSURLUbiquitousItemDownloadingStatusCurrent" => Ok(FileState::Local),
+        "(null)" => Ok(FileState::Local),
         _ => Ok(FileState::Unknown),
     }
 }
