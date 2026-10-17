@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::storage::placement::{PlacementCondition, PlacementRule};
 use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::validate_writable;
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
@@ -40,7 +41,8 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                               storage_path_input: Option<Entity<InputState>>,
                               max_concurrent_downloads: usize,
                               max_concurrent_downloads_input: Option<Entity<InputState>>,
-                              create_collections: bool, storage_roots: Vec<StorageRoot>)
+                              create_collections: bool, storage_roots: Vec<StorageRoot>,
+                              storage_rules: Vec<PlacementRule>)
                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -194,7 +196,90 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
            .child(render_create_collections_toggle(create_collections, entity.clone(), colors))
            // ── Additional roots ───────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
-           .child(render_storage_roots(storage_roots, entity, colors))
+           .child(render_storage_roots(storage_roots, entity.clone(), colors))
+           .child(div().h(px(1.0)).bg(border))
+           .child(render_storage_rules(storage_rules, entity, colors))
+}
+
+/// Renders saved placement rules in evaluation order. Rule creation is kept
+/// in the core configuration API; this view makes persisted rules visible and
+/// safely supports removing or reordering them.
+fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsController>,
+                        colors: &ColorTokens)
+                        -> impl IntoElement + 'static + use<> {
+    let text_primary = colors.text_primary;
+    let text_secondary = colors.text_secondary;
+    let border = colors.border;
+    div().flex()
+         .flex_col()
+         .gap(px(8.0))
+         .child(div().text_sm()
+                     .font_weight(gpui::FontWeight::SEMIBOLD)
+                     .text_color(text_primary)
+                     .child(t!("settings.storage_rules_title")))
+         .children(rules.into_iter().enumerate().map(|(index, rule)| {
+             let entity_up = entity.clone();
+             let entity_down = entity.clone();
+             let entity_remove = entity.clone();
+             div()
+                .flex()
+                .items_center()
+                .gap(px(6.0))
+                .p(px(6.0))
+                .border_1()
+                .border_color(border)
+                .child(
+                    div()
+                        .flex_1()
+                        .text_xs()
+                        .text_color(text_secondary)
+                        .child(format_rule(&rule)),
+                )
+                .child(
+                    Button::new(SharedString::from(format!("rule-up-{index}")))
+                        .ghost()
+                        .icon(IconName::ChevronUp)
+                        .on_click(move |_, _, cx| {
+                            entity_up.update(cx, |ctrl, cx| {
+                                ctrl.move_storage_rule(index, false, cx);
+                            });
+                        }),
+                )
+                .child(
+                    Button::new(SharedString::from(format!("rule-down-{index}")))
+                        .ghost()
+                        .icon(IconName::ChevronDown)
+                        .on_click(move |_, _, cx| {
+                            entity_down.update(cx, |ctrl, cx| {
+                                ctrl.move_storage_rule(index, true, cx);
+                            });
+                        }),
+                )
+                .child(
+                    Button::new(SharedString::from(format!("rule-remove-{index}")))
+                        .ghost()
+                        .icon(IconName::Close)
+                        .on_click(move |_, _, cx| {
+                            entity_remove.update(cx, |ctrl, cx| {
+                                ctrl.remove_storage_rule(index, cx);
+                            });
+                        }),
+                )
+         }))
+}
+
+fn format_rule(rule: &PlacementRule) -> String {
+    match &rule.condition {
+        PlacementCondition::Publisher(name) => {
+            format!("Publisher: {name} → root {}", rule.target_root_id)
+        }
+        PlacementCondition::Collection(id) => {
+            format!("Collection: {id} → root {}", rule.target_root_id)
+        }
+        PlacementCondition::SizeAtLeastMb(size) => {
+            format!("Size ≥ {size:.1} MB → root {}", rule.target_root_id)
+        }
+    }
 }
 
 /// Renders the configured roots and lets the user add or remove named roots.
