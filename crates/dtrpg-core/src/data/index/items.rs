@@ -85,8 +85,8 @@ fn insert_item(conn: &Connection, item: &LibraryItem) -> rusqlite::Result<()> {
 
     for file in &item.files {
         conn.execute(
-            "INSERT INTO files (item_id, file_id, file_index, name, format, size_mb, downloaded)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO files (item_id, file_id, file_index, name, format, size_mb, downloaded, offloaded)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 item.id.as_ref(),
                 file.id.as_ref(),
@@ -95,6 +95,7 @@ fn insert_item(conn: &Connection, item: &LibraryItem) -> rusqlite::Result<()> {
                 file.format.as_ref(),
                 file.size_mb,
                 file.downloaded,
+                file.offloaded,
             ],
         )?;
     }
@@ -150,7 +151,7 @@ fn row_to_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
 
 fn load_files_for(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<LibraryItemFile>> {
     let mut stmt = conn.prepare(
-                                "SELECT file_id, file_index, name, format, size_mb, downloaded
+                                "SELECT file_id, file_index, name, format, size_mb, downloaded, offloaded
          FROM files WHERE item_id = ?1 ORDER BY file_index",
     )?;
     let files = stmt.query_map(params![item_id], |row| {
@@ -160,7 +161,7 @@ fn load_files_for(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<Libr
                                              format:     Arc::from(row.get::<_, String>(3)?),
                                              size_mb:    row.get(4)?,
                                              downloaded: row.get(5)?,
-                                             offloaded: false, })
+                                             offloaded: row.get(6)?, })
                     })?
                     .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(files)

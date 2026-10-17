@@ -6,7 +6,7 @@ use rusqlite::Connection;
 /// Bump whenever the schema changes in a way that requires existing
 /// databases to be rebuilt, mirroring `catalog_cache.rs`'s
 /// `CACHE_SCHEMA_VERSION` convention for the JSON cache it replaces.
-pub(super) const SCHEMA_VERSION: i64 = 1;
+pub(super) const SCHEMA_VERSION: i64 = 2;
 
 /// Creates every table, index, and the FTS5 virtual table if they don't
 /// already exist, then records (or checks) the schema version via SQLite's
@@ -16,6 +16,7 @@ pub(super) const SCHEMA_VERSION: i64 = 1;
 ///
 /// Returns a [`rusqlite::Error`] if any DDL statement fails.
 pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
+    let previous_version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
     conn.execute_batch(
                        "
         CREATE TABLE IF NOT EXISTS items (
@@ -50,6 +51,7 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
             format     TEXT NOT NULL,
             size_mb    REAL NOT NULL,
             downloaded INTEGER NOT NULL DEFAULT 0,
+            offloaded INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (item_id, file_id, name)
         );
         CREATE INDEX IF NOT EXISTS files_by_item ON files(item_id);
@@ -115,6 +117,9 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
         );
         ",
     )?;
+    if previous_version == 1 {
+        conn.execute("ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0", [])?;
+    }
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())
 }

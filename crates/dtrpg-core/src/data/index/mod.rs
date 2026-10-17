@@ -236,6 +236,7 @@ mod tests {
         assert_eq!(loaded.files.len(), 1);
         assert_eq!(loaded.files[0].name.as_ref(), "Moria.pdf");
         assert!(loaded.files[0].downloaded);
+        assert!(!loaded.files[0].offloaded);
     }
 
     #[test]
