@@ -1,10 +1,8 @@
 name: Windows Build Spike
 
 # Manual-only trial build to confirm the pinned `gpui` revision compiles on
-# `windows-latest`. Not part of the nightly/release path. Once this passes
-# reliably, remove `continue-on-error` from the Windows leg in
-# `package.yaml` and delete this workflow. See
-# openspec/changes/add-release-packaging-workflow design.md Open Questions.
+# `windows-latest`. The required Windows leg in `ci.yml` is the authoritative
+# automated check; this manual workflow remains useful for verbose diagnostics.
 
 on:
   workflow_dispatch:
@@ -33,7 +31,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build (release)
-        run: cargo build --release --package dtrpg-core --target x86_64-pc-windows-msvc --verbose
+        run: cargo build --release --package dtrpg-desktop --target x86_64-pc-windows-msvc --verbose
 
       - name: Test
-        run: cargo test --release --package dtrpg-core --target x86_64-pc-windows-msvc --verbose
+        run: cargo test --release --workspace --target x86_64-pc-windows-msvc --verbose
