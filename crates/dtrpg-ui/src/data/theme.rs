@@ -1,12 +1,11 @@
 //! Libri theme system: six color themes, two density variants, four
 //! user-selectable font-family roles, and one shared UI text size.
 
-use gpui::{Hsla, Pixels, SharedString, px}; // Pixels kept for GPUI layout fields
-
-use crate::data::constants::{
+use dtrpg_core::data::constants::{
     DEFAULT_BODY_FONT, DEFAULT_LABEL_FONT, DEFAULT_MONO_FONT, DEFAULT_UI_TEXT_SIZE,
     DEFAULT_VALUE_FONT,
 };
+use gpui::{Hsla, Pixels, SharedString, px}; // Pixels kept for GPUI layout fields
 
 // ── Color tokens
 // ──────────────────────────────────────────────────────────────

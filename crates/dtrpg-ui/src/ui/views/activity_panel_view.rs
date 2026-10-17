@@ -3,6 +3,7 @@
 
 use std::time::Instant;
 
+use dtrpg_core::data::activity::{ActivitySnapshot, ActivityStatus};
 use gpui::prelude::*;
 use gpui::{AnyElement, Entity, IntoElement, ParentElement, Styled, div, px, relative};
 use gpui_kit::component::scroll::ScrollableElement;
@@ -10,7 +11,6 @@ use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
-use crate::data::activity::{ActivitySnapshot, ActivityStatus};
 use crate::data::theme::ColorTokens;
 
 /// Renders the activity panel's content. The caller (the status bar's `Popover`

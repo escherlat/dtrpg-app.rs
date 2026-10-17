@@ -1,6 +1,9 @@
 //! Toolbar view: section title, search, sort dropdown, group toggle, layout
 //! switcher.
 
+use dtrpg_core::data::enums::CatalogPresentation;
+use dtrpg_core::util::filter::*;
+use dtrpg_core::util::sort::*;
 use gpui::prelude::*;
 use gpui::{Entity, IntoElement, MouseButton, ParentElement, Styled, div, px};
 use gpui_kit::component::Icon;
@@ -13,10 +16,8 @@ use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
-use crate::data::{enums::CatalogPresentation, theme::ColorTokens};
-use crate::util::filter::*;
+use crate::data::theme::ColorTokens;
 use crate::util::pluralize::pluralize;
-use crate::util::sort::*;
 
 /// Human-readable title for a sidebar filter, used by both the catalog tab
 /// header and the status bar's active-tab summary.
@@ -291,8 +292,9 @@ fn render_layout_switcher(current: CatalogPresentation, entity: Entity<LibraryCo
 
 #[cfg(test)]
 mod tests {
+    use dtrpg_core::util::filter::SidebarFilter;
+
     use super::*;
-    use crate::util::filter::SidebarFilter;
 
     #[test]
     fn publisher_filter_includes_name() {

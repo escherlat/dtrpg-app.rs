@@ -140,7 +140,7 @@ impl LibraryController {
                          method,
                          self.collection_sort_direction,
                          &catalog_ids);
-        crate::data::ui_preferences::UiPreferences::load()
+        dtrpg_core::data::ui_preferences::UiPreferences::load()
             .save_collection_sort(method, self.collection_sort_direction);
         cx.emit(LibraryChanged);
     }
@@ -155,7 +155,7 @@ impl LibraryController {
                          self.collection_sort,
                          direction,
                          &catalog_ids);
-        crate::data::ui_preferences::UiPreferences::load()
+        dtrpg_core::data::ui_preferences::UiPreferences::load()
             .save_collection_sort(self.collection_sort, direction);
         cx.emit(LibraryChanged);
     }
@@ -178,11 +178,11 @@ impl LibraryController {
 
     /// Persists the current sidebar filter, sort, grouped, and presentation
     /// state to disk. Best-effort — I/O failures are logged and ignored (see
-    /// [`crate::data::file_openers::CatalogViewPrefs::save`]).
+    /// [`dtrpg_core::data::file_openers::CatalogViewPrefs::save`]).
     pub(super) fn save_view_prefs(&self) {
-        crate::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
-                                                                self.sort,
-                                                                self.grouped,
-                                                                self.presentation).save();
+        dtrpg_core::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
+                                                                     self.sort,
+                                                                     self.grouped,
+                                                                     self.presentation).save();
     }
 }

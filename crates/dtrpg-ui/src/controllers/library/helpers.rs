@@ -192,7 +192,7 @@ pub(crate) fn missing_file_indices(files: &[LibraryItemFile]) -> Vec<u32> {
 ///
 /// Used by the `request_*` gating wrappers to compute the aggregate size a
 /// queuing action would enqueue, for comparison against
-/// [`crate::data::storage::available_space_mb`].
+/// [`dtrpg_core::data::storage::available_space_mb`].
 pub(crate) fn missing_files_size_mb(files: &[LibraryItemFile]) -> f64 {
     files.iter()
          .filter(|f| !f.downloaded)
@@ -298,7 +298,8 @@ pub(crate) fn reload_cooldown_active(meta: Option<&CacheMetadata>, now_secs: u64
     else {
         return false;
     };
-    now_secs.saturating_sub(meta.saved_at_secs) < crate::data::constants::FORCE_RELOAD_COOLDOWN_SECS
+    now_secs.saturating_sub(meta.saved_at_secs)
+    < dtrpg_core::data::constants::FORCE_RELOAD_COOLDOWN_SECS
 }
 
 /// Returns `true` if a fresh-install catalog-initialization request should be
@@ -324,7 +325,7 @@ pub(crate) fn item_check_due(last_checked: Option<std::time::SystemTime>) -> boo
         None => true,
         Some(last) => {
             last.elapsed().map(|e| e.as_secs()).unwrap_or(0)
-            >= crate::data::constants::ITEM_CHECK_COOLDOWN_SECS
+            >= dtrpg_core::data::constants::ITEM_CHECK_COOLDOWN_SECS
         }
     }
 }
@@ -419,7 +420,7 @@ pub(crate) fn check_batch_cooldown_active(last_batch_secs: Option<u64>, now_secs
     else {
         return false;
     };
-    now_secs.saturating_sub(last) < crate::data::constants::ITEM_CHECK_BATCH_COOLDOWN_SECS
+    now_secs.saturating_sub(last) < dtrpg_core::data::constants::ITEM_CHECK_BATCH_COOLDOWN_SECS
 }
 
 /// Selects up to `limit` catalog item ids overdue for an availability check
@@ -474,7 +475,7 @@ pub(crate) fn partial_fetch_since(catalog: &[LibraryItem]) -> Option<String> {
     let max_epoch = catalog.iter()
                            .filter_map(|item| item.date_updated.or(item.date_added))
                            .max()?;
-    crate::util::datetime::epoch_to_rfc3339(max_epoch)
+    dtrpg_core::util::datetime::epoch_to_rfc3339(max_epoch)
 }
 
 /// Determines whether a startup remote-vs-cached item count mismatch should

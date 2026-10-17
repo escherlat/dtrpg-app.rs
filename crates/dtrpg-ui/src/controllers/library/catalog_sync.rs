@@ -311,7 +311,7 @@ impl LibraryController {
                 let endpoint_reachable = async_cx
                     .background_executor()
                     .spawn(async move {
-                        monitor_for_totals.check_endpoint(crate::data::constants::DTRPG_API_HOST)
+                        monitor_for_totals.check_endpoint(dtrpg_core::data::constants::DTRPG_API_HOST)
                     })
                     .await;
                 if gated {
@@ -327,9 +327,9 @@ impl LibraryController {
                     let svc = service_arc.clone();
                     let cancel = std::sync::atomic::AtomicBool::new(false);
                     let config = retry::RetryConfig {
-                        max_attempts: crate::data::constants::CATALOG_SYNC_MAX_ATTEMPTS,
-                        base_secs: crate::data::constants::CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
-                        max_secs: crate::data::constants::CATALOG_SYNC_RETRY_MAX_DELAY_SECS,
+                        max_attempts: dtrpg_core::data::constants::CATALOG_SYNC_MAX_ATTEMPTS,
+                        base_secs: dtrpg_core::data::constants::CATALOG_SYNC_RETRY_BASE_DELAY_SECS,
+                        max_secs: dtrpg_core::data::constants::CATALOG_SYNC_RETRY_MAX_DELAY_SECS,
                     };
                     let mut on_retry =
                         |attempt: u32, delay: std::time::Duration, e: &LibraryServiceError| {
@@ -416,7 +416,7 @@ impl LibraryController {
             let endpoint_reachable = async_cx
                 .background_executor()
                 .spawn(async move {
-                    monitor_for_fetch.check_endpoint(crate::data::constants::DTRPG_API_HOST)
+                    monitor_for_fetch.check_endpoint(dtrpg_core::data::constants::DTRPG_API_HOST)
                 })
                 .await;
             if !endpoint_reachable {

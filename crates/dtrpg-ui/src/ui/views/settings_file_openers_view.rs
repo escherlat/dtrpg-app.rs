@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::file_openers::FileOpenerEntry;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, div, px};
 use gpui_kit::component::WindowExt as _;
@@ -10,7 +11,6 @@ use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
-use crate::data::file_openers::FileOpenerEntry;
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
 

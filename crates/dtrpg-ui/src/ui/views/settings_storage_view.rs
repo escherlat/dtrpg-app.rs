@@ -3,6 +3,8 @@
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::storage::validate_writable;
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use gpui::{AnyElement, Element, Entity, IntoElement, ParentElement, Styled, div, px};
 use gpui_kit::component::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -11,7 +13,6 @@ use gpui_kit::component::switch::Switch;
 use rust_i18n::t;
 
 use crate::controllers::settings::SettingsController;
-use crate::data::storage::validate_writable;
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
 
@@ -237,12 +238,14 @@ fn render_create_collections_toggle(create_collections: bool,
 /// Developer Mode caveat only when running on Windows — it does not apply
 /// to macOS or Linux, where symlink creation needs no elevated privilege.
 fn create_collections_note() -> String {
-    #[cfg(target_os = "windows")]
-    return format!("{} {}",
-                   t!("settings.create_collections_note"),
-                   t!("settings.create_collections_note_windows"));
-    #[cfg(not(target_os = "windows"))]
-    t!("settings.create_collections_note").to_string()
+    if Platform.kind() == PlatformKind::Windows {
+        format!("{} {}",
+                t!("settings.create_collections_note"),
+                t!("settings.create_collections_note_windows"))
+    }
+    else {
+        t!("settings.create_collections_note").to_string()
+    }
 }
 
 /// Renders the "Max concurrent downloads" row: a label/note pair and an
@@ -286,10 +289,9 @@ fn render_concurrency_row(max_concurrent_downloads: usize, input: Option<Entity<
 // ───────────────────────────────────────────────────────────────────
 
 fn platform_reveal_label() -> std::borrow::Cow<'static, str> {
-    #[cfg(target_os = "macos")]
-    return t!("detail.show_in_finder");
-    #[cfg(target_os = "windows")]
-    return t!("detail.show_in_explorer");
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    return t!("detail.show_in_files");
+    match Platform.kind() {
+        PlatformKind::MacOs => t!("detail.show_in_finder"),
+        PlatformKind::Windows => t!("detail.show_in_explorer"),
+        PlatformKind::Linux => t!("detail.show_in_files"),
+    }
 }

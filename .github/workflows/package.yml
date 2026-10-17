@@ -1,9 +1,8 @@
 name: Package
 
 # Builds installable Libri packages with cargo-packager for every platform
-# ci.yml already tests (macOS, Linux), plus a best-effort Windows leg (see
-# windows-spike.yaml for the standalone build-only trial that gates removing
-# `continue-on-error` below).
+# ci.yml tests macOS, Linux, and Windows. The package matrix below produces
+# installable artifacts for the same three targets.
 #
 # Runs on every merge into develop, keeping the result as a workflow artifact,
 # and is called by release.yml with a tag, which also attaches the installers
@@ -43,11 +42,6 @@ jobs:
     name: Package (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
-    # The Windows leg is unverified against the pinned `gpui` revision (see
-    # windows-spike.yaml); it must not block macOS/Linux packaging while
-    # that's resolved.
-    continue-on-error: ${{ matrix.name == 'Windows' }}
-
     strategy:
       fail-fast: false
       matrix:
@@ -112,7 +106,7 @@ jobs:
       # cargo-packager resolves `[package.metadata.packager]` from the manifest
       # in the current directory, not from a workspace root with `--packages`.
       - name: Package
-        working-directory: crates/dtrpg-core
+        working-directory: crates/dtrpg-desktop
         shell: bash
         env:
           # macOS Developer ID signing/notarization credentials. While unset the
@@ -134,7 +128,7 @@ jobs:
           DTRPG_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           DTRPG_SENTRY_ENVIRONMENT: production
           DTRPG_SENTRY_RELEASE: ${{ inputs.tag }}
-          # `before-packaging-command` in `crates/dtrpg-core/Cargo.toml` runs a
+          # `before-packaging-command` in `crates/dtrpg-desktop/Cargo.toml` runs a
           # plain `cargo build` with no `--target`. Without this, cargo writes
           # the binary to `target/release/` while `cargo packager --target
           # ${{ matrix.target }}` looks for it under

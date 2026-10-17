@@ -9,6 +9,9 @@
 
 use std::sync::Arc;
 
+use dtrpg_core::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
+use dtrpg_core::data::enums::ItemStatus;
+use dtrpg_core::data::library::LibraryItem;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, Entity, IntoElement, ParentElement, Pixels, Point, SharedString, Styled, anchored,
@@ -24,9 +27,6 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::tabs::TabsController;
-use crate::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
-use crate::data::enums::ItemStatus;
-use crate::data::library::LibraryItem;
 use crate::data::theme::ColorTokens;
 use crate::util::datetime::{format_absolute, format_relative};
 
@@ -60,6 +60,7 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
     let entity_download = entity.clone();
     let entity_open_detail = entity.clone();
     let is_downloaded = item.status == ItemStatus::Downloaded;
+    let is_offloaded = item.is_offloaded();
     let item_id = Arc::clone(&item.id);
     let item_id_for_detail = Arc::clone(&item.id);
     let item_title = item.title.to_string();
@@ -167,13 +168,18 @@ pub fn render_item_popover(item: &LibraryItem, position: Point<Pixels>,
                         .small()
                         .disabled(true)
                         .loading(is_verifying)
-                        .icon(if is_downloaded {
+                        .icon(if is_offloaded {
+                            IconName::Globe // cloud-only local bytes
+                        } else if is_downloaded {
                             IconName::ArrowDown // TODO: FileCheckCorner
                         } else {
                             IconName::Globe // TODO: CloudCog
                         })
                         .when(is_verifying, |btn| {
                             btn.tooltip(t!("detail.tooltip_verifying_download"))
+                        })
+                        .when(is_offloaded && is_downloaded, |btn| {
+                            btn.tooltip(t!("detail.tooltip_offloaded_download"))
                         }),
                 )
                 .child(

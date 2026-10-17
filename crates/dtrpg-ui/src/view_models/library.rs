@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use crate::data::library::LibraryItem;
-use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
+use dtrpg_core::data::library::LibraryItem;
+use dtrpg_core::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
 
 /// Returns `true` when `error` indicates the session has expired.
 ///
@@ -162,8 +162,9 @@ impl LibraryViewModel {
 
 #[cfg(test)]
 mod tests {
+    use dtrpg_core::services::stub::{StubLibraryService, StubMode};
+
     use super::*;
-    use crate::services::stub::{StubLibraryService, StubMode};
 
     #[test]
     fn load_list_enters_loaded_with_seeded_stub_data() {

@@ -1,11 +1,11 @@
 //! Authentication state controller: owns `AuthState` and the active notice
 //! list.
 
+use dtrpg_core::data::auth_state::AuthState;
+use dtrpg_core::data::notification::{Notice, NoticeAction, NoticeKind};
 use gpui::Context;
 
-use crate::data::auth_state::AuthState;
 use crate::data::events::AuthStateChanged;
-use crate::data::notification::{Notice, NoticeAction, NoticeKind};
 
 /// Owns the application's authentication state and the derived notice list.
 pub struct AuthStateController {

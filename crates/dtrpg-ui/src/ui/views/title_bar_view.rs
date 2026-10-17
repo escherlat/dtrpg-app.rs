@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Entity, Image, ImageFormat, ImageSource, MouseButton, ParentElement, Styled,
@@ -37,7 +38,7 @@ pub fn render_title_bar(auth: &AuthStateSnapshot, settings: Entity<SettingsContr
     // `appears_transparent: true`. The wordmark sits immediately after this
     // clearance — it is the app's only wordmark; `sidebar_view::build_header`
     // no longer repeats it.
-    let leading_inset = if cfg!(target_os = "macos") {
+    let leading_inset = if Platform.kind() == PlatformKind::MacOs {
         px(78.0)
     }
     else {

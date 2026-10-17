@@ -84,31 +84,38 @@ pub fn init() -> LogGuards {
     let guards = if let Err(e) = std::fs::create_dir_all(&log_dir) {
         // Can't create log dir — set up console-only and continue.
         let filter = build_filter();
-        tracing_subscriber::registry().with(filter)
-                                      .with(fmt::layer().with_writer(std::io::stderr).compact())
-                                      .with(sentry_layer(sentry_active))
-                                      .init();
-        eprintln!("warning: could not create log directory {}: {e}",
-                  log_dir.display());
-        LogGuards { _worker:                            None,
-                    #[cfg(feature = "sentry")]
-                    _sentry:                            sentry_guard, }
-    }
-    else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt::layer().with_writer(std::io::stderr).compact())
+            .with(sentry_layer(sentry_active))
+            .init();
+        eprintln!(
+            "warning: could not create log directory {}: {e}",
+            log_dir.display()
+        );
+        LogGuards {
+            _worker: None,
+            #[cfg(feature = "sentry")]
+            _sentry: sentry_guard,
+        }
+    } else {
         let file_appender = tracing_appender::rolling::daily(&log_dir, "libri.log");
         let (non_blocking, worker_guard) = tracing_appender::non_blocking(file_appender);
 
         let filter = build_filter();
 
-        tracing_subscriber::registry().with(filter)
-                                      .with(fmt::layer().with_writer(std::io::stderr).compact())
-                                      .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
-                                      .with(sentry_layer(sentry_active))
-                                      .init();
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt::layer().with_writer(std::io::stderr).compact())
+            .with(fmt::layer().with_writer(non_blocking).with_ansi(false))
+            .with(sentry_layer(sentry_active))
+            .init();
 
-        LogGuards { _worker:                            Some(worker_guard),
-                    #[cfg(feature = "sentry")]
-                    _sentry:                            sentry_guard, }
+        LogGuards {
+            _worker: Some(worker_guard),
+            #[cfg(feature = "sentry")]
+            _sentry: sentry_guard,
+        }
     };
 
     sentry_status.log();
@@ -125,8 +132,10 @@ pub fn init() -> LogGuards {
 /// and the client initialised successfully.
 #[cfg(feature = "sentry")]
 fn init_sentry_client() -> (Option<sentry::ClientInitGuard>, SentryStatus) {
-    let dsn = runtime_or_builtin(crate::constants::SENTRY_DSN_ENV,
-                                 option_env!("DTRPG_SENTRY_DSN_BUILTIN"));
+    let dsn = runtime_or_builtin(
+        crate::constants::SENTRY_DSN_ENV,
+        option_env!("DTRPG_SENTRY_DSN_BUILTIN"),
+    );
     let environment = runtime_or_builtin(
         crate::constants::SENTRY_ENVIRONMENT_ENV,
         option_env!("DTRPG_SENTRY_ENVIRONMENT_BUILTIN"),
@@ -148,9 +157,10 @@ fn init_sentry_client() -> (Option<sentry::ClientInitGuard>, SentryStatus) {
 /// Returns `None` if neither source has a non-empty value.
 #[cfg(feature = "sentry")]
 fn runtime_or_builtin(env_var: &str, builtin: Option<&str>) -> Option<String> {
-    std::env::var(env_var).ok()
-                          .filter(|s| !s.is_empty())
-                          .or_else(|| builtin.filter(|s| !s.is_empty()).map(str::to_string))
+    std::env::var(env_var)
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| builtin.filter(|s| !s.is_empty()).map(str::to_string))
 }
 
 /// Initialises the Sentry client with the given DSN/environment/release.
@@ -162,16 +172,19 @@ fn runtime_or_builtin(env_var: &str, builtin: Option<&str>) -> Option<String> {
 /// [`init_sentry_client`] so it can be exercised directly in tests without
 /// mutating process-wide environment state.
 #[cfg(feature = "sentry")]
-fn init_sentry_with(dsn: String, environment: String, release: String)
-                    -> (Option<sentry::ClientInitGuard>, SentryStatus) {
-    let guard = sentry::init((dsn,
-                              sentry::ClientOptions::new().environment(environment)
-                                                          .release(release)));
+fn init_sentry_with(
+    dsn: String, environment: String, release: String,
+) -> (Option<sentry::ClientInitGuard>, SentryStatus) {
+    let guard = sentry::init((
+        dsn,
+        sentry::ClientOptions::new()
+            .environment(environment)
+            .release(release),
+    ));
 
     if guard.is_enabled() {
         (Some(guard), SentryStatus::Active)
-    }
-    else {
+    } else {
         (None, SentryStatus::DisabledNoDsn)
     }
 }
@@ -184,7 +197,9 @@ fn init_sentry_with(dsn: String, environment: String, release: String)
 /// `sentry` feature is not compiled in.
 #[cfg(feature = "sentry")]
 fn sentry_layer<S>(active: bool) -> Option<sentry_tracing::SentryLayer<S>>
-    where S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a> {
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
     active.then(sentry_tracing::layer)
 }
 
@@ -200,7 +215,9 @@ impl<S> tracing_subscriber::Layer<S> for NoopLayer<S> where S: tracing::Subscrib
 
 #[cfg(not(feature = "sentry"))]
 fn sentry_layer<S>(_active: bool) -> Option<NoopLayer<S>>
-    where S: tracing::Subscriber {
+where
+    S: tracing::Subscriber,
+{
     None
 }
 
@@ -223,8 +240,9 @@ fn build_filter() -> EnvFilter {
 fn platform_log_dir() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
-        dirs::home_dir().map(|h| h.join("Library/Logs/com.pilgrimagesoftware.dtrpg"))
-                        .unwrap_or_else(|| PathBuf::from("/tmp/com.pilgrimagesoftware.dtrpg"))
+        dirs::home_dir()
+            .map(|h| h.join("Library/Logs/com.pilgrimagesoftware.dtrpg"))
+            .unwrap_or_else(|| PathBuf::from("/tmp/com.pilgrimagesoftware.dtrpg"))
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -264,9 +282,11 @@ mod tests {
     #[test]
     #[cfg(feature = "sentry")]
     fn sentry_active_when_dsn_present() {
-        let (guard, status) = init_sentry_with("https://public@sentry.example.test/1".to_string(),
-                                               "test".to_string(),
-                                               "0.0.0".to_string());
+        let (guard, status) = init_sentry_with(
+            "https://public@sentry.example.test/1".to_string(),
+            "test".to_string(),
+            "0.0.0".to_string(),
+        );
         assert!(guard.is_some());
         assert!(matches!(status, SentryStatus::Active));
     }

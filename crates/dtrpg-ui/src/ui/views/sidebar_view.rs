@@ -7,6 +7,12 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::library::SectionCounts;
+use dtrpg_core::data::ui_state::UiState;
+use dtrpg_core::util::filter::SidebarFilter;
+use dtrpg_core::util::matching::name_matches_query;
+use dtrpg_core::util::sort::{CollectionSortMethod, SortDirection};
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, ElementId, Entity, IntoElement, SharedString, Window, div, px,
@@ -27,14 +33,8 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::tabs::{TabTarget, TabsController};
-use crate::data::collection::CollectionEntry;
-use crate::data::library::SectionCounts;
-use crate::data::ui_state::UiState;
 use crate::ui::library::drag::DraggedLibraryItem;
-use crate::util::filter::SidebarFilter;
-use crate::util::matching::name_matches_query;
 use crate::util::publisher::PublisherEntry;
-use crate::util::sort::{CollectionSortMethod, SortDirection};
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or
 /// Collections).

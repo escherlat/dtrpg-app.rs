@@ -4,41 +4,41 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 use std::sync::Arc;
 
+use dtrpg_core::data::catalog_cache::{
+    CacheMetadata, load_cache_metadata, load_catalog_cache, save_catalog_cache,
+    save_check_batch_timestamp, save_fresh_install_request_timestamp,
+};
+use dtrpg_core::data::collection::CollectionEntry;
+use dtrpg_core::data::collections_cache::{load_collections_cache, save_collections_cache};
+use dtrpg_core::data::constants::{
+    CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
+    CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS,
+};
+use dtrpg_core::data::cover_cache::{load_cached_cover, save_cached_cover};
+use dtrpg_core::data::enums::*;
+use dtrpg_core::data::library::*;
+use dtrpg_core::data::paths::{cache_dir, covers_dir};
+use dtrpg_core::data::selection::Selection;
+use dtrpg_core::data::storage::StorageConfig;
+use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
+use dtrpg_core::services::network_monitor::NetworkMonitor;
+use dtrpg_core::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
+use dtrpg_core::util::datetime::now_secs;
+use dtrpg_core::util::filter::*;
+use dtrpg_core::util::matching::*;
+use dtrpg_core::util::sort::*;
 use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, Point, SharedString, Task};
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
-use crate::data::catalog_cache::{
-    CacheMetadata, load_cache_metadata, load_catalog_cache, save_catalog_cache,
-    save_check_batch_timestamp, save_fresh_install_request_timestamp,
-};
-use crate::data::collection::CollectionEntry;
-use crate::data::collections_cache::{load_collections_cache, save_collections_cache};
-use crate::data::constants::{
-    CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
-    CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS,
-};
-use crate::data::cover_cache::{load_cached_cover, save_cached_cover};
-use crate::data::enums::*;
 use crate::data::events::*;
-use crate::data::library::*;
-use crate::data::paths::{cache_dir, covers_dir};
-use crate::data::selection::Selection;
-use crate::data::storage::StorageConfig;
 use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
-use crate::services::collections::{CollectionsService, CollectionsServiceErrorKind};
-use crate::services::network_monitor::NetworkMonitor;
-use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
-use crate::util::datetime::now_secs;
 use crate::util::file_presence::{
     ItemVerification, apply_presence_changes, find_presence_changes, resolved_file_path,
 };
-use crate::util::filter::*;
-use crate::util::matching::*;
 use crate::util::publisher::*;
-use crate::util::sort::*;
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 mod bulk_selection;
@@ -370,12 +370,12 @@ pub struct LibraryController {
     /// `download_queue`.
     download_activity_ids:         HashMap<(Arc<str>, u32), u64>,
     /// Shared thumbnail/download concurrency limit. Initialized from
-    /// [`crate::data::storage::StorageConfig`] and kept in sync with the
+    /// [`dtrpg_core::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].
     max_concurrent_downloads:      usize,
     /// User-configured "Recently Updated" sidebar window, in days.
-    /// Initialized from [`crate::data::storage::StorageConfig`] and kept in
-    /// sync with the Storage settings page via
+    /// Initialized from [`dtrpg_core::data::storage::StorageConfig`] and kept
+    /// in sync with the Storage settings page via
     /// [`Self::set_recently_updated_window_days`].
     recently_updated_window_days:  u32,
     /// A queuing action stashed by a `request_*` gating wrapper after it

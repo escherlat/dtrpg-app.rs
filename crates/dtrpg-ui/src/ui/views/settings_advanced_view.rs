@@ -1,6 +1,10 @@
 //! Advanced settings section: cache visibility and destructive/maintenance
 //! actions (cache details, opening the cache folder, cache clearing).
 
+use dtrpg_core::data::constants::{
+    FORCE_RELOAD_COOLDOWN_SECS, ITEM_CHECK_BATCH_COOLDOWN_SECS, ITEM_CHECK_BATCH_TIMER_SECS,
+    ITEM_CHECK_COOLDOWN_SECS, STALE_SECS, THUMBNAIL_COOLDOWN_SECS,
+};
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AnyElement, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
@@ -13,10 +17,6 @@ use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
 
 use crate::controllers::settings::{CacheCounts, SettingsController};
-use crate::data::constants::{
-    FORCE_RELOAD_COOLDOWN_SECS, ITEM_CHECK_BATCH_COOLDOWN_SECS, ITEM_CHECK_BATCH_TIMER_SECS,
-    ITEM_CHECK_COOLDOWN_SECS, STALE_SECS, THUMBNAIL_COOLDOWN_SECS,
-};
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::small_caps_text;
 use crate::util::datetime::{format_absolute, format_relative};

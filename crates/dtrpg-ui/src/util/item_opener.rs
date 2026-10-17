@@ -3,9 +3,8 @@
 
 use std::path::Path;
 
+use dtrpg_core::data::library::LibraryItemFile;
 use thiserror::Error;
-
-use crate::data::library::LibraryItemFile;
 
 /// Errors that can occur when attempting to open an item.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -161,7 +160,8 @@ mod tests {
                           name:       name.into(),
                           format:     "PDF".into(),
                           size_mb:    1.0,
-                          downloaded: false, }
+                          downloaded: false,
+                offloaded: false, }
     }
 
     #[test]

@@ -18,8 +18,8 @@ impl LibraryController {
                activity: Entity<ActivityController>, cx: &mut Context<Self>)
                -> Self {
         let vm = LibraryViewModel::new(service);
-        let prefs = crate::data::ui_preferences::UiPreferences::load();
-        let view_prefs = crate::data::file_openers::CatalogViewPrefs::load();
+        let prefs = dtrpg_core::data::ui_preferences::UiPreferences::load();
+        let view_prefs = dtrpg_core::data::file_openers::CatalogViewPrefs::load();
         let storage = StorageConfig::load();
 
         let mut ctrl =
@@ -59,7 +59,7 @@ impl LibraryController {
                    publisher_search_query: String::new(),
                    collection_search_open: false,
                    collection_search_query: String::new(),
-                   detail_panel_width: crate::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
+                   detail_panel_width: dtrpg_core::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
                    entry_bounds: HashMap::new(),
                    selected_item_file: HashMap::new(),
                    other_details_open: HashMap::new(),
@@ -99,7 +99,7 @@ impl LibraryController {
                   async_cx
                     .background_executor()
                     .timer(std::time::Duration::from_secs(
-                        crate::data::constants::ITEM_CHECK_BATCH_TIMER_SECS,
+                        dtrpg_core::data::constants::ITEM_CHECK_BATCH_TIMER_SECS,
                     ))
                     .await;
                   let alive = this.update(async_cx, |ctrl, cx| ctrl.request_check_batch(cx))
@@ -131,7 +131,7 @@ impl LibraryController {
                   async_cx
                     .background_executor()
                     .timer(std::time::Duration::from_secs(
-                        crate::data::constants::CATALOG_REFRESH_TIMER_INTERVAL_SECS,
+                        dtrpg_core::data::constants::CATALOG_REFRESH_TIMER_INTERVAL_SECS,
                     ))
                     .await;
                   let alive = this.update(async_cx, |ctrl, cx| ctrl.start_load(cx))

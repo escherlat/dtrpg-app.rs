@@ -3,10 +3,11 @@
 
 use std::path::PathBuf;
 
+use dtrpg_core::data::enums::SelectionField;
+use dtrpg_core::util::matching::collection_member_id;
+
 use super::*;
-use crate::data::enums::SelectionField;
 use crate::util::item_opener::ItemOpener;
-use crate::util::matching::collection_member_id;
 
 impl LibraryController {
     // ── Selection mode ────────────────────────────────────────────────────

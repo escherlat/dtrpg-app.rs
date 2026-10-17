@@ -13,6 +13,7 @@
 //! overlays) so they always appear next to the button that opens them,
 //! regardless of window width or future status bar layout changes.
 
+use dtrpg_core::data::activity::{ActivitySnapshot, AlertHistorySnapshot};
 use gpui::prelude::*;
 use gpui::{Anchor, Entity, IntoElement, Styled, div, px};
 use gpui_kit::component::IconName;
@@ -27,7 +28,6 @@ use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
-use crate::data::activity::{ActivitySnapshot, AlertHistorySnapshot};
 use crate::data::theme::{ColorTokens, ThemeKey};
 use crate::i18n::Locale;
 use crate::ui::views::activity_panel_view::render_activity_panel;

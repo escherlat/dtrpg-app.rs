@@ -6,7 +6,7 @@
 //! # Supported locales
 //! `en` (authoritative), `fr` (stub), `de` (stub). The system locale is
 //! detected at startup via `sys-locale`; unrecognized locales fall back to
-//! `en`. A persisted user selection (see [`crate::data::ui_preferences`])
+//! `en`. A persisted user selection (see [`dtrpg_core::data::ui_preferences`])
 //! takes precedence over both.
 
 const SUPPORTED: [&str; 3] = ["en", "fr", "de"];
@@ -58,8 +58,8 @@ impl Locale {
 ///
 /// Must be called before any `t!()` macro is evaluated.
 pub fn init() {
-    let persisted = crate::data::ui_preferences::UiPreferences::load().locale()
-                                                                      .map(str::to_owned);
+    let persisted = dtrpg_core::data::ui_preferences::UiPreferences::load().locale()
+                                                                           .map(str::to_owned);
 
     let chosen = resolve_locale(persisted.as_deref(), &detect_os_locale());
 
