@@ -201,23 +201,45 @@ pub(super) fn get_item(conn: &Connection, id: &str) -> Result<Option<LibraryItem
 /// `query`, returning matching items ranked by FTS5's default relevance
 /// order.
 ///
+/// `query` is free text, not FTS5 query syntax -- see [`sanitize_fts_query`].
+///
 /// # Errors
 ///
-/// Returns [`IndexError::Sqlite`] if the query fails (including a malformed
-/// FTS5 query string, which `fts5`'s own syntax can reject).
+/// Returns [`IndexError::Sqlite`] if the query fails.
 pub(super) fn search(conn: &Connection, query: &str) -> Result<Vec<LibraryItem>, IndexError> {
+    let fts_query = sanitize_fts_query(query);
+    if fts_query.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let mut stmt = conn.prepare(
                                 "SELECT items.* FROM items_fts
          JOIN items ON items.id = items_fts.item_id
          WHERE items_fts MATCH ?1
          ORDER BY rank",
     )?;
-    let mut items = stmt.query_map(params![query], row_to_item)?
+    let mut items = stmt.query_map(params![fts_query], row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
     for item in &mut items {
         item.files = load_files_for(conn, &item.id)?;
     }
     Ok(items)
+}
+
+/// Turns free-text user input into a safe FTS5 query: each whitespace-
+/// separated token becomes a double-quoted phrase (FTS5 special characters
+/// inside -- apostrophes, colons, hyphens, parentheses -- are neutralized by
+/// the quoting, so a title like "Player's Handbook" or "Sci-Fi" searches as
+/// literal text rather than being parsed as query syntax), ANDed together
+/// via FTS5's default bareword-adjacency operator.
+///
+/// A literal double-quote in the input is escaped by doubling it, per FTS5's
+/// own string-literal escaping rule.
+fn sanitize_fts_query(input: &str) -> String {
+    input.split_whitespace()
+         .map(|token| format!("\"{}\"", token.replace('"', "\"\"")))
+         .collect::<Vec<_>>()
+         .join(" ")
 }
 
 /// Counts every item in the catalog.
@@ -260,4 +282,32 @@ pub(super) fn count_recently_updated(conn: &Connection, now_secs: i64, window_da
                                     |row| row.get(0),
     )?;
     Ok(count as usize)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod sanitize_tests {
+    use super::sanitize_fts_query;
+
+    #[test]
+    fn single_word_is_quoted() {
+        assert_eq!(sanitize_fts_query("Moria"), "\"Moria\"");
+    }
+
+    #[test]
+    fn apostrophe_is_neutralized_by_quoting() {
+        assert_eq!(sanitize_fts_query("Player's Handbook"),
+                   "\"Player's\" \"Handbook\"");
+    }
+
+    #[test]
+    fn literal_double_quote_is_escaped() {
+        assert_eq!(sanitize_fts_query("say \"hi\""), "\"say\" \"\"\"hi\"\"\"");
+    }
+
+    #[test]
+    fn empty_input_produces_empty_query() {
+        assert_eq!(sanitize_fts_query(""), "");
+        assert_eq!(sanitize_fts_query("   "), "");
+    }
 }
