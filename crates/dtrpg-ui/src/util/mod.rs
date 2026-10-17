@@ -2,6 +2,7 @@ pub mod datetime;
 pub mod file_info;
 pub mod file_presence;
 pub mod file_size;
+pub mod icloud_status;
 pub mod init;
 pub mod item_opener;
 pub mod pluralize;

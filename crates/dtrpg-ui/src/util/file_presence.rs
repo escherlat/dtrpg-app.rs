@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
 use dtrpg_core::data::storage::StorageConfig;
-use dtrpg_core::platform::{FileState, Platform, PlatformIntegration};
+use crate::util::icloud_status;
 
 /// Resolves the expected on-disk path for `file` within `item`'s entry,
 /// matching `dispatch_download`'s destination computation so both the
@@ -27,6 +27,8 @@ pub struct PresenceChange {
     pub file_name: Arc<str>,
     /// Whether the file is actually on disk.
     pub present:   bool,
+    /// Whether a cloud provider has evicted the file's local bytes.
+    pub offloaded: bool,
 }
 
 /// What a disk check found for one catalog entry, ready to be applied to the
@@ -54,12 +56,15 @@ pub fn find_presence_changes(item: &LibraryItem, storage: &StorageConfig)
         item.files
             .iter()
             .filter_map(|file| {
-                let state = Platform.file_state(&resolved_file_path(storage, item, file))
-                                    .unwrap_or(FileState::Unknown);
-                let present = matches!(state, FileState::Local);
-                (file.downloaded != present).then(|| PresenceChange { file_name:
-                                                                          Arc::clone(&file.name),
-                                                                      present })
+                let path = resolved_file_path(storage, item, file);
+                let present = path.exists();
+                let offloaded = present && icloud_status::is_offloaded(&path);
+                (file.downloaded != present || file.offloaded != offloaded)
+                    .then(|| PresenceChange {
+                        file_name: Arc::clone(&file.name),
+                        present,
+                        offloaded,
+                    })
             })
             .collect();
 
@@ -80,6 +85,10 @@ pub fn apply_presence_changes(item: &mut LibraryItem, changes: &[PresenceChange]
         for file in item.files.iter_mut().filter(|f| f.name == change.file_name) {
             if file.downloaded != change.present {
                 file.downloaded = change.present;
+                changed = true;
+            }
+            if file.offloaded != change.offloaded {
+                file.offloaded = change.offloaded;
                 changed = true;
             }
         }
@@ -258,9 +267,11 @@ mod tests {
         assert_eq!(verification.item_id, it.id);
         assert_eq!(verification.changes,
                    vec![PresenceChange { file_name: "Gone.pdf".into(),
-                                         present:   false, },
+                                         present:   false,
+                                         offloaded: false, },
                         PresenceChange { file_name: "Here.pdf".into(),
-                                         present:   true, },]);
+                                         present:   true,
+                                         offloaded: false, },]);
 
         std::fs::remove_dir_all(&dir).ok();
     }
