@@ -18,17 +18,6 @@ When a catalog page is appended, every item whose `cover_url` is `Some` AND whos
 - **WHEN** `append_catalog_page` is called and an item's cover is already marked in-flight in `CoverCache`
 - **THEN** that item is NOT added to the queue
 
-### Requirement: Sequential single-item processing
-The thumbnail queue SHALL process exactly one item at a time. The next fetch SHALL NOT begin until the current fetch completes (success or failure).
-
-#### Scenario: Queue drains one item at a time
-- **WHEN** the queue contains multiple items
-- **THEN** each item is fetched sequentially, with the next fetch starting only after the previous one finishes
-
-#### Scenario: Fetch completion triggers next item
-- **WHEN** a thumbnail fetch completes (success or failure)
-- **THEN** the next item in the queue is dequeued and fetched
-
 ### Requirement: Successful fetch stored in CoverCache
 When a thumbnail HTTP request returns a successful response with image data, the bytes SHALL be stored in `CoverCache` keyed by the item's `cover_url`, the in-flight marker SHALL be cleared, and the catalog view SHALL be re-rendered.
 
@@ -41,19 +30,19 @@ When a thumbnail HTTP request returns a successful response with image data, the
 - **THEN** the in-flight marker is cleared and the queue continues to the next item
 
 ### Requirement: Activity panel tracking
-While the thumbnail queue is non-empty, the activity panel SHALL show a single aggregated item. The label SHALL reflect the number of remaining covers. When the queue empties, the activity item SHALL be marked complete.
+While thumbnail fetches are waiting or running, the activity panel SHALL show a single aggregated item. Its label SHALL reflect the number of covers not yet finished, and its progress SHALL be the fraction of the batch that has finished. When the last fetch in the batch finishes, the activity item SHALL be marked complete.
 
-#### Scenario: Activity item appears when queue starts
-- **WHEN** the first item is added to a previously empty queue
+#### Scenario: Activity item appears when the first fetch starts
+- **WHEN** the first thumbnail fetch of a batch starts
 - **THEN** a new activity entry is created with a label indicating covers are loading
 
-#### Scenario: Activity label updates as queue drains
-- **WHEN** a thumbnail fetch completes and the queue still has items
-- **THEN** the activity entry's label is updated to reflect the new remaining count
+#### Scenario: Activity label and progress update as fetches finish
+- **WHEN** a thumbnail fetch finishes and others have not
+- **THEN** the activity entry's label is updated to the number not yet finished, and its progress to the number finished out of those finished plus those not yet finished
 
-#### Scenario: Activity item completes when queue empties
-- **WHEN** the last item in the queue has been fetched
-- **THEN** the activity entry is marked complete
+#### Scenario: Activity item completes when the last fetch finishes
+- **WHEN** the last unfinished fetch of the batch finishes, whether it was waiting or already running when the others finished
+- **THEN** the activity entry is marked complete, and not before
 
 ### Requirement: Thumbnail fetches run without requiring an ambient async runtime
 The thumbnail HTTP fetch SHALL execute in a way that does not depend on an active Tokio (or other) async reactor being present on the executing thread, since `dtrpg-ui` does not own or depend on one and gpui's executors are not Tokio-backed.
@@ -63,9 +52,8 @@ The thumbnail HTTP fetch SHALL execute in a way that does not depend on an activ
 - **THEN** the fetch completes successfully (using a mechanism, such as `reqwest`'s blocking client, that manages its own runtime internally rather than requiring one)
 
 ### Requirement: Manual trigger via context menu
-Every catalog entry in all three layouts (list, thumbs, grid) SHALL expose a "Load Thumbnail" context menu item that enqueues the entry's thumbnail for loading.
+Every catalog entry in all three layouts (list, thumbs, grid) SHALL expose a "Load Thumbnail" context menu item that loads the entry's thumbnail ahead of background loading, fetching it from the network rather than the on-disk cache.
 
-#### Scenario: Context menu enqueues item
+#### Scenario: Context menu loads the thumbnail
 - **WHEN** the user right-clicks a catalog entry and selects "Load Thumbnail"
-- **THEN** the entry's `cover_url` is added to the front of the queue and loading begins if not already active
-
+- **THEN** the entry's `cover_url` is scheduled ahead of any background thumbnail loading still waiting, and is fetched from the network even if a cached copy exists
