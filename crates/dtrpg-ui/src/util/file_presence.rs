@@ -295,6 +295,50 @@ mod tests {
     }
 
     #[test]
+    fn verify_item_downloads_clears_a_stale_offloaded_flag_on_a_missing_file() {
+        let dir = test_dir("stale-offloaded-missing");
+        let storage = storage_at(&dir);
+        let mut it = make_item("verify-offloaded-1", "Presence Publisher");
+        let mut file = make_file("f1", "Gone.pdf", true);
+        file.offloaded = true;
+        it.files = vec![file];
+        it.recompute_status();
+
+        let changed = verify_item_downloads(&mut it, &storage);
+
+        assert!(changed);
+        assert!(!it.files[0].downloaded);
+        assert!(!it.files[0].offloaded);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn verify_item_downloads_reports_a_change_when_only_the_offloaded_flag_differs() {
+        let dir = test_dir("only-offloaded-differs");
+        let storage = storage_at(&dir);
+        let mut it = make_item("verify-offloaded-2", "Presence Publisher");
+        let mut file = make_file("f1", "Here.pdf", true);
+        // The file is fully on disk, so the stored flag is the stale part.
+        file.offloaded = true;
+        it.files = vec![file];
+        it.recompute_status();
+
+        let dest_dir = storage.path_for_publisher(&it.publisher);
+        std::fs::create_dir_all(&dest_dir).unwrap();
+        std::fs::write(dest_dir.join("Here.pdf"), b"pdf").unwrap();
+
+        let changed = verify_item_downloads(&mut it, &storage);
+
+        assert!(changed);
+        assert!(it.files[0].downloaded);
+        assert!(!it.files[0].offloaded);
+        assert_eq!(it.status, ItemStatus::Downloaded);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn find_presence_changes_reports_only_files_that_differ() {
         let dir = test_dir("find-differ");
         let storage = storage_at(&dir);

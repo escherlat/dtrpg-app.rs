@@ -131,11 +131,12 @@ three places, now fixed:
   is an error now.
 - **macOS file state** asked `mdls` for an `NSURL` key that `mdls` does not
   expose, so it always answered local. It now reads the `SF_DATALESS` bit of
-  `st_flags` (`FileState::from_macos_flags`), and treats a missing file with a
-  hidden `.name.icloud` sibling as a placeholder, which is how iCloud Drive
-  offloaded files before macOS 14. This reads the file system directly, so no
-  `objc2` call is needed for file state; `NSURLUbiquitousItemDownloadingStatusKey`
-  in the table is the documented equivalent, not the mechanism.
+  `st_flags` (`FileState::from_macos_flags`). This reads the file system
+  directly, so no `objc2` call is needed for file state;
+  `NSURLUbiquitousItemDownloadingStatusKey` in the table is the documented
+  equivalent, not the mechanism. The hidden `.name.icloud` stubs that iCloud
+  Drive left before macOS 14 are not handled, as `icloud-offloaded-file-awareness`
+  decided.
 
 The decoding is pure and tested on every platform. Reading the real flags
 from a real offloaded file is not covered by an automated test, because CI

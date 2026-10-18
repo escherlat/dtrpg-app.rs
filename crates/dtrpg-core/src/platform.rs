@@ -207,25 +207,9 @@ fn file_state(path: &Path) -> io::Result<FileState> {
 
     match std::fs::metadata(path) {
         Ok(metadata) => Ok(FileState::from_macos_flags(metadata.st_flags())),
-        // Before macOS 14 an offloaded file was replaced by a hidden stub.
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            if icloud_stub_path(path).is_some_and(|stub| stub.exists()) {
-                Ok(FileState::CloudOnly)
-            }
-            else {
-                Ok(FileState::Missing)
-            }
-        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(FileState::Missing),
         Err(error) => Err(error),
     }
-}
-
-/// Returns the hidden `.name.icloud` stub that stands in for `path` when
-/// iCloud Drive has offloaded it, or `None` for a path with no file name.
-#[cfg(any(target_os = "macos", test))]
-fn icloud_stub_path(path: &Path) -> Option<std::path::PathBuf> {
-    let name = path.file_name()?.to_string_lossy();
-    Some(path.with_file_name(format!(".{name}.icloud")))
 }
 
 #[cfg(target_os = "windows")]
@@ -298,7 +282,7 @@ fn run_command<I, S>(program: &str, args: I) -> io::Result<()>
 mod tests {
     use std::path::Path;
 
-    use super::{Capabilities, FileState, Platform, PlatformIntegration, icloud_stub_path};
+    use super::{Capabilities, FileState, Platform, PlatformIntegration};
 
     #[test]
     fn capabilities_match_the_target_contract() {
@@ -348,13 +332,6 @@ mod tests {
         assert_eq!(FileState::from_macos_flags(0x4000_0000),
                    FileState::CloudOnly);
         assert_eq!(FileState::from_macos_flags(0x0000_8000), FileState::Local);
-    }
-
-    #[test]
-    fn icloud_stub_is_a_hidden_sibling() {
-        assert_eq!(icloud_stub_path(Path::new("/lib/Book.pdf")),
-                   Some(Path::new("/lib/.Book.pdf.icloud").to_path_buf()));
-        assert_eq!(icloud_stub_path(Path::new("/")), None);
     }
 
     #[test]
