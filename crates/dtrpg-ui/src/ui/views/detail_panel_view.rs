@@ -39,6 +39,7 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
+use crate::view_models::inspector::InspectorViewModel;
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
@@ -68,6 +69,8 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
     let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
 
+    let inspector = InspectorViewModel::new(item);
+    let snapshot = inspector.snapshot();
     let item = item.clone();
     let is_checking = entity.read(cx).is_checking(&item.id);
     let is_verifying = entity.read(cx).is_verifying_downloads(&item.id);
@@ -153,7 +156,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                             .flex_col()
                             .gap(px(4.0))
                             .child(
-                                selectable_text("detail-tab-publisher", item.publisher.to_string())
+                                selectable_text("detail-tab-publisher", snapshot.publisher.to_string())
                                     .text_xs()
                                     .text_color(colors.text_tertiary),
                             )
@@ -163,7 +166,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     .items_center()
                                     .gap(px(6.0))
                                     .child(
-                                        selectable_text("detail-tab-title", item.title.to_string())
+                                        selectable_text("detail-tab-title", snapshot.title.to_string())
                                             .text_xl()
                                             .font_weight(gpui::FontWeight::SEMIBOLD)
                                             .text_color(text_primary),
@@ -173,13 +176,13 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                     .children(render_checking_indicator(is_checking)),
                             )
                             .child(
-                                selectable_text("detail-tab-line", item.line.to_string())
+                                selectable_text("detail-tab-line", snapshot.line.to_string())
                                     .text_sm()
                                     .text_color(text_secondary),
                             ),
                     )
                     .child(
-                        selectable_text("detail-tab-desc", item.desc.to_string())
+                        selectable_text("detail-tab-desc", snapshot.description.to_string())
                             .text_sm()
                             .text_color(text_secondary),
                     )
