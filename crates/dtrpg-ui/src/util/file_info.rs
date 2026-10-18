@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use dtrpg_core::util::container;
+use crate::util::zip_preview;
 
 /// A file's Info column value. Formats without a defined extraction, and
 /// files whose content can't be parsed, are represented by [`Self::None`]
@@ -41,23 +41,13 @@ pub fn extract_pdf_page_count(path: &Path) -> Option<u32> {
     u32::try_from(doc.get_pages().len()).ok()
 }
 
-/// Returns the number of entries in a supported container, or `None` if the
-/// file can't be opened or parsed.
-#[must_use]
-pub fn extract_container_file_count(path: &Path) -> Option<u32> {
-    let entries = container::list_entries(path).ok()?;
-    u32::try_from(entries.len()).ok()
-}
-
-/// Returns the number of entries in a Zip archive.
+/// Returns the number of entries in `path`'s Zip central directory, or
+/// `None` if the file can't be opened or parsed as a Zip archive. Reuses
+/// the same archive-reading path as the zip-content-preview hover.
 #[must_use]
 pub fn extract_zip_file_count(path: &Path) -> Option<u32> {
-    matches!(
-        container::detect_format(path),
-        Ok(container::ContainerFormat::Zip)
-    )
-    .then(|| extract_container_file_count(path))
-    .flatten()
+    let entries = zip_preview::list_entries(path).ok()?;
+    u32::try_from(entries.len()).ok()
 }
 
 /// Returns `path`'s pixel dimensions, or `None` if the file can't be opened
@@ -75,11 +65,12 @@ pub fn extract_image_dimensions(path: &Path) -> Option<(u32, u32)> {
 pub fn compute_file_info(path: &Path, format: &str) -> FileInfo {
     match format.to_ascii_uppercase().as_str() {
         "PDF" => extract_pdf_page_count(path).map_or(FileInfo::None, FileInfo::PageCount),
-        "ZIP" | "TAR" | "TGZ" | "TAR.GZ" | "GZ" | "BZ2" | "TAR.BZ2" | "XZ" | "TAR.XZ" => {
-            extract_container_file_count(path).map_or(FileInfo::None, FileInfo::ContainedFiles)
+        "ZIP" => extract_zip_file_count(path).map_or(FileInfo::None, FileInfo::ContainedFiles),
+        "JPG" | "JPEG" | "PNG" | "GIF" | "WEBP" | "BMP" => {
+            extract_image_dimensions(path).map_or(FileInfo::None, |(w, h)| {
+                                              FileInfo::Dimensions(w, h)
+                                          })
         }
-        "JPG" | "JPEG" | "PNG" | "GIF" | "WEBP" | "BMP" => extract_image_dimensions(path)
-            .map_or(FileInfo::None, |(w, h)| FileInfo::Dimensions(w, h)),
         _ => FileInfo::None,
     }
 }

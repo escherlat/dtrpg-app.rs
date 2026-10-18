@@ -157,9 +157,9 @@ detail:
   field_file_id: "File ID"
   field_download_location: "Download location"
   copy_tooltip: "Copy"
-  container_preview_heading: "Container contents"
-  container_preview_empty: "This container has no entries."
-  container_preview_unavailable: "Preview unavailable"
+  zip_preview_heading: "Zip contents"
+  zip_preview_empty: "This archive has no entries."
+  zip_preview_unavailable: "Preview unavailable"
 
 settings:
   title: "Settings"

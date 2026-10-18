@@ -139,9 +139,9 @@ detail:
   field_file_id: "Datei-ID"
   field_download_location: "Speicherort"
   copy_tooltip: "Kopieren"
-  container_preview_heading: "Container-Inhalt"
-  container_preview_empty: "Dieser Container enthält keine Einträge."
-  container_preview_unavailable: "Vorschau nicht verfügbar"
+  zip_preview_heading: "Zip-Inhalt"
+  zip_preview_empty: "Dieses Archiv enthält keine Einträge."
+  zip_preview_unavailable: "Vorschau nicht verfügbar"
 
 settings:
   title: "Einstellungen"
