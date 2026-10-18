@@ -1,5 +1,6 @@
 //! UI-facing state for the v2 item inspector.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use dtrpg_core::data::enums::ItemStatus;
@@ -37,22 +38,20 @@ pub enum InspectorPreviewState {
 /// Presentation data for one file in the inspector.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InspectorFile {
-    pub name: Arc<str>,
-    pub format: Arc<str>,
-    pub size_mb: f64,
+    pub name:       Arc<str>,
+    pub format:     Arc<str>,
+    pub size_mb:    f64,
     pub downloaded: bool,
-    pub offloaded: bool,
+    pub offloaded:  bool,
 }
 
 impl From<&LibraryItemFile> for InspectorFile {
     fn from(file: &LibraryItemFile) -> Self {
-        Self {
-            name: Arc::clone(&file.name),
-            format: Arc::clone(&file.format),
-            size_mb: file.size_mb,
-            downloaded: file.downloaded,
-            offloaded: file.offloaded,
-        }
+        Self { name:       Arc::clone(&file.name),
+               format:     Arc::clone(&file.format),
+               size_mb:    file.size_mb,
+               downloaded: file.downloaded,
+               offloaded:  file.offloaded, }
     }
 }
 
@@ -63,35 +62,33 @@ impl From<&LibraryItemFile> for InspectorFile {
 /// loaded by commands without coupling them to rendering.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InspectorSnapshot {
-    pub item_id: Arc<str>,
-    pub title: Arc<str>,
-    pub publisher: Arc<str>,
-    pub line: Arc<str>,
-    pub description: Arc<str>,
-    pub status: ItemStatus,
+    pub item_id:      Arc<str>,
+    pub title:        Arc<str>,
+    pub publisher:    Arc<str>,
+    pub line:         Arc<str>,
+    pub description:  Arc<str>,
+    pub status:       ItemStatus,
     pub is_available: bool,
-    pub files: Vec<InspectorFile>,
+    pub files:        Vec<InspectorFile>,
 }
 
 impl From<&LibraryItem> for InspectorSnapshot {
     fn from(item: &LibraryItem) -> Self {
-        Self {
-            item_id: Arc::clone(&item.id),
-            title: Arc::clone(&item.title),
-            publisher: Arc::clone(&item.publisher),
-            line: Arc::clone(&item.line),
-            description: Arc::clone(&item.desc),
-            status: item.status,
-            is_available: item.is_available,
-            files: item.files.iter().map(InspectorFile::from).collect(),
-        }
+        Self { item_id:      Arc::clone(&item.id),
+               title:        Arc::clone(&item.title),
+               publisher:    Arc::clone(&item.publisher),
+               line:         Arc::clone(&item.line),
+               description:  Arc::clone(&item.desc),
+               status:       item.status,
+               is_available: item.is_available,
+               files:        item.files.iter().map(InspectorFile::from).collect(), }
     }
 }
 
 /// View-model state shared by inspector surfaces.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InspectorViewModel {
-    snapshot: InspectorSnapshot,
+    snapshot:   InspectorSnapshot,
     active_tab: InspectorTab,
 }
 
@@ -99,10 +96,8 @@ impl InspectorViewModel {
     /// Creates an inspector from a catalog item with the Overview tab active.
     #[must_use]
     pub fn new(item: &LibraryItem) -> Self {
-        Self {
-            snapshot: InspectorSnapshot::from(item),
-            active_tab: InspectorTab::default(),
-        }
+        Self { snapshot:   InspectorSnapshot::from(item),
+               active_tab: InspectorTab::default(), }
     }
 
     /// Returns the immutable data rendered by the active inspector surface.
@@ -123,39 +118,89 @@ impl InspectorViewModel {
     }
 }
 
+/// Returns the ancestor directory paths of `name`, trimmed of trailing
+/// separators (the keys stored in the collapsed-directory set).
+fn ancestor_dirs(name: &str) -> Vec<String> {
+    let trimmed = name.trim_end_matches('/');
+    let mut parts: Vec<&str> = trimmed.split('/').collect();
+    if parts.len() <= 1 {
+        return Vec::new();
+    }
+    parts.pop();
+    let mut dirs = Vec::with_capacity(parts.len());
+    let mut prefix = String::new();
+    for part in parts {
+        if !prefix.is_empty() {
+            prefix.push('/');
+        }
+        prefix.push_str(part);
+        dirs.push(prefix.clone());
+    }
+    dirs
+}
+
+/// Returns the entries visible in the Contents tab: descendants of collapsed
+/// directories are hidden, and a non-empty `filter` shows matching entries
+/// plus the directories containing them (collapse state is ignored while
+/// filtering so matches stay reachable).
+#[must_use]
+pub fn visible_entries<'a>(entries: &'a [ContainerEntry], collapsed: &HashSet<String>,
+                           filter: &str)
+                           -> Vec<&'a ContainerEntry> {
+    let needle = filter.trim().to_lowercase();
+    if needle.is_empty() {
+        return entries.iter()
+                      .filter(|entry| {
+                          ancestor_dirs(&entry.name).iter()
+                                                    .all(|dir| !collapsed.contains(dir))
+                      })
+                      .collect();
+    }
+    entries.iter()
+           .filter(|entry| {
+               if entry.name.to_lowercase().contains(&needle) {
+                   return true;
+               }
+               let prefix = entry.name.trim_end_matches('/');
+               entries.iter().any(|other| {
+                                 other.name.to_lowercase().contains(&needle)
+                                 && other.name.starts_with(&format!("{prefix}/"))
+                             })
+           })
+           .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
     use dtrpg_core::data::enums::ItemStatus;
+
+    use super::*;
 
     #[test]
     fn snapshot_preserves_item_and_file_presentation_data() {
-        let mut item = LibraryItem::new(
-            "item-1",
-            "The Manual",
-            "Publisher",
-            "Core",
-            "Rulebook",
-            "PDF",
-            120,
-            12.5,
-            2026,
-            1,
-            ItemStatus::Cloud,
-            "#123456",
-            "Description",
-            None,
-        );
+        let mut item = LibraryItem::new("item-1",
+                                        "The Manual",
+                                        "Publisher",
+                                        "Core",
+                                        "Rulebook",
+                                        "PDF",
+                                        120,
+                                        12.5,
+                                        2026,
+                                        1,
+                                        ItemStatus::Cloud,
+                                        "#123456",
+                                        "Description",
+                                        None);
         item.is_available = false;
-        item.files.push(LibraryItemFile {
-            id: "file-1".into(),
-            index: 0,
-            name: "manual.pdf".into(),
-            format: "PDF".into(),
-            size_mb: 12.5,
-            downloaded: false,
-            offloaded: false,
-        });
+        item.files
+            .push(LibraryItemFile { id:         "file-1".into(),
+                                    index:      0,
+                                    name:       "manual.pdf".into(),
+                                    format:     "PDF".into(),
+                                    size_mb:    12.5,
+                                    downloaded: false,
+                                    offloaded:  false, });
 
         let snapshot = InspectorSnapshot::from(&item);
 
@@ -167,26 +212,88 @@ mod tests {
 
     #[test]
     fn view_model_defaults_to_overview_and_changes_tabs_without_io() {
-        let item = LibraryItem::new(
-            "item-1",
-            "Title",
-            "Publisher",
-            "",
-            "",
-            "PDF",
-            0,
-            0.0,
-            2026,
-            0,
-            ItemStatus::Cloud,
-            "#000000",
-            "",
-            None,
-        );
+        let item = LibraryItem::new("item-1",
+                                    "Title",
+                                    "Publisher",
+                                    "",
+                                    "",
+                                    "PDF",
+                                    0,
+                                    0.0,
+                                    2026,
+                                    0,
+                                    ItemStatus::Cloud,
+                                    "#000000",
+                                    "",
+                                    None);
         let mut model = InspectorViewModel::new(&item);
 
         assert_eq!(model.active_tab(), InspectorTab::Overview);
         model.set_active_tab(InspectorTab::Files);
         assert_eq!(model.active_tab(), InspectorTab::Files);
+    }
+
+    fn entry(name: &str, is_directory: bool) -> ContainerEntry {
+        ContainerEntry { name: name.to_string(),
+                         size_bytes: 10,
+                         is_directory }
+    }
+
+    fn entries() -> Vec<ContainerEntry> {
+        vec![entry("art/", true),
+             entry("art/page-one.png", false),
+             entry("art/page-two.png", false),
+             entry("text/", true),
+             entry("text/chapter-one.txt", false),
+             entry("readme.txt", false),]
+    }
+
+    #[test]
+    fn visible_entries_shows_everything_without_collapse() {
+        let es = entries();
+        let visible = visible_entries(&es, &HashSet::new(), "");
+
+        assert_eq!(visible.len(), 6);
+    }
+
+    #[test]
+    fn visible_entries_hides_descendants_of_collapsed_directories() {
+        let collapsed = HashSet::from(["art".to_string()]);
+
+        let es = entries();
+        let visible = visible_entries(&es, &collapsed, "");
+
+        let names: Vec<&str> = visible.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names,
+                   vec!["art/", "text/", "text/chapter-one.txt", "readme.txt"]);
+    }
+
+    #[test]
+    fn visible_entries_filter_keeps_matches_and_their_directories() {
+        let es = entries();
+        let visible = visible_entries(&es, &HashSet::new(), "chapter");
+
+        let names: Vec<&str> = visible.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names, vec!["text/", "text/chapter-one.txt"]);
+    }
+
+    #[test]
+    fn visible_entries_filter_overrides_collapse() {
+        let collapsed = HashSet::from(["art".to_string()]);
+
+        let es = entries();
+        let visible = visible_entries(&es, &collapsed, "page-one");
+
+        let names: Vec<&str> = visible.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names, vec!["art/", "art/page-one.png"]);
+    }
+
+    #[test]
+    fn visible_entries_filter_is_case_insensitive() {
+        let es = entries();
+        let visible = visible_entries(&es, &HashSet::new(), "README");
+
+        let names: Vec<&str> = visible.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names, vec!["readme.txt"]);
     }
 }

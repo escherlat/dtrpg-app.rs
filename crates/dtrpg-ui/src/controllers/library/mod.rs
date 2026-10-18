@@ -27,7 +27,10 @@ use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
 use dtrpg_core::util::sort::*;
-use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task};
+use gpui::{
+    AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task, Window,
+};
+use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -305,6 +308,8 @@ pub struct LibraryController {
     inspector_extractions:         HashMap<Arc<str>, bool>,
     /// Preview state for one archive entry per inspector item.
     inspector_preview:             HashMap<Arc<str>, InspectorPreviewState>,
+    inspector_collapsed_dirs:      HashMap<Arc<str>, HashSet<String>>,
+    inspector_filter_inputs:       HashMap<Arc<str>, Entity<InputState>>,
     /// Whether the "Other details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry
@@ -316,11 +321,11 @@ pub struct LibraryController {
     /// `selected_item_file`. Ephemeral — never persisted, and defaults to
     /// collapsed.
     file_other_details_open:       HashMap<Arc<str>, bool>,
-    /// Per-file Info column metadata (PDF page count, container entry count, image
-    /// dimensions), keyed by `(entry_id, row_ix)` and computed once on first
-    /// access — see [`Self::file_info`]. Evicted per-entry whenever a file's
-    /// `downloaded` flag transitions, since re-downloading may change the
-    /// file's content.
+    /// Per-file Info column metadata (PDF page count, container entry count,
+    /// image dimensions), keyed by `(entry_id, row_ix)` and computed once
+    /// on first access — see [`Self::file_info`]. Evicted per-entry
+    /// whenever a file's `downloaded` flag transitions, since
+    /// re-downloading may change the file's content.
     file_info_cache:               HashMap<(Arc<str>, usize), crate::util::file_info::FileInfo>,
     /// Ids of catalog items with an availability check currently in flight
     /// (on-demand or queued), mirroring `CoverCache::in_flight`'s role for

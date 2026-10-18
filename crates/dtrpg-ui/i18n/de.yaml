@@ -146,6 +146,7 @@ detail:
   inspector_summary_tab: "Zusammenfassung"
   inspector_contents_loading: "Archivinhalt wird geladen…"
   inspector_contents_unavailable: "Archivinhalt ist nicht verfügbar."
+  inspector_contents_filter_placeholder: "Einträge filtern…"
   inspector_preview: "Vorschau"
   inspector_preview_loading: "Vorschau für {name} wird geladen…"
   inspector_preview_unavailable: "Keine Textvorschau für {name}"
