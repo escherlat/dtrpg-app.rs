@@ -306,6 +306,8 @@ pub struct LibraryController {
     inspector_selected_entries:    HashMap<Arc<str>, HashSet<String>>,
     /// Whether an extraction task is active for an inspector entry.
     inspector_extractions:         HashMap<Arc<str>, bool>,
+    /// Selected archive file index per inspector entry.
+    inspector_selected_archive:    HashMap<Arc<str>, usize>,
     /// Preview state for one archive entry per inspector item.
     inspector_preview:             HashMap<Arc<str>, InspectorPreviewState>,
     inspector_collapsed_dirs:      HashMap<Arc<str>, HashSet<String>>,

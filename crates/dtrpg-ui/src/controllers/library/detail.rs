@@ -94,6 +94,55 @@ impl LibraryController {
         self.inspector_filter_inputs.insert(entry_id, input);
     }
 
+    /// Returns the index of the selected archive file for `entry_id`.
+    #[must_use]
+    pub fn inspector_selected_archive_for(&self, entry_id: &str) -> usize {
+        self.inspector_selected_archive.get(entry_id).copied().unwrap_or(0)
+    }
+
+    /// Sets the selected archive file index for `entry_id`.
+    pub fn set_inspector_selected_archive(&mut self, entry_id: Arc<str>, index: usize,
+                                         cx: &mut Context<Self>) {
+        self.inspector_selected_archive.insert(Arc::clone(&entry_id), index);
+        self.inspector_contents.remove(&entry_id);
+        self.inspector_preview.remove(&entry_id);
+        self.inspector_selected_entries.remove(&entry_id);
+        self.inspector_collapsed_dirs.remove(&entry_id);
+        cx.emit(LibraryChanged);
+        self.load_inspector_contents(Arc::clone(&entry_id), cx);
+    }
+
+    /// Returns true if the item has multiple container-format archives.
+    #[must_use]
+    pub fn inspector_has_multiple_archives(&self, entry_id: &str) -> bool {
+        self.item_by_id(entry_id)
+            .is_some_and(|item| {
+                item.files
+                    .iter()
+                    .filter(|file| {
+                        matches!(file.format.to_ascii_uppercase().as_str(),
+                                 "ZIP" | "TAR" | "TAR.GZ" | "TGZ" | "TAR.BZ2" | "TBZ2" | "TAR.XZ" | "TXZ")
+                    })
+                    .count()
+                    > 1
+            })
+    }
+
+    /// Returns the list of container-format file names for the inspector.
+    #[must_use]
+    pub fn inspector_archive_files(&self, entry_id: &str) -> Vec<String> {
+        self.item_by_id(entry_id)
+            .map_or_else(Vec::new, |item| {
+                item.files
+                    .iter()
+                    .filter(|file| {
+                        matches!(file.format.to_ascii_uppercase().as_str(),
+                                 "ZIP" | "TAR" | "TAR.GZ" | "TGZ" | "TAR.BZ2" | "TBZ2" | "TAR.XZ" | "TXZ")
+                    })
+                    .map(|file| file.name.as_ref().to_string())
+                    .collect()
+            })
+    }
     /// Returns the current preview state for an archive entry.
     #[must_use]
     pub fn inspector_preview_for(&self, entry_id: &str) -> InspectorPreviewState {
@@ -117,7 +166,8 @@ impl LibraryController {
         else {
             return;
         };
-        let Some(file) = item.files.iter().find(|file| {
+        let selected_idx = self.inspector_selected_archive_for(&entry_id);
+        let mut archives: Vec<_> = item.files.iter().enumerate().filter(|(_, file)| {
                                               matches!(file.format.to_ascii_uppercase().as_str(),
                                                        "ZIP"
                                                        | "TAR"
@@ -127,7 +177,9 @@ impl LibraryController {
                                                        | "TBZ2"
                                                        | "TAR.XZ"
                                                        | "TXZ")
-                                          })
+                                          }).collect();
+        archives.sort_by_key(|(i, _)| *i);
+        let Some((_, file)) = archives.get(selected_idx).copied()
         else {
             return;
         };
@@ -196,7 +248,8 @@ impl LibraryController {
         else {
             return;
         };
-        let Some(file) = item.files.iter().find(|file| {
+        let selected_idx = self.inspector_selected_archive_for(&entry_id);
+        let mut archives: Vec<_> = item.files.iter().enumerate().filter(|(_, file)| {
                                               matches!(file.format.to_ascii_uppercase().as_str(),
                                                        "ZIP"
                                                        | "TAR"
@@ -206,7 +259,9 @@ impl LibraryController {
                                                        | "TBZ2"
                                                        | "TAR.XZ"
                                                        | "TXZ")
-                                          })
+                                          }).collect();
+        archives.sort_by_key(|(i, _)| *i);
+        let Some((_, file)) = archives.get(selected_idx).copied()
         else {
             return;
         };
@@ -252,7 +307,8 @@ impl LibraryController {
         else {
             return;
         };
-        let Some(file) = item.files.iter().find(|file| {
+        let selected_idx = self.inspector_selected_archive_for(&entry_id);
+        let mut archives: Vec<_> = item.files.iter().enumerate().filter(|(_, file)| {
                                               matches!(file.format.to_ascii_uppercase().as_str(),
                                                        "ZIP"
                                                        | "TAR"
@@ -262,7 +318,9 @@ impl LibraryController {
                                                        | "TBZ2"
                                                        | "TAR.XZ"
                                                        | "TXZ")
-                                          })
+                                          }).collect();
+        archives.sort_by_key(|(i, _)| *i);
+        let Some((_, file)) = archives.get(selected_idx).copied()
         else {
             self.inspector_contents
                 .insert(entry_id, InspectorContentsState::Unavailable);
