@@ -120,6 +120,33 @@ pub(super) fn tags_for_item(conn: &Connection, item_id: &str) -> Result<Vec<Stri
     Ok(names_for_item(conn, item_id)?)
 }
 
+/// Returns the tags of every item in the catalog that has any, keyed by item
+/// id, each list ordered ignoring case.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+pub(super) fn all_item_tags(
+    conn: &Connection)
+    -> Result<std::collections::HashMap<String, Vec<String>>, IndexError> {
+    let mut stmt = conn.prepare("SELECT it.item_id, t.name FROM item_tags it
+                                 JOIN tags t ON t.id = it.tag_id
+                                 JOIN items i ON i.id = it.item_id")?;
+    let rows = stmt.query_map([], |row| {
+                       Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                   })?;
+    let mut by_item: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for row in rows {
+        let (item_id, name) = row?;
+        by_item.entry(item_id).or_default().push(name);
+    }
+    for names in by_item.values_mut() {
+        names.sort_by_key(|name| name.to_lowercase());
+    }
+    Ok(by_item)
+}
+
 /// Tags `item_id` with `tag`. Returns `false` if the item already had it.
 ///
 /// # Errors

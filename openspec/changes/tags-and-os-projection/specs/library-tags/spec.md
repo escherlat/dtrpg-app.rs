@@ -75,6 +75,12 @@ reading them, and SHALL rewrite the file to match the index.
 - **WHEN** a downloaded file carries no tags and its item has tags in the index
 - **THEN** Libri SHALL write the item's tags to the file
 
+#### Scenario: An item with no tags in the index is left alone
+
+- **WHEN** a downloaded file carries tags and its item has none in the index
+- **THEN** Libri SHALL leave the file's tags as they are at launch, because the user may have tagged the file
+  before using Libri's tags
+
 #### Scenario: A file that cannot be written
 
 - **WHEN** a file is read-only or its volume does not support extended attributes

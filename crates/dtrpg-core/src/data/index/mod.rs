@@ -194,6 +194,16 @@ impl LibraryIndex {
         tags::tags_for_item(&self.conn, item_id)
     }
 
+    /// Returns the tags of every item that has any, keyed by item id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn all_item_tags(&self)
+                         -> Result<std::collections::HashMap<String, Vec<String>>, IndexError> {
+        tags::all_item_tags(&self.conn)
+    }
+
     /// Tags the item `item_id` with `tag`; returns `false` if it already had
     /// the tag. Tags are free text, unique ignoring case.
     ///

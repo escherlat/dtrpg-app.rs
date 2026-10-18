@@ -312,3 +312,18 @@ fn upgrading_an_older_index_keeps_its_tags_when_the_catalog_is_rewritten() {
 
     assert_eq!(index.tags_for_item("a").unwrap(), ["solo"]);
 }
+
+#[test]
+fn every_items_tags_can_be_read_at_once() {
+    let mut index = index_with(&["a", "b", "c"]);
+    index.add_tag("a", "solo").unwrap();
+    index.add_tag("a", "Beta").unwrap();
+    index.add_tag("b", "solo").unwrap();
+
+    let all = index.all_item_tags().unwrap();
+
+    assert_eq!(all.len(), 2);
+    assert_eq!(all["a"], ["Beta", "solo"]);
+    assert_eq!(all["b"], ["solo"]);
+    assert!(!all.contains_key("c"));
+}

@@ -155,6 +155,18 @@ impl LibraryApi {
         self.open_index()?.tags_for_item(item_id)
     }
 
+    /// Returns the tags of every item that has any, keyed by the stable catalog
+    /// id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or queried.
+    pub fn index_all_item_tags(
+        &self)
+        -> Result<std::collections::HashMap<String, Vec<String>>, IndexError> {
+        self.open_index()?.all_item_tags()
+    }
+
     /// Tags the item `item_id` with `tag`; returns `false` if it already had
     /// the tag. Tags are free text, unique ignoring case: adding "Solo" when
     /// "solo" exists uses the existing spelling.

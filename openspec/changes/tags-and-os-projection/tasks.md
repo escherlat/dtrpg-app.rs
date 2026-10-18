@@ -28,8 +28,14 @@ actual APFS volume and having Finder show the tags (task 5.4).
 
 ## 3. Reconciliation
 
+The comparison and rewriting are `dtrpg_core::services::tag_projection` (`reconcile_file_tags` for the launch pass,
+`project_item_tags` for a change or a finished download). They take the platform as a parameter and are tested
+against one kept in memory. The launch pass leaves a file alone when its item has no tags in the index, so tags
+the user set in Finder before using Libri's are not wiped on first launch; removing an item's last tag in Libri
+clears its files through `project_item_tags`. Wiring them into the app (3.1, 3.3, 3.4) is the next slice.
+
 - [ ] 3.1 On launch, in the background, compare each downloaded file with the index and rewrite the differences
-- [ ] 3.2 Skip and log files that cannot be written; never fail the launch
+- [x] 3.2 Skip and log files that cannot be written; never fail the launch
 - [ ] 3.3 Report the number of restored files in the activity panel
 - [ ] 3.4 Project an item's tags when one of its files finishes downloading
 
