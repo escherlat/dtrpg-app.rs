@@ -7,6 +7,10 @@
 use std::io;
 use std::path::Path;
 
+mod materialize;
+
+pub use materialize::{MaterializeWait, materialize_and_wait};
+
 /// Native capabilities available on the current operating system.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Capabilities {

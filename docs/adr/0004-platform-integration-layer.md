@@ -141,3 +141,18 @@ three places, now fixed:
 The decoding is pure and tested on every platform. Reading the real flags
 from a real offloaded file is not covered by an automated test, because CI
 cannot produce one.
+
+## Materializing before opening
+
+Opening an item whose file is a cloud placeholder first asks the platform to
+make it local, waits for that (`dtrpg_core::platform::materialize_and_wait`,
+which polls `file_state` up to two minutes), then launches the default
+application. `ItemOpener::open` does this on a background thread of the shared
+runtime and returns at once, so the window stays responsive. If materializing
+fails or times out, the failure is logged and the launch is still attempted,
+because both macOS and Windows fetch a placeholder when an application opens
+it. Platforms whose `Capabilities::materialize` is `false` skip the step.
+
+The UI offers no control that depends on a capability that can be `false`
+today: reveal is supported everywhere, and there is no tag or materialize
+control. A control added later must read `Capabilities` first.

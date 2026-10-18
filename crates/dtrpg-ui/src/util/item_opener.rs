@@ -4,7 +4,10 @@
 use std::path::Path;
 
 use dtrpg_core::data::library::LibraryItemFile;
+use dtrpg_core::platform::{MaterializeWait, Platform, PlatformIntegration, materialize_and_wait};
 use thiserror::Error;
+
+use crate::util::icloud_status;
 
 /// Errors that can occur when attempting to open an item.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -41,11 +44,30 @@ fn launch(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Requests an offloaded file, waits for it to become local, and launches it.
+///
+/// A failure to materialize is logged and the launch is still attempted: the
+/// operating system fetches a placeholder itself when an application opens it.
+fn materialize_then_launch(path: &Path) {
+    if let Err(error) = materialize_and_wait(&Platform, path, MaterializeWait::default()) {
+        tracing::warn!(path = %path.display(), %error, "could not materialize before opening");
+    }
+    if let Err(error) = launch(path) {
+        tracing::warn!(path = %path.display(), %error, "could not open the materialized file");
+    }
+}
+
 /// Service for opening files in the system's default application.
 pub struct ItemOpener;
 
 impl ItemOpener {
     /// Opens the file at the given path using the system's default application.
+    ///
+    /// A file the platform has offloaded to the cloud is first requested and
+    /// waited for on a background thread, so the window stays responsive and
+    /// the application is not launched on a placeholder. In that case this
+    /// returns `Ok` at once and a failure is logged, because the launch has
+    /// not happened yet.
     ///
     /// # Errors
     ///
@@ -57,6 +79,16 @@ impl ItemOpener {
         // Check if the file exists first
         if !path.exists() {
             return Err(OpenError::FileNotFound(path.display().to_string()));
+        }
+
+        if icloud_status::is_offloaded(path)
+           && Platform.capabilities().materialize
+           && let Ok(runtime) = dtrpg_core::runtime::handle()
+        {
+            let path = path.to_path_buf();
+            // Not awaited: the wait is bounded by `MaterializeWait`.
+            drop(runtime.spawn_blocking(move || materialize_then_launch(&path)));
+            return Ok(());
         }
 
         // Attempt to open the file with the system's default application
