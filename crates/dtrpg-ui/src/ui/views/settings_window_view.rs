@@ -91,6 +91,7 @@ impl Render for SettingsWindowView {
                                           snap.storage_path_exists,
                                           snap.storage_roots,
                                           snap.storage_rules,
+                                          snap.publisher_rule_input,
                                           self.settings.clone(),
                                           self.library.clone(),
                                           &self.focus_handle,

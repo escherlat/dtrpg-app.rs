@@ -178,6 +178,7 @@ settings:
   storage_add_root_tooltip: "Speicherort hinzufügen…"
   storage_remove_root_tooltip: "Speicherort entfernen"
   storage_rules_title: "Platzierungsregeln"
+  storage_add_rule: "Verlegerregel hinzufügen"
   max_concurrent_downloads_title: "Maximale gleichzeitige Downloads"
   max_concurrent_downloads_note: "Gemeinsames Limit für das Laden von Miniaturansichten und Dateidownloads."
   recently_updated_window_title: "Zeitraum für „Kürzlich aktualisiert“"
