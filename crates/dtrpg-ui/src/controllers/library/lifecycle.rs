@@ -62,6 +62,7 @@ impl LibraryController {
                    detail_panel_width: dtrpg_core::data::constants::DETAIL_PANEL_DEFAULT_WIDTH,
                    entry_bounds: HashMap::new(),
                    selected_item_file: HashMap::new(),
+                   inspector_tabs: HashMap::new(),
                    other_details_open: HashMap::new(),
                    file_other_details_open: HashMap::new(),
                    zip_preview: None,

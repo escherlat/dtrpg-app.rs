@@ -39,7 +39,7 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::view_models::inspector::InspectorViewModel;
+use crate::view_models::inspector::{InspectorTab, InspectorViewModel};
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
@@ -69,15 +69,28 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
     let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
 
-    let inspector = InspectorViewModel::new(item);
-    let snapshot = inspector.snapshot();
     let item = item.clone();
+    let inspector_tab = entity.read(cx).inspector_tab_for(&item.id);
+    if inspector_tab != InspectorTab::Overview {
+        return render_secondary_inspector_tab(&item,
+                                              inspector_tab,
+                                              InspectorRenderContext { storage_root_path: &storage_root_path,
+                                                                        entity,
+                                                                        tabs,
+                                                                        colors,
+                                                                        window,
+                                                                        cx });
+    }
+    let inspector = InspectorViewModel::new(&item);
+    let snapshot = inspector.snapshot();
     let is_checking = entity.read(cx).is_checking(&item.id);
     let is_verifying = entity.read(cx).is_verifying_downloads(&item.id);
     let entity_download = entity.clone();
     let entity_refresh_thumbnail = entity.clone();
     let entity_other_details = entity.clone();
     let entity_collections = entity.clone();
+    let entity_tabs = entity.clone();
+    let inspector_entry_id = Arc::clone(&item.id);
     let entity_item_tier = entity;
     let item_id = Arc::clone(&item.id);
     let is_downloaded = item.status == ItemStatus::Downloaded;
@@ -143,8 +156,15 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
             div().flex_none().pl(px(20.0)).pr(px(16.0)).py(px(16.0)).child(cover_box)
         })
         .child(
-            div().flex_1().min_h_0().flex().flex_col().child(
-                div()
+            div().flex_1()
+                   .min_h_0()
+                   .flex()
+                   .flex_col()
+                   .child(render_inspector_tab_bar(inspector_entry_id,
+                                                   entity_tabs,
+                                                   inspector_tab,
+                                                   colors))
+                   .child(div()
                     .overflow_y_scrollbar()
                     .p(px(20.0))
                     .flex()
@@ -1373,6 +1393,98 @@ fn render_relative_date_value(item_id: &str, slot: &str, ts: i64, value_font_fam
          .child(selectable_text(SharedString::from(format!("detail-{slot}-{item_id}-text")),
                                 relative).font_family(value_font_family.to_string()))
          .tooltip(move |window, cx| Tooltip::new(absolute.clone()).build(window, cx))
+         .into_any_element()
+}
+
+
+fn inspector_tab_label(tab: InspectorTab) -> String {
+    match tab {
+        InspectorTab::Overview => t!("detail.inspector_overview_tab").to_string(),
+        InspectorTab::Files => t!("detail.inspector_files_tab").to_string(),
+        InspectorTab::Collections => t!("detail.inspector_collections_tab").to_string(),
+        InspectorTab::Summary => t!("detail.inspector_summary_tab").to_string(),
+    }
+}
+
+fn render_inspector_tab_bar(entry_id: Arc<str>, entity: Entity<LibraryController>,
+                           active: InspectorTab, colors: &ColorTokens) -> AnyElement {
+    let tabs = [InspectorTab::Overview,
+                InspectorTab::Files,
+                InspectorTab::Collections,
+                InspectorTab::Summary];
+    div().id("inspector-tabs")
+         .flex()
+         .items_center()
+         .gap(px(4.0))
+         .border_b_1()
+         .border_color(colors.border)
+         .px(px(20.0))
+         .children(tabs.into_iter().map(|tab| {
+             let click_entity = entity.clone();
+             let click_id = Arc::clone(&entry_id);
+             let active_color = if tab == active { colors.accent } else { colors.border };
+             div().id(SharedString::from(format!("inspector-tab-{tab:?}")))
+                 .px(px(10.0))
+                 .py(px(8.0))
+                 .text_xs()
+                 .text_color(if tab == active { colors.text_primary } else { colors.text_secondary })
+                 .border_b_2()
+                 .border_color(active_color)
+                 .cursor_pointer()
+                 .on_click(move |_, _, cx| {
+                     click_entity.update(cx, |controller, cx| {
+                         controller.set_inspector_tab(Arc::clone(&click_id), tab, cx);
+                     });
+                 })
+                 .child(inspector_tab_label(tab))
+         }))
+         .into_any_element()
+}
+
+struct InspectorRenderContext<'a> {
+    storage_root_path: &'a Path,
+    entity: Entity<LibraryController>,
+    tabs: &'a Entity<TabsController>,
+    colors: &'a ColorTokens,
+    window: &'a mut Window,
+    cx: &'a mut App,
+}
+
+fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorTab,
+                                  context: InspectorRenderContext<'_>) -> AnyElement {
+    let content: AnyElement = match tab {
+        InspectorTab::Files => render_item_tier(item,
+                                                 context.storage_root_path,
+                                                 context.entity.clone(),
+                                                 context.tabs,
+                                                 context.colors,
+                                                 context.window,
+                                                 context.cx).into_any_element(),
+        InspectorTab::Collections => render_collections_section(item, context.entity.clone(), context.colors, context.cx)
+            .into_any_element(),
+        InspectorTab::Summary => div().flex()
+                                      .flex_col()
+                                      .gap(px(12.0))
+                                      .p(px(20.0))
+                                      .child(div().text_sm()
+                                                 .font_weight(gpui::FontWeight::SEMIBOLD)
+                                                 .text_color(context.colors.text_primary)
+                                                 .child(inspector_tab_label(InspectorTab::Summary)))
+                                      .child(selectable_text("inspector-summary-text",
+                                                             item.desc.to_string())
+                                                 .text_sm()
+                                                 .text_color(context.colors.text_secondary))
+                                      .into_any_element(),
+        InspectorTab::Overview => div().into_any_element(),
+    };
+
+    div().id("inspector-secondary-tab")
+         .flex_1()
+         .min_h_0()
+         .flex()
+         .flex_col()
+         .child(render_inspector_tab_bar(Arc::clone(&item.id), context.entity, tab, context.colors))
+         .child(div().flex_1().min_h_0().overflow_y_scrollbar().child(content))
          .into_any_element()
 }
 
