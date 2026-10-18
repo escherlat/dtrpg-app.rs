@@ -10,7 +10,8 @@ use std::path::PathBuf;
 use gpui::Hsla;
 use serde::Deserialize;
 
-use crate::data::theme::{ColorTokens, ThemeKey, ThemeMode, hex, semantic_colors};
+use crate::data::theme::{ColorTokens, ThemeMode, hex, semantic_colors};
+use crate::data::theme_catalog::ThemeId;
 
 #[derive(Debug, Deserialize)]
 struct ThemeToml {
@@ -57,20 +58,21 @@ struct PaletteToml {
     scrim: Option<String>,
 }
 
-/// Loads a built-in theme by key from embedded TOML files.
-/// Falls back to compiled defaults if not found.
-pub fn load_builtin(key: ThemeKey) -> ColorTokens {
-    let id = key.as_str();
-    let toml = match id {
+/// Loads a theme's colors from its embedded TOML file by id.
+///
+/// An unknown id falls back to the compiled default (parchment), so a stale
+/// persisted selection never fails to produce a usable palette.
+pub fn load(id: &ThemeId) -> ColorTokens {
+    let toml = match id.as_str() {
         "parchment" => include_str!("../../../../assets/themes/parchment.toml"),
         "slate" => include_str!("../../../../assets/themes/slate.toml"),
         "sage" => include_str!("../../../../assets/themes/sage.toml"),
         "ink" => include_str!("../../../../assets/themes/ink.toml"),
         "moss" => include_str!("../../../../assets/themes/moss.toml"),
         "rosewood" => include_str!("../../../../assets/themes/rosewood.toml"),
-        _ => return compiled_default(key),
+        _ => return compiled_default(id),
     };
-    parse_theme_toml(toml).unwrap_or_else(|_| compiled_default(key))
+    parse_theme_toml(toml).unwrap_or_else(|_| compiled_default(id))
 }
 
 /// Loads a theme from an arbitrary TOML file.
@@ -166,14 +168,15 @@ fn fallback_base(name: &str, mode: ThemeMode) -> ColorTokens {
     }
 }
 
-fn compiled_default(key: ThemeKey) -> ColorTokens {
-    match key {
-        ThemeKey::Parchment => crate::data::theme::parchment_colors(),
-        ThemeKey::Slate => crate::data::theme::slate_colors(),
-        ThemeKey::Sage => crate::data::theme::sage_colors(),
-        ThemeKey::Ink => crate::data::theme::ink_colors(),
-        ThemeKey::Moss => crate::data::theme::moss_colors(),
-        ThemeKey::Rosewood => crate::data::theme::rosewood_colors(),
+fn compiled_default(id: &ThemeId) -> ColorTokens {
+    match id.as_str() {
+        "parchment" => crate::data::theme::parchment_colors(),
+        "slate" => crate::data::theme::slate_colors(),
+        "sage" => crate::data::theme::sage_colors(),
+        "ink" => crate::data::theme::ink_colors(),
+        "moss" => crate::data::theme::moss_colors(),
+        "rosewood" => crate::data::theme::rosewood_colors(),
+        _ => crate::data::theme::parchment_colors(),
     }
 }
 
@@ -181,7 +184,7 @@ fn compiled_default(key: ThemeKey) -> ColorTokens {
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)] // Test fixtures use unwrap/expect for concise assertions.
 
-    use crate::data::theme::ThemeKey;
+    use crate::data::theme_catalog::ThemeId;
 
     #[test]
     fn custom_theme_reads_flat_palette_fields() {
@@ -235,16 +238,10 @@ mod tests {
 
     #[test]
     fn builtin_toml_matches_compiled_defaults() {
-        for key in [
-            ThemeKey::Parchment,
-            ThemeKey::Slate,
-            ThemeKey::Sage,
-            ThemeKey::Ink,
-            ThemeKey::Moss,
-            ThemeKey::Rosewood,
-        ] {
-            let loaded = super::load_builtin(key);
-            let compiled = super::compiled_default(key);
+        for id in ["parchment", "slate", "sage", "ink", "moss", "rosewood"] {
+            let key = ThemeId::from(id);
+            let loaded = super::load(&key);
+            let compiled = super::compiled_default(&key);
             let fields = [
                 ("desktop_bg", loaded.desktop_bg, compiled.desktop_bg),
                 ("surface", loaded.surface, compiled.surface),

@@ -28,7 +28,8 @@ use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
 use crate::controllers::library::LibraryController;
-use crate::data::theme::{ColorTokens, ThemeKey};
+use crate::data::theme::ColorTokens;
+use crate::data::theme_catalog::{ThemeCatalog, ThemeId, theme_label};
 use crate::i18n::Locale;
 use crate::ui::views::activity_panel_view::render_activity_panel;
 use crate::ui::views::alert_history_view::render_alert_history_panel;
@@ -48,7 +49,7 @@ pub struct StatusBarSnapshot {
     /// detail tab: always 1).
     pub active_tab_count: usize,
     /// Currently active theme.
-    pub theme_key:        ThemeKey,
+    pub theme_key:        ThemeId,
     /// Currently active locale.
     pub current_locale:   Locale,
 }
@@ -62,17 +63,6 @@ pub struct ActivityBarData<'a> {
     pub snap:       &'a ActivitySnapshot,
     /// Alert history panel snapshot for the current render pass.
     pub alert_snap: &'a AlertHistorySnapshot,
-}
-
-fn theme_label(key: ThemeKey) -> String {
-    match key {
-        ThemeKey::Parchment => t!("theme.parchment").to_string(),
-        ThemeKey::Slate => t!("theme.slate").to_string(),
-        ThemeKey::Sage => t!("theme.sage").to_string(),
-        ThemeKey::Ink => t!("theme.ink").to_string(),
-        ThemeKey::Moss => t!("theme.moss").to_string(),
-        ThemeKey::Rosewood => t!("theme.rosewood").to_string(),
-    }
 }
 
 /// Builds a `Button` tooltip with a title line above a descriptive body line.
@@ -132,24 +122,20 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
     let theme_picker =
         Button::new("status-bar-theme").ghost()
                                        .compact()
-                                       .label(theme_label(snap.theme_key))
+                                       .label(theme_label(&snap.theme_key))
                                        .tooltip(t!("status_bar.theme_tooltip",
-                                                   theme = theme_label(snap.theme_key)).to_string())
+                                                   theme = theme_label(&snap.theme_key)).to_string())
                                        .dropdown_menu(move |menu, _, _| {
                                            let mut m = menu;
-                                           for key in [ThemeKey::Parchment,
-                                                       ThemeKey::Slate,
-                                                       ThemeKey::Sage,
-                                                       ThemeKey::Ink,
-                                                       ThemeKey::Moss,
-                                                       ThemeKey::Rosewood]
-                                           {
+                                           for id in ThemeCatalog::builtins() {
                                                let e = entity.clone();
+                                               let lbl = theme_label(&id);
+                                               let checked = id == snap.theme_key;
                                                m = m.item(
-                    PopupMenuItem::new(theme_label(key))
-                        .checked(key == snap.theme_key)
+                    PopupMenuItem::new(lbl)
+                        .checked(checked)
                         .on_click(move |_, _, cx| {
-                            e.update(cx, |ctrl, cx| ctrl.set_theme(key, cx));
+                            e.update(cx, |ctrl, cx| ctrl.set_theme(id.clone(), cx));
                         }),
                 );
                                            }

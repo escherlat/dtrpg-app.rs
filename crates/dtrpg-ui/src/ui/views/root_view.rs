@@ -1185,7 +1185,7 @@ impl Render for LibraryRootView {
                                                                total_mb,
                                                                active_tab_label,
                                                                active_tab_count,
-                                                               theme_key: theme.key,
+                                                               theme_key: theme.id.clone(),
                                                                current_locale },
                                            lib_entity.clone(),
                                            ActivityBarData { entity:     activity_entity.clone(),

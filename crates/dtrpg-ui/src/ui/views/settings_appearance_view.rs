@@ -25,32 +25,15 @@ use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
 use crate::controllers::settings::FontSelectState;
-use crate::data::theme::{ColorTokens, LibriTheme, ThemeKey};
+use crate::data::theme::ColorTokens;
+use crate::data::theme::LibriTheme;
+use crate::data::theme_catalog::{ThemeCatalog, theme_label};
 use crate::ui::widgets::small_caps_text;
 
 /// Width of the label column shared by every row in this section, so the
 /// controls on the right all start at the same horizontal position
 /// regardless of how long each row's label text is.
 const LABEL_COL_WIDTH: gpui::Pixels = px(130.0);
-
-/// All theme keys offered by the picker, in display order.
-const THEME_KEYS: [ThemeKey; 6] = [ThemeKey::Parchment,
-                                   ThemeKey::Slate,
-                                   ThemeKey::Sage,
-                                   ThemeKey::Ink,
-                                   ThemeKey::Moss,
-                                   ThemeKey::Rosewood];
-
-fn theme_label(key: ThemeKey) -> String {
-    match key {
-        ThemeKey::Parchment => t!("theme.parchment").to_string(),
-        ThemeKey::Slate => t!("theme.slate").to_string(),
-        ThemeKey::Sage => t!("theme.sage").to_string(),
-        ThemeKey::Ink => t!("theme.ink").to_string(),
-        ThemeKey::Moss => t!("theme.moss").to_string(),
-        ThemeKey::Rosewood => t!("theme.rosewood").to_string(),
-    }
-}
 
 /// Renders a row's label in the shared, fixed-width left column so every
 /// row's control starts at the same horizontal position. Rendered in the
@@ -210,7 +193,7 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
                                 mono: mono_font_select, } = font_selects;
     let text_primary = colors.text_primary;
     let border = colors.border;
-    let theme_key = theme.key;
+    let theme_id = theme.id.clone();
     let scale = theme.fonts.ui_text_size.as_f32() / DEFAULT_UI_TEXT_SIZE;
     let body_pt = BODY_FONT_SIZE_PT * scale;
     let value_pt = body_pt * VALUE_FONT_SIZE_RATIO;
@@ -220,16 +203,18 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
     let entity_theme = entity.clone();
 
     let theme_button = Button::new("appearance-theme").outline()
-                                                      .label(theme_label(theme_key))
+                                                      .label(theme_label(&theme_id))
                                                       .dropdown_menu(move |menu, _, _| {
                                                           let mut m = menu;
-                                                          for key in THEME_KEYS {
+                                                          for id in ThemeCatalog::builtins() {
                                                               let e = entity_theme.clone();
+                                                              let lbl = theme_label(&id);
+                                                              let checked = id == theme_id;
                                                               m = m.item(
-                    PopupMenuItem::new(theme_label(key))
-                        .checked(key == theme_key)
+                    PopupMenuItem::new(lbl)
+                        .checked(checked)
                         .on_click(move |_, _, cx| {
-                            e.update(cx, |ctrl, cx| ctrl.set_theme(key, cx));
+                            e.update(cx, |ctrl, cx| ctrl.set_theme(id.clone(), cx));
                         }),
                 );
                                                           }
