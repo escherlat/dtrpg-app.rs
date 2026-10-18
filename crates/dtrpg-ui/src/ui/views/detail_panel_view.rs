@@ -39,7 +39,8 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::view_models::inspector::{InspectorContentsState, InspectorTab, InspectorViewModel};
+use crate::view_models::inspector::{InspectorContentsState, InspectorPreviewState, InspectorTab,
+                                   InspectorViewModel};
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
@@ -1404,6 +1405,10 @@ fn render_inspector_contents(state: &InspectorContentsState, entry_id: &Arc<str>
                 let size_bytes = entry.size_bytes;
                 let click_entity = entity.clone();
                 let click_id = Arc::clone(entry_id);
+                let toggle_name = name.clone();
+                let preview_name = name.clone();
+                let preview_entity = entity.clone();
+                let preview_id = Arc::clone(entry_id);
                 let depth = name.trim_end_matches('/').matches('/').count();
                 let label = name.trim_end_matches('/').rsplit('/').next().unwrap_or(&name).to_string();
                 div()
@@ -1416,7 +1421,8 @@ fn render_inspector_contents(state: &InspectorContentsState, entry_id: &Arc<str>
                     .on_click(move |_, _, cx| {
                         if !is_directory {
                             click_entity.update(cx, |controller, cx| {
-                                controller.toggle_inspector_entry(Arc::clone(&click_id), name.clone(), cx);
+                                controller.toggle_inspector_entry(Arc::clone(&click_id),
+                                                                toggle_name.clone(), cx);
                             });
                         }
                     })
@@ -1427,12 +1433,29 @@ fn render_inspector_contents(state: &InspectorContentsState, entry_id: &Arc<str>
                     .child(div().text_xs().text_color(colors.text_tertiary).child(
                         if is_directory { String::new() } else { format!("{} bytes", size_bytes) },
                     ))
+                    .child(if is_directory {
+                        div().into_any_element()
+                    } else {
+                        Button::new(format!("inspector-preview-{name}"))
+                            .ghost()
+                            .child(t!("detail.inspector_preview").to_string())
+                            .on_click(move |_, _, cx| {
+                                cx.stop_propagation();
+                                preview_entity.update(cx, |controller, cx| {
+                                    controller.preview_inspector_entry(Arc::clone(&preview_id),
+                                                                        preview_name.clone(), cx);
+                                });
+                            })
+                            .into_any_element()
+                    })
             });
+            let preview = entity.read(cx).inspector_preview_for(entry_id);
             div()
                 .p(px(20.0))
                 .flex()
                 .flex_col()
                 .gap(px(8.0))
+                .children(render_inspector_preview(&preview, entry_id, entity.clone(), colors))
                 .children(rows)
                 .child(
                     Button::new("inspector-extract-selected")
@@ -1453,6 +1476,64 @@ fn render_inspector_contents(state: &InspectorContentsState, entry_id: &Arc<str>
                 .into_any_element()
         }
     }
+}
+
+fn render_inspector_preview(state: &InspectorPreviewState, entry_id: &Arc<str>,
+                            entity: Entity<LibraryController>,
+                            colors: &ColorTokens) -> Option<AnyElement> {
+    let body: AnyElement = match state {
+        InspectorPreviewState::None => return None,
+        InspectorPreviewState::Loading(name) => div()
+            .text_sm()
+            .text_color(colors.text_secondary)
+            .child(t!("detail.inspector_preview_loading", name = name.clone()).to_string())
+            .into_any_element(),
+        InspectorPreviewState::Unavailable(name) => div()
+            .text_sm()
+            .text_color(colors.text_secondary)
+            .child(t!("detail.inspector_preview_unavailable", name = name.clone()).to_string())
+            .into_any_element(),
+        InspectorPreviewState::Text { name, contents } => div()
+            .flex()
+            .flex_col()
+            .gap(px(6.0))
+            .child(div().text_xs().text_color(colors.text_tertiary).child(name.clone()))
+            .child(div()
+                       .id("inspector-preview-body")
+                       .max_h(px(240.0))
+                       .overflow_y_scroll()
+                       .rounded_md()
+                       .bg(colors.surface_alt)
+                       .p(px(8.0))
+                       .text_xs()
+                       .font_family("monospace".to_string())
+                       .text_color(colors.text_primary)
+                       .child(contents.clone()))
+            .into_any_element(),
+    };
+    Some(div()
+             .id("inspector-preview-panel")
+             .flex()
+             .flex_col()
+             .gap(px(8.0))
+             .rounded_md()
+             .border_1()
+             .border_color(colors.border)
+             .p(px(10.0))
+             .child(body)
+             .child(Button::new("inspector-preview-close")
+                        .ghost()
+                        .child(t!("detail.inspector_preview_close").to_string())
+                        .on_click({
+                            let close_entity = entity.clone();
+                            let close_id = Arc::clone(entry_id);
+                            move |_, _, cx| {
+                                close_entity.update(cx, |controller, cx| {
+                                    controller.clear_inspector_preview(Arc::clone(&close_id), cx);
+                                });
+                            }
+                        }))
+             .into_any_element())
 }
 
 fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorTab,

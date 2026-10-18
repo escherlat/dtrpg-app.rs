@@ -40,7 +40,7 @@ use crate::util::file_presence::{
     find_presence_changes_in_collections, resolved_file_path_in_collections, resolved_item_dir,
 };
 use crate::util::publisher::*;
-use crate::view_models::inspector::{InspectorContentsState, InspectorTab};
+use crate::view_models::inspector::{InspectorContentsState, InspectorPreviewState, InspectorTab};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 mod bulk_selection;
@@ -303,6 +303,8 @@ pub struct LibraryController {
     inspector_selected_entries:    HashMap<Arc<str>, HashSet<String>>,
     /// Whether an extraction task is active for an inspector entry.
     inspector_extractions:         HashMap<Arc<str>, bool>,
+    /// Preview state for one archive entry per inspector item.
+    inspector_preview:             HashMap<Arc<str>, InspectorPreviewState>,
     /// Whether the "Other details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry

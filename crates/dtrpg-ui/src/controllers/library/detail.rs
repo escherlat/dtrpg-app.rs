@@ -41,6 +41,51 @@ impl LibraryController {
         self.inspector_selected_entries.get(entry_id).map_or(0, HashSet::len)
     }
 
+    /// Returns the current preview state for an archive entry.
+    #[must_use]
+    pub fn inspector_preview_for(&self, entry_id: &str) -> InspectorPreviewState {
+        self.inspector_preview.get(entry_id).cloned().unwrap_or(InspectorPreviewState::None)
+    }
+
+    /// Clears the current archive entry preview for `entry_id`.
+    pub fn clear_inspector_preview(&mut self, entry_id: Arc<str>,
+                                   cx: &mut Context<Self>) {
+        if self.inspector_preview.remove(&entry_id).is_some() {
+            cx.emit(LibraryChanged);
+        }
+    }
+
+    /// Loads one archive entry for inline text preview off the render path.
+    pub fn preview_inspector_entry(&mut self, entry_id: Arc<str>, name: String,
+                                   cx: &mut Context<Self>) {
+        let Some(item) = self.item_by_id(&entry_id).cloned() else { return; };
+        let Some(file) = item.files.iter().find(|file| {
+            matches!(file.format.to_ascii_uppercase().as_str(),
+                     "ZIP" | "TAR" | "TAR.GZ" | "TGZ" | "TAR.BZ2" | "TBZ2" | "TAR.XZ" | "TXZ")
+        }) else { return; };
+        let path = resolved_item_dir(&StorageConfig::load(), &item).join(file.name.as_ref());
+        self.inspector_preview.insert(Arc::clone(&entry_id), InspectorPreviewState::Loading(name.clone()));
+        cx.emit(LibraryChanged);
+        cx.spawn(async move |this, async_cx| {
+              let read_name = name.clone();
+              let result = async_cx.background_executor().spawn(async move {
+                  let reader = dtrpg_core::util::container::open(&path)?;
+                  reader.read_entry(&read_name)
+              }).await;
+              this.update(async_cx, |controller, cx| {
+                     let state = match result {
+                         Ok(bytes) => match String::from_utf8(bytes) {
+                             Ok(contents) => InspectorPreviewState::Text { name, contents },
+                             Err(_) => InspectorPreviewState::Unavailable(name),
+                         },
+                         Err(_) => InspectorPreviewState::Unavailable(name),
+                     };
+                     controller.inspector_preview.insert(entry_id, state);
+                     cx.emit(LibraryChanged);
+                 }).ok();
+          }).detach();
+    }
+
     /// Toggles one archive entry's extraction selection.
     pub fn toggle_inspector_entry(&mut self, entry_id: Arc<str>, name: String,
                                   cx: &mut Context<Self>) {
