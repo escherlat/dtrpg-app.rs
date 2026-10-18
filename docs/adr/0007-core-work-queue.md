@@ -308,3 +308,24 @@ say.
   the user's real one, so tests cannot disturb it.
 - **All three hand-rolled queues are gone.** `LibraryController` no longer
   holds a `VecDeque` queue or slot counters of its own.
+
+### Download progress (task 3.7)
+
+- **A new behavior, not a move.** Downloads had never reported progress; the
+  activity entry showed a label and an indeterminate bar. This slice adds it,
+  as the `libri-work-queue` spec asks.
+- **`DownloadControl` groups what a download observes.** `download_item` took
+  a cancel flag and a retry callback; a progress callback would have made its
+  parameter list unwieldy, so the three travel in one struct that
+  implementations call through `cancel_flag`, `report_retry` and
+  `report_progress`.
+- **Progress is throttled at the source.** The transfer reports at most every
+  100 ms and once more at the end, so a large file does not send thousands of
+  updates. A retry starts counting from zero again.
+- **The total is optional.** It comes from the response's length. When the
+  server gives none, the controller leaves the bar indeterminate rather than
+  guess.
+- **`LibraryApi` is not involved yet.** The queue still belongs to the desktop
+  controller, and the MCP server has no download tool. When one is added, it
+  can read the same `Progress` events.
+

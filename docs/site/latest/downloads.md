@@ -19,6 +19,14 @@ the last file lands, or back to the cloud marker if you cancel. A muted
 spinner means something different: Libri is checking the item's files
 against what is on disk.
 
+## Download progress
+
+A running download appears in the activity panel with a progress bar that
+fills as the file arrives. If the server doesn't say how large the file is,
+the bar stays indeterminate instead of guessing. When a download retries
+after a failure, its label says so, and the bar starts over for the new
+attempt.
+
 ## Where files go
 
 Downloads save to the folder set in Settings > Downloads' Download
@@ -41,6 +49,10 @@ Libri dispatches queued files to fill as many of that many concurrency
 slots as are free, rather than downloading everything at once or strictly
 one at a time.
 
+A download you start goes ahead of thumbnails still waiting to load, so a
+large catalog loading its covers doesn't hold up a file you asked for.
+Thumbnails already loading finish first; nothing is interrupted.
+
 ## Retries and disk space
 
 A transient failure (a dropped connection, a 5xx response) retries with
@@ -54,3 +66,8 @@ room.
 Catalog items occasionally get re-checked against the server to confirm
 they're still available for download, on a cooldown so repeatedly viewing
 the same item's details doesn't trigger a check every time.
+
+Checks run one at a time, and they don't count against the concurrency
+limit above, so a busy download queue never holds one up. A check you ask
+for, by opening an item's details or choosing Check Item Availability,
+goes ahead of the automatic background ones.

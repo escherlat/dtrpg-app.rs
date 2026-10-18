@@ -132,6 +132,8 @@ pub(super) struct ScriptedLibrary {
     missing:        HashSet<u64>,
     erroring:       HashSet<u64>,
     checked:        Mutex<Vec<u64>>,
+    /// A progress report every download makes as soon as it begins.
+    progress:       Option<(u64, Option<u64>)>,
 }
 
 impl ScriptedLibrary {
@@ -156,7 +158,23 @@ impl ScriptedLibrary {
                         check_permits: Permits::new(usize::MAX / 2),
                         missing:       HashSet::new(),
                         erroring:      HashSet::new(),
-                        checked:       Mutex::new(Vec::new()), })
+                        checked:       Mutex::new(Vec::new()),
+                        progress:      None, })
+    }
+
+    /// A service whose downloads each report `received` of `total` bytes as
+    /// soon as they begin, then hold for a permit.
+    pub(super) fn reporting(received: u64, total: Option<u64>) -> Arc<Self> {
+        Arc::new(Self { permits:       Permits::new(0),
+                        failing:       HashSet::new(),
+                        retrying:      HashSet::new(),
+                        started:       Mutex::new(Vec::new()),
+                        cancelled:     Mutex::new(Vec::new()),
+                        check_permits: Permits::new(usize::MAX / 2),
+                        missing:       HashSet::new(),
+                        erroring:      HashSet::new(),
+                        checked:       Mutex::new(Vec::new()),
+                        progress:      Some((received, total)), })
     }
 
     /// A service whose availability checks hold for a permit each. The
@@ -171,7 +189,8 @@ impl ScriptedLibrary {
                         check_permits: Permits::new(check_permits),
                         missing:       missing.iter().copied().collect(),
                         erroring:      erroring.iter().copied().collect(),
-                        checked:       Mutex::new(Vec::new()), })
+                        checked:       Mutex::new(Vec::new()),
+                        progress:      None, })
     }
 
     /// Lets one more availability check finish.
@@ -223,18 +242,18 @@ impl LibraryService for SharedLibrary {
     }
 
     fn download_item(&self, order_product_id: u64, _index: u32, _dest: &Path,
-                     cancel: &std::sync::atomic::AtomicBool,
-                     on_retry: Option<&mut dyn FnMut(u32, Duration)>)
+                     mut control: DownloadControl<'_>)
                      -> Result<(), LibraryServiceError> {
         let library = &self.0;
         library.started.lock().unwrap().push(order_product_id);
-        if library.retrying.contains(&order_product_id)
-           && let Some(on_retry) = on_retry
-        {
-            on_retry(2, Duration::from_secs(3));
+        if library.retrying.contains(&order_product_id) {
+            control.report_retry(2, Duration::from_secs(3));
+        }
+        if let Some((received, total)) = library.progress {
+            control.report_progress(received, total);
         }
         let go = library.permits
-                        .take("a download", || cancel.load(Ordering::SeqCst));
+                        .take("a download", || control.cancel_flag().load(Ordering::SeqCst));
         if !go {
             library.cancelled.lock().unwrap().push(order_product_id);
             return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network, "cancelled"));

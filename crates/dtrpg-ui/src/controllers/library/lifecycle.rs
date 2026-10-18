@@ -122,7 +122,9 @@ impl LibraryController {
             JobEvent::Retrying { id, attempt, delay } => {
                 self.download_retrying(id, attempt, delay, cx);
             }
-            JobEvent::Progress { .. } => {}
+            JobEvent::Progress { id, done, total } => {
+                self.download_progress(id, done, total, cx);
+            }
             JobEvent::Finished { id, outcome } => {
                 self.thumbnail_finished(id, outcome.clone(), cx);
                 self.download_finished(id, outcome.clone(), cx);

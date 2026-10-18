@@ -23,7 +23,9 @@ use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use dtrpg_core::services::covers::{CoverFetcher, HttpCoverTransport};
 use dtrpg_core::services::network_monitor::NetworkMonitor;
-use dtrpg_core::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
+use dtrpg_core::services::{
+    DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry,
+};
 use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;

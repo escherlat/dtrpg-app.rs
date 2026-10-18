@@ -220,3 +220,61 @@ fn downloads_and_thumbnails_share_one_limit_and_downloads_go_first(cx: &mut Test
     fixture.transport.release(1);
     wait_for(cx, |cx| cached(cx, "x") && cached(cx, "y"));
 }
+
+/// The progress shown for the first activity entry, if it shows any.
+fn shown_progress(fixture: &Fixture, cx: &mut TestAppContext) -> Option<f32> {
+    fixture.activity
+           .read_with(cx, |a, _| a.snapshot().items.first().and_then(|item| item.progress))
+}
+
+#[gpui::test]
+fn a_running_download_shows_how_far_along_it_is(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx, ScriptedTransport::open(), ScriptedLibrary::reporting(25, Some(100)), 3,
+                               entries(&[("a", A)]));
+
+    download(&fixture, cx, "a");
+
+    wait_for(cx, |cx| shown_progress(&fixture, cx) == Some(0.25));
+    fixture.library.release(1);
+    wait_for(cx, |cx| file_downloaded(&fixture, cx, "a"));
+}
+
+#[gpui::test]
+fn a_download_never_shows_more_than_a_full_bar(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx, ScriptedTransport::open(), ScriptedLibrary::reporting(150, Some(100)), 3,
+                               entries(&[("a", A)]));
+
+    download(&fixture, cx, "a");
+
+    wait_for(cx, |cx| shown_progress(&fixture, cx) == Some(1.0));
+    fixture.library.release(1);
+    wait_for(cx, |cx| file_downloaded(&fixture, cx, "a"));
+}
+
+#[gpui::test]
+fn a_download_of_unknown_size_keeps_an_indeterminate_bar(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx, ScriptedTransport::open(), ScriptedLibrary::reporting(25, None), 3,
+                               entries(&[("a", A)]));
+
+    download(&fixture, cx, "a");
+    wait_for(cx, |cx| activity_counts(&fixture, cx).0 == 1);
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    cx.run_until_parked();
+
+    assert_eq!(shown_progress(&fixture, cx), None);
+    fixture.library.release(1);
+    wait_for(cx, |cx| file_downloaded(&fixture, cx, "a"));
+}
+
+#[gpui::test]
+fn a_download_that_reports_nothing_keeps_an_indeterminate_bar(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx, ScriptedTransport::open(), ScriptedLibrary::gated(), 3,
+                               entries(&[("a", A)]));
+
+    download(&fixture, cx, "a");
+    wait_for(cx, |cx| activity_counts(&fixture, cx).0 == 1);
+
+    assert_eq!(shown_progress(&fixture, cx), None);
+    fixture.library.release(1);
+    wait_for(cx, |cx| file_downloaded(&fixture, cx, "a"));
+}

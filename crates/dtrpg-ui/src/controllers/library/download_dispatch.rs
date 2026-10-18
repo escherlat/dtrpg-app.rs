@@ -40,13 +40,14 @@ impl LibraryController {
                                                                           &file,
                                                                           &collection_ids);
                              job_dest.put(path.clone());
-                             service.download_item(order_product_id,
-                                                   index,
-                                                   &path,
-                                                   context.cancel_flag(),
-                                                   Some(&mut |attempt, delay| {
-                                                       context.report_retry(attempt, delay);
-                                                   }))
+                             let mut on_retry =
+                                 |attempt, delay| context.report_retry(attempt, delay);
+                             let mut on_progress =
+                                 |received, total| context.report_progress(received, total);
+                             let control = DownloadControl::new(context.cancel_flag())
+                                 .on_retry(&mut on_retry)
+                                 .on_progress(&mut on_progress);
+                             service.download_item(order_product_id, index, &path, control)
                                     .map_err(|error| error.to_string())
                          });
         self.download_jobs.add(id,
@@ -73,6 +74,25 @@ impl LibraryController {
         let activity_id = self.activity
                               .update(cx, |a, cx| a.start(&label, Some(cancel), cx));
         self.download_jobs.set_activity(id, activity_id);
+    }
+
+    /// Moves a download's progress bar to the fraction of the file received.
+    /// A download whose size is unknown keeps its indeterminate bar.
+    pub(super) fn download_progress(&mut self, id: JobId, received: u64, total: Option<u64>,
+                                    cx: &mut Context<Self>) {
+        let Some(activity_id) = self.download_jobs.get(id).and_then(|job| job.activity_id)
+        else {
+            return;
+        };
+        let Some(total) = total.filter(|total| *total > 0)
+        else {
+            return;
+        };
+        // The activity entry keeps the value within 0 to 1, should the server
+        // send more than it said it would.
+        let fraction = (received as f64 / total as f64) as f32;
+        self.activity
+            .update(cx, |a, cx| a.update_progress(activity_id, fraction, cx));
     }
 
     /// Updates a download's activity label to say it is retrying.
