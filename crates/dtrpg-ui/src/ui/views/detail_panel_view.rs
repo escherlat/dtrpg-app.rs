@@ -39,7 +39,7 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::view_models::inspector::{InspectorTab, InspectorViewModel};
+use crate::view_models::inspector::{InspectorContentsState, InspectorTab, InspectorViewModel};
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
@@ -1402,6 +1402,7 @@ fn inspector_tab_label(tab: InspectorTab) -> String {
         InspectorTab::Overview => t!("detail.inspector_overview_tab").to_string(),
         InspectorTab::Files => t!("detail.inspector_files_tab").to_string(),
         InspectorTab::Collections => t!("detail.inspector_collections_tab").to_string(),
+        InspectorTab::Contents => t!("detail.inspector_contents_tab").to_string(),
         InspectorTab::Summary => t!("detail.inspector_summary_tab").to_string(),
     }
 }
@@ -1411,6 +1412,7 @@ fn render_inspector_tab_bar(entry_id: Arc<str>, entity: Entity<LibraryController
     let tabs = [InspectorTab::Overview,
                 InspectorTab::Files,
                 InspectorTab::Collections,
+                InspectorTab::Contents,
                 InspectorTab::Summary];
     div().id("inspector-tabs")
          .flex()
@@ -1434,6 +1436,9 @@ fn render_inspector_tab_bar(entry_id: Arc<str>, entity: Entity<LibraryController
                  .on_click(move |_, _, cx| {
                      click_entity.update(cx, |controller, cx| {
                          controller.set_inspector_tab(Arc::clone(&click_id), tab, cx);
+                         if tab == InspectorTab::Contents {
+                             controller.load_inspector_contents(Arc::clone(&click_id), cx);
+                         }
                      });
                  })
                  .child(inspector_tab_label(tab))
@@ -1450,8 +1455,55 @@ struct InspectorRenderContext<'a> {
     cx: &'a mut App,
 }
 
+fn render_inspector_contents(state: &InspectorContentsState, colors: &ColorTokens) -> AnyElement {
+    match state {
+        InspectorContentsState::Unavailable => div()
+            .p(px(20.0))
+            .text_sm()
+            .text_color(colors.text_secondary)
+            .child(t!("detail.inspector_contents_unavailable").to_string())
+            .into_any_element(),
+        InspectorContentsState::Loading => div()
+            .p(px(20.0))
+            .text_sm()
+            .text_color(colors.text_secondary)
+            .child(t!("detail.inspector_contents_loading").to_string())
+            .into_any_element(),
+        InspectorContentsState::Loaded(entries) => div()
+            .p(px(20.0))
+            .flex()
+            .flex_col()
+            .gap(px(4.0))
+            .children(entries.iter().map(|entry| {
+                let depth = entry.name.trim_end_matches('/').matches('/').count();
+                let label = entry.name.trim_end_matches('/').rsplit('/').next().unwrap_or(&entry.name);
+                div()
+                    .pl(px(depth as f32 * 14.0))
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .text_sm()
+                    .text_color(colors.text_primary)
+                    .child(if entry.is_directory {
+                        format!("▸ {label}")
+                    } else {
+                        label.to_string()
+                    })
+                    .child(div().text_xs().text_color(colors.text_tertiary).child(
+                        if entry.is_directory {
+                            String::new()
+                        } else {
+                            format!("{} bytes", entry.size_bytes)
+                        },
+                    ))
+            }))
+            .into_any_element(),
+    }
+}
+
 fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorTab,
                                   context: InspectorRenderContext<'_>) -> AnyElement {
+    let contents = context.entity.read(context.cx).inspector_contents_for(&item.id);
     let content: AnyElement = match tab {
         InspectorTab::Files => render_item_tier(item,
                                                  context.storage_root_path,
@@ -1462,6 +1514,7 @@ fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorTab,
                                                  context.cx).into_any_element(),
         InspectorTab::Collections => render_collections_section(item, context.entity.clone(), context.colors, context.cx)
             .into_any_element(),
+        InspectorTab::Contents => render_inspector_contents(&contents, context.colors),
         InspectorTab::Summary => div().flex()
                                       .flex_col()
                                       .gap(px(12.0))

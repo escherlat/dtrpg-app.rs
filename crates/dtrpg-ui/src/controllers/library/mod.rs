@@ -40,7 +40,7 @@ use crate::util::file_presence::{
     find_presence_changes_in_collections, resolved_file_path_in_collections, resolved_item_dir,
 };
 use crate::util::publisher::*;
-use crate::view_models::inspector::InspectorTab;
+use crate::view_models::inspector::{InspectorContentsState, InspectorTab};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
 mod bulk_selection;
@@ -315,6 +315,8 @@ pub struct LibraryController {
     selected_item_file:            HashMap<Arc<str>, usize>,
     /// Active v2 inspector tab per detail entry. Session-only state.
     inspector_tabs:                HashMap<Arc<str>, InspectorTab>,
+    /// Lazily loaded archive entries for each inspector entry.
+    inspector_contents:            HashMap<Arc<str>, InspectorContentsState>,
     /// Whether the "Other details" disclosure section is expanded in a
     /// catalog entry's detail tab, keyed by catalog entry id. Ephemeral —
     /// never persisted, and defaults to collapsed for entries with no entry
