@@ -37,16 +37,17 @@ file-system extended attributes.
 
 None. `libri-platform-integration` already requires "the index is authoritative for tags"; this change meets it.
 
-## Open questions
+## Decisions
 
-- **Which files carry the tags?** An item can have several files. Proposed: every downloaded file of the item
-  carries all the item's tags, since the file is what Finder shows.
-- **What does reconciliation show the user?** Proposed: a count in the activity panel ("2 files' tags restored
-  from your library"), not a dialog, and a line in the log naming each file.
-- **Tag colors.** macOS tags carry a color index after the name. Proposed: write the name only, and preserve the
-  color an existing tag already has when rewriting the attribute.
-- **Dependency.** Proposed: the `xattr` crate, per the project rule to prefer existing crates over custom code.
-  It covers macOS and Linux and compiles to a no-op error on Windows.
+Settled with the project owner on 2026-10-18.
+
+- **Which files carry the tags?** Every downloaded file of the item carries all the item's tags, since the file is
+  what Finder shows.
+- **What does reconciliation show the user?** A count in the activity panel ("2 files' tags restored from your
+  library") and a line in the log naming each file. No dialog, and never silent.
+- **Tag colors.** Libri writes the name only. When it rewrites a file's tags, a color an existing tag of the same
+  name already has is kept. Libri does not manage colors.
+- **Dependency.** The `xattr` crate, for macOS and Linux builds only, so Windows builds do not pull it in.
 
 ## Impact
 
