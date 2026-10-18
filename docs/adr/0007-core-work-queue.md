@@ -195,16 +195,16 @@ branch, with the full suite run at each step:
   to keep single-flight checks inside one accounting scheme; if more kinds
   need caps, a per-kind limit table replaces it.
 
-## Open questions
+## Resolved (2026-10-18)
 
-1. **Disk verification.** `verify_selected_item_download` is a handful of
-   `Path::exists` calls, triggered when the user selects an item. Putting it
-   behind a full download slot would delay a result the user is looking at.
-   The recommendation is to leave it inline, exempt from the queue, and to
-   amend `libri-work-queue` so its "verification" wording means availability
-   checks. The alternative is a fourth, unmetered kind that is queued for
-   observability but does not count against the limit.
-2. **Priority of manually triggered checks.** Periodic checks are
-   `Background`. `request_check_batch` serves both the automatic timer and a
-   manual trigger; confirm whether a manual trigger should submit its batch
-   as `Interactive`.
+1. **Disk verification stays inline and outside the queue.**
+   `verify_selected_item_download` is a handful of `Path::exists` calls,
+   triggered when the user selects an item. Putting it behind a download
+   slot would delay a result the user is looking at. `libri-work-queue` is
+   amended so that "verification" means availability checks.
+2. **Manually triggered availability checks are `Interactive`.**
+   `request_check_batch` serves both the automatic timer and a manual
+   trigger. The timer submits its batch as `Background`; a manual trigger
+   submits its batch as `Interactive`. The `Check` cap of 1 applies to both,
+   so a manual batch jumps ahead of pending background work but still runs
+   one check at a time.
