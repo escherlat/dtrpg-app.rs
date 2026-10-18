@@ -22,9 +22,9 @@ pub enum CollectionsServiceErrorKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CollectionsServiceError {
     /// The machine-classified failure kind.
-    pub kind: CollectionsServiceErrorKind,
+    pub kind:        CollectionsServiceErrorKind,
     /// Human-readable baseline error message.
-    pub message: String,
+    pub message:     String,
     /// The server-specified wait duration from a `Retry-After` header, when
     /// the failure was a [`CollectionsServiceErrorKind::RateLimited`]
     /// response that included one.
@@ -34,11 +34,9 @@ pub struct CollectionsServiceError {
 impl CollectionsServiceError {
     /// Creates a new service error.
     pub fn new(kind: CollectionsServiceErrorKind, message: impl Into<String>) -> Self {
-        Self {
-            kind,
-            message: message.into(),
-            retry_after: None,
-        }
+        Self { kind,
+               message: message.into(),
+               retry_after: None }
     }
 
     /// Attaches a `Retry-After`-derived wait duration to this error.
@@ -109,9 +107,8 @@ pub trait CollectionsService: Send + Sync + 'static {
     ///
     /// Returns a [`CollectionsServiceError`] if the request fails, the session
     /// is invalid, or the underlying API does not support this operation.
-    fn remove_member(
-        &self, collection_id: u64, item_id: u64,
-    ) -> Result<(), CollectionsServiceError>;
+    fn remove_member(&self, collection_id: u64, item_id: u64)
+                     -> Result<(), CollectionsServiceError>;
 }
 
 #[cfg(test)]
@@ -145,68 +142,65 @@ pub mod stub {
     impl CollectionsService for CollectionsStubService {
         fn list_collections(&self) -> Result<Vec<CollectionEntry>, CollectionsServiceError> {
             match self.mode {
-                CollectionsStubMode::Seeded => Ok(vec![CollectionEntry {
-                    id: 1,
-                    name: Arc::from("Favorites"),
-                    member_ids: Arc::from([42u64, 99u64]),
-                    created_at: 1_700_000_000,
-                }]),
+                CollectionsStubMode::Seeded => {
+                    Ok(vec![CollectionEntry { id:         1,
+                                              name:       Arc::from("Favorites"),
+                                              member_ids: Arc::from([42u64, 99u64]),
+                                              created_at: 1_700_000_000, }])
+                }
                 CollectionsStubMode::Empty => Ok(vec![]),
-                CollectionsStubMode::Error => Err(CollectionsServiceError::new(
-                    CollectionsServiceErrorKind::Session,
-                    "stub: simulated session error",
-                )),
+                CollectionsStubMode::Error => {
+                    Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                     "stub: simulated session error"))
+                }
             }
         }
 
-        fn create_collection(
-            &self, name: &str,
-        ) -> Result<CollectionEntry, CollectionsServiceError> {
+        fn create_collection(&self, name: &str)
+                             -> Result<CollectionEntry, CollectionsServiceError> {
             match self.mode {
-                CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(CollectionEntry {
-                    id: 1,
-                    name: Arc::from(name),
-                    member_ids: Arc::from(&[][..]),
-                    created_at: 1_700_000_000,
-                }),
-                CollectionsStubMode::Error => Err(CollectionsServiceError::new(
-                    CollectionsServiceErrorKind::Session,
-                    "stub: simulated session error",
-                )),
+                CollectionsStubMode::Seeded | CollectionsStubMode::Empty => {
+                    Ok(CollectionEntry { id:         1,
+                                         name:       Arc::from(name),
+                                         member_ids: Arc::from(&[][..]),
+                                         created_at: 1_700_000_000, })
+                }
+                CollectionsStubMode::Error => {
+                    Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                     "stub: simulated session error"))
+                }
             }
         }
 
         fn delete_collection(&self, _id: u64) -> Result<(), CollectionsServiceError> {
             match self.mode {
                 CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(()),
-                CollectionsStubMode::Error => Err(CollectionsServiceError::new(
-                    CollectionsServiceErrorKind::Session,
-                    "stub: simulated session error",
-                )),
+                CollectionsStubMode::Error => {
+                    Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                     "stub: simulated session error"))
+                }
             }
         }
 
-        fn add_member(
-            &self, _collection_id: u64, _item_id: u64,
-        ) -> Result<(), CollectionsServiceError> {
+        fn add_member(&self, _collection_id: u64, _item_id: u64)
+                      -> Result<(), CollectionsServiceError> {
             match self.mode {
                 CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(()),
-                CollectionsStubMode::Error => Err(CollectionsServiceError::new(
-                    CollectionsServiceErrorKind::Session,
-                    "stub: simulated session error",
-                )),
+                CollectionsStubMode::Error => {
+                    Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                     "stub: simulated session error"))
+                }
             }
         }
 
-        fn remove_member(
-            &self, _collection_id: u64, _item_id: u64,
-        ) -> Result<(), CollectionsServiceError> {
+        fn remove_member(&self, _collection_id: u64, _item_id: u64)
+                         -> Result<(), CollectionsServiceError> {
             match self.mode {
                 CollectionsStubMode::Seeded | CollectionsStubMode::Empty => Ok(()),
-                CollectionsStubMode::Error => Err(CollectionsServiceError::new(
-                    CollectionsServiceErrorKind::Session,
-                    "stub: simulated session error",
-                )),
+                CollectionsStubMode::Error => {
+                    Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                     "stub: simulated session error"))
+                }
             }
         }
     }

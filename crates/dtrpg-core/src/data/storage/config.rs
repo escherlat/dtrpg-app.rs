@@ -57,36 +57,34 @@ fn default_recently_updated_window_days() -> u32 {
 /// Clamps `days` to `[RECENTLY_UPDATED_WINDOW_MIN_DAYS,
 /// RECENTLY_UPDATED_WINDOW_MAX_DAYS]`.
 pub(crate) fn clamp_recently_updated_window_days(days: u32) -> u32 {
-    days.clamp(
-        RECENTLY_UPDATED_WINDOW_MIN_DAYS,
-        RECENTLY_UPDATED_WINDOW_MAX_DAYS,
-    )
+    days.clamp(RECENTLY_UPDATED_WINDOW_MIN_DAYS,
+               RECENTLY_UPDATED_WINDOW_MAX_DAYS)
 }
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct StorageConfigFile {
-    pub(crate) root_path: Option<String>,
+    pub(crate) root_path:                    Option<String>,
     #[serde(default = "default_max_concurrent_downloads")]
-    pub(crate) max_concurrent_downloads: usize,
+    pub(crate) max_concurrent_downloads:     usize,
     #[serde(default)]
-    pub(crate) create_collections: bool,
+    pub(crate) create_collections:           bool,
     #[serde(default = "default_recently_updated_window_days")]
     pub(crate) recently_updated_window_days: u32,
     /// Named storage roots beyond the default (`root_path`). Empty for
     /// every config file written before multi-root support existed.
     #[serde(default)]
-    pub(crate) extra_roots: Vec<StorageRoot>,
+    pub(crate) extra_roots:                  Vec<StorageRoot>,
     /// Ordered placement rules. Empty for every config file written
     /// before placement rules existed.
     #[serde(default)]
-    pub(crate) rules: Vec<PlacementRule>,
+    pub(crate) rules:                        Vec<PlacementRule>,
     /// Next id to assign to an added root (`extra_roots` ids start at 1;
     /// `0` is reserved for the default root). Persisted so a removed
     /// root's id is never reassigned to a new one -- a stale rule
     /// referencing a removed root's id simply stops matching, rather than
     /// matching whatever new root later reuses that id.
     #[serde(default = "default_next_root_id")]
-    pub(crate) next_root_id: u32,
+    pub(crate) next_root_id:                 u32,
 }
 
 fn default_next_root_id() -> u32 {
@@ -103,16 +101,16 @@ fn default_next_root_id() -> u32 {
 /// is set, and to [`RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS`] when no
 /// "Recently Updated window" override is set.
 pub struct StorageConfig {
-    pub(crate) override_path: Option<PathBuf>,
-    pub(crate) max_concurrent_downloads: usize,
-    pub(crate) create_collections: bool,
+    pub(crate) override_path:                Option<PathBuf>,
+    pub(crate) max_concurrent_downloads:     usize,
+    pub(crate) create_collections:           bool,
     pub(crate) recently_updated_window_days: u32,
     /// Named storage roots beyond the default (id [`DEFAULT_ROOT_ID`]).
-    pub(crate) extra_roots: Vec<StorageRoot>,
+    pub(crate) extra_roots:                  Vec<StorageRoot>,
     /// Ordered placement rules; see [`placement::resolve_root_id`].
-    pub(crate) rules: Vec<PlacementRule>,
+    pub(crate) rules:                        Vec<PlacementRule>,
     /// Next id to assign to an added root.
-    pub(crate) next_root_id: u32,
+    pub(crate) next_root_id:                 u32,
 }
 
 impl StorageConfig {
@@ -129,43 +127,34 @@ impl StorageConfig {
     pub fn load() -> Self {
         let path = config_path();
         let file_existed = path.as_ref().is_some_and(|p| p.exists());
-        let file = path
-            .as_ref()
-            .and_then(|p| std::fs::read_to_string(p).ok())
-            .and_then(|text| toml::from_str::<StorageConfigFile>(&text).ok());
-        let override_path = file
-            .as_ref()
-            .and_then(|cfg| cfg.root_path.clone())
-            .map(PathBuf::from);
-        let max_concurrent_downloads = file
-            .as_ref()
-            .map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS, |cfg| {
-                cfg.max_concurrent_downloads
-            });
-        let recently_updated_window_days = file
-            .as_ref()
-            .map_or(RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, |cfg| {
-                clamp_recently_updated_window_days(cfg.recently_updated_window_days)
-            });
+        let file = path.as_ref()
+                       .and_then(|p| std::fs::read_to_string(p).ok())
+                       .and_then(|text| toml::from_str::<StorageConfigFile>(&text).ok());
+        let override_path = file.as_ref()
+                                .and_then(|cfg| cfg.root_path.clone())
+                                .map(PathBuf::from);
+        let max_concurrent_downloads = file.as_ref().map_or(DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+                                                            |cfg| cfg.max_concurrent_downloads);
+        let recently_updated_window_days =
+            file.as_ref()
+                .map_or(RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, |cfg| {
+                    clamp_recently_updated_window_days(cfg.recently_updated_window_days)
+                });
         let create_collections = file.as_ref().is_some_and(|cfg| cfg.create_collections);
-        let extra_roots = file
-            .as_ref()
-            .map(|cfg| cfg.extra_roots.clone())
-            .unwrap_or_default();
-        let rules = file
-            .as_ref()
-            .map(|cfg| cfg.rules.clone())
-            .unwrap_or_default();
+        let extra_roots = file.as_ref()
+                              .map(|cfg| cfg.extra_roots.clone())
+                              .unwrap_or_default();
+        let rules = file.as_ref()
+                        .map(|cfg| cfg.rules.clone())
+                        .unwrap_or_default();
         let next_root_id = file.as_ref().map_or(1, |cfg| cfg.next_root_id);
-        let config = Self {
-            override_path,
-            max_concurrent_downloads,
-            create_collections,
-            recently_updated_window_days,
-            extra_roots,
-            rules,
-            next_root_id,
-        };
+        let config = Self { override_path,
+                            max_concurrent_downloads,
+                            create_collections,
+                            recently_updated_window_days,
+                            extra_roots,
+                            rules,
+                            next_root_id };
         if !file_existed {
             config.save();
         }
@@ -186,15 +175,13 @@ impl StorageConfig {
     /// `StorageConfig` across the crate boundary, and `cfg(test)` only
     /// applies when the crate it's written in is itself under test.
     pub fn for_test(root: PathBuf) -> Self {
-        Self {
-            override_path: Some(root),
-            max_concurrent_downloads: DEFAULT_MAX_CONCURRENT_DOWNLOADS,
-            create_collections: false,
-            recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
-            extra_roots: Vec::new(),
-            rules: Vec::new(),
-            next_root_id: 1,
-        }
+        Self { override_path:                Some(root),
+               max_concurrent_downloads:     DEFAULT_MAX_CONCURRENT_DOWNLOADS,
+               create_collections:           false,
+               recently_updated_window_days: RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS,
+               extra_roots:                  Vec::new(),
+               rules:                        Vec::new(),
+               next_root_id:                 1, }
     }
 
     /// Returns the resolved download root (saved override, or platform
@@ -259,11 +246,9 @@ impl StorageConfig {
     #[must_use]
     pub fn roots(&self) -> Vec<StorageRoot> {
         let mut all = Vec::with_capacity(1 + self.extra_roots.len());
-        all.push(StorageRoot {
-            id: DEFAULT_ROOT_ID,
-            name: "Default".to_string(),
-            path: self.root_path(),
-        });
+        all.push(StorageRoot { id:   DEFAULT_ROOT_ID,
+                               name: "Default".to_string(),
+                               path: self.root_path(), });
         all.extend(self.extra_roots.iter().cloned());
         all
     }
@@ -322,10 +307,8 @@ impl StorageConfig {
 
     /// Appends a new placement rule to the end of the evaluation order.
     pub fn add_rule(&mut self, condition: PlacementCondition, target_root_id: u32) {
-        self.rules.push(PlacementRule {
-            condition,
-            target_root_id,
-        });
+        self.rules.push(PlacementRule { condition,
+                                        target_root_id });
         self.save();
     }
 
@@ -362,14 +345,11 @@ impl StorageConfig {
     /// matching rule's target id no longer resolves to a configured root
     /// (e.g. the root it pointed at was removed).
     #[must_use]
-    pub fn resolve_root_for(
-        &self, publisher: &str, collection_ids: &[u64], size_mb: f64,
-    ) -> StorageRoot {
-        let default_root = StorageRoot {
-            id: DEFAULT_ROOT_ID,
-            name: "Default".to_string(),
-            path: self.root_path(),
-        };
+    pub fn resolve_root_for(&self, publisher: &str, collection_ids: &[u64], size_mb: f64)
+                            -> StorageRoot {
+        let default_root = StorageRoot { id:   DEFAULT_ROOT_ID,
+                                         name: "Default".to_string(),
+                                         path: self.root_path(), };
         placement::resolve_root_id(&self.rules, publisher, collection_ids, size_mb)
             .and_then(|id| self.root(id))
             .unwrap_or(default_root)
@@ -450,19 +430,19 @@ impl StorageConfig {
     /// `{app_preferences_dir}/storage.toml`. Silently ignores I/O errors
     /// (the state remains applied in memory).
     fn save(&self) {
-        let cfg = StorageConfigFile {
-            root_path: self
-                .override_path
-                .as_ref()
-                .map(|p| p.to_string_lossy().into_owned()),
-            max_concurrent_downloads: self.max_concurrent_downloads,
-            create_collections: self.create_collections,
-            recently_updated_window_days: self.recently_updated_window_days,
-            extra_roots: self.extra_roots.clone(),
-            rules: self.rules.clone(),
-            next_root_id: self.next_root_id,
-        };
-        let Some(config_file) = config_path() else {
+        let cfg = StorageConfigFile { root_path:
+                                          self.override_path
+                                              .as_ref()
+                                              .map(|p| p.to_string_lossy().into_owned()),
+                                      max_concurrent_downloads:     self.max_concurrent_downloads,
+                                      create_collections:           self.create_collections,
+                                      recently_updated_window_days:
+                                          self.recently_updated_window_days,
+                                      extra_roots:                  self.extra_roots.clone(),
+                                      rules:                        self.rules.clone(),
+                                      next_root_id:                 self.next_root_id, };
+        let Some(config_file) = config_path()
+        else {
             return;
         };
         if let Some(parent) = config_file.parent() {

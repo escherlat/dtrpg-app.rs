@@ -27,9 +27,8 @@ pub fn now_secs() -> i64 {
 /// assert_eq!(ts, Some(1_721_144_752));
 /// ```
 pub fn parse_rfc3339_to_epoch(input: &str) -> Option<i64> {
-    DateTime::parse_from_rfc3339(input)
-        .ok()
-        .map(|dt| dt.timestamp())
+    DateTime::parse_from_rfc3339(input).ok()
+                                       .map(|dt| dt.timestamp())
 }
 
 /// Formats a Unix timestamp as an RFC 3339 / ISO 8601 string in UTC (e.g.
@@ -56,27 +55,21 @@ mod tests {
     #[test]
     fn parses_rfc3339_with_negative_offset() {
         // 2024-07-16T10:45:52-05:00 == 2024-07-16T15:45:52Z
-        assert_eq!(
-            parse_rfc3339_to_epoch("2024-07-16T10:45:52-05:00"),
-            Some(1_721_144_752)
-        );
+        assert_eq!(parse_rfc3339_to_epoch("2024-07-16T10:45:52-05:00"),
+                   Some(1_721_144_752));
     }
 
     #[test]
     fn parses_rfc3339_with_positive_offset() {
         // 2024-07-17T00:45:52+09:00 == 2024-07-16T15:45:52Z
-        assert_eq!(
-            parse_rfc3339_to_epoch("2024-07-17T00:45:52+09:00"),
-            Some(1_721_144_752)
-        );
+        assert_eq!(parse_rfc3339_to_epoch("2024-07-17T00:45:52+09:00"),
+                   Some(1_721_144_752));
     }
 
     #[test]
     fn parses_rfc3339_with_z_suffix() {
-        assert_eq!(
-            parse_rfc3339_to_epoch("2024-01-05T15:42:00Z"),
-            Some(1_704_469_320)
-        );
+        assert_eq!(parse_rfc3339_to_epoch("2024-01-05T15:42:00Z"),
+                   Some(1_704_469_320));
     }
 
     #[test]

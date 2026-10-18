@@ -13,11 +13,11 @@ pub enum NoticeKind {
 #[derive(Debug, Clone)]
 pub struct Notice {
     /// The kind of auth notice.
-    pub kind: NoticeKind,
+    pub kind:      NoticeKind,
     /// Whether the user has dismissed this notice for the current session.
     pub dismissed: bool,
     /// The primary action associated with this notice.
-    pub action: NoticeAction,
+    pub action:    NoticeAction,
 }
 
 /// The action triggered by the primary button on a notice row.

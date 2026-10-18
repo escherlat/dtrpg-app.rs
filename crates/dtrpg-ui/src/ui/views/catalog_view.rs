@@ -398,12 +398,14 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                   .child(item.year.to_string())
                   .into_any_element(),
 
-        6 => div().h_full()
-                  .flex()
-                  .items_center()
-                  .justify_center()
-                  .child(render_status(&item.id, item.status, item.is_offloaded(), activity, colors))
-                  .into_any_element(),
+        6 => {
+            div().h_full()
+                 .flex()
+                 .items_center()
+                 .justify_center()
+                 .child(render_status(&item.id, item.status, item.is_offloaded(), activity, colors))
+                 .into_any_element()
+        }
 
         7 => {
             if item.status == ItemStatus::Downloaded {
@@ -1613,8 +1615,9 @@ fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
 /// entry's files is queued or downloading, [`ItemActivity::Verifying`] while
 /// a file-presence check (`verify-downloaded-status-against-disk`) is in
 /// flight for it.
-fn render_status(id: &Arc<str>, status: ItemStatus, offloaded: bool,
-                 activity: ItemActivity, colors: &ColorTokens) -> AnyElement {
+fn render_status(id: &Arc<str>, status: ItemStatus, offloaded: bool, activity: ItemActivity,
+                 colors: &ColorTokens)
+                 -> AnyElement {
     match activity {
         ItemActivity::Downloading => {
             return render_downloading_indicator(id, colors).into_any_element();
@@ -1628,11 +1631,10 @@ fn render_status(id: &Arc<str>, status: ItemStatus, offloaded: bool,
     let text_tertiary = colors.text_tertiary;
     match status {
         ItemStatus::Downloaded if offloaded => div().text_xs()
-                                                   .text_color(colors.warning_text)
-                                                   .flex_none()
-                                                   .child("☁")
-                                                   
-                                                   .into_any_element(),
+                                                    .text_color(colors.warning_text)
+                                                    .flex_none()
+                                                    .child("☁")
+                                                    .into_any_element(),
         ItemStatus::Downloaded => div().size(px(7.0))
                                        .rounded_full()
                                        .bg(accent)
@@ -1801,7 +1803,12 @@ fn render_thumb_row(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
         }
         if status == ItemStatus::Downloaded {
             Badge::new().dot()
-                        .color(if item.is_offloaded() { colors.warning_text } else { gpui::green() })
+                        .color(if item.is_offloaded() {
+                                   colors.warning_text
+                               }
+                               else {
+                                   gpui::green()
+                               })
                         .child(inner)
                         .into_any_element()
         }
@@ -2109,7 +2116,12 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
         }
         if status == ItemStatus::Downloaded {
             Badge::new().dot()
-                        .color(if item.is_offloaded() { colors.warning_text } else { gpui::green() })
+                        .color(if item.is_offloaded() {
+                                   colors.warning_text
+                               }
+                               else {
+                                   gpui::green()
+                               })
                         .child(inner)
                         .into_any_element()
         }
@@ -2168,7 +2180,11 @@ fn render_grid_card(item: &LibraryItem, cover_image: Option<Arc<Image>>, colors:
                                              .text_color(colors.text_tertiary)
                                              .truncate()
                                              .child(publisher))
-                                 .child(render_status(&id, status, item.is_offloaded(), activity, &colors))))
+                                 .child(render_status(&id,
+                                                      status,
+                                                      item.is_offloaded(),
+                                                      activity,
+                                                      &colors))))
          .context_menu(move |menu, window, cx| {
              let menu = match status {
                  ItemStatus::Downloaded => {

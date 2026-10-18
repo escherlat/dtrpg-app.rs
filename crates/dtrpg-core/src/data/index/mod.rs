@@ -228,7 +228,7 @@ mod tests {
                                              format:     Arc::from("PDF"),
                                              size_mb:    12.0,
                                              downloaded: true,
-                                             offloaded: false, }];
+                                             offloaded:  false, }];
         index.replace_all_items(&[moria]).unwrap();
 
         let loaded = index.get_item("a1").unwrap().unwrap();

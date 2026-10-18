@@ -11,7 +11,7 @@ use super::{
 };
 
 pub(super) struct TarReader {
-    path: PathBuf,
+    path:   PathBuf,
     format: ContainerFormat,
 }
 
@@ -57,38 +57,31 @@ impl TarReader {
 impl ContainerReader for TarReader {
     fn visit_entries(&self, visitor: &mut dyn FnMut(ContainerEntry)) -> Result<(), ContainerError> {
         let mut archive = self.archive()?;
-        let entries = archive
-            .entries()
-            .map_err(|error| ContainerError::Io(error.to_string()))?;
+        let entries = archive.entries()
+                             .map_err(|error| ContainerError::Io(error.to_string()))?;
         for entry in entries {
             let entry = entry.map_err(|error| ContainerError::Io(error.to_string()))?;
-            let path = entry
-                .path()
-                .map_err(|error| ContainerError::Io(error.to_string()))?;
-            visitor(ContainerEntry {
-                name: path.to_string_lossy().into_owned(),
-                size_bytes: entry.size(),
-                is_directory: entry.header().entry_type().is_dir(),
-            });
+            let path = entry.path()
+                            .map_err(|error| ContainerError::Io(error.to_string()))?;
+            visitor(ContainerEntry { name:         path.to_string_lossy().into_owned(),
+                                     size_bytes:   entry.size(),
+                                     is_directory: entry.header().entry_type().is_dir(), });
         }
         Ok(())
     }
 
     fn read_entry(&self, name: &str) -> Result<Vec<u8>, ContainerError> {
         let mut archive = self.archive()?;
-        let entries = archive
-            .entries()
-            .map_err(|error| ContainerError::Io(error.to_string()))?;
+        let entries = archive.entries()
+                             .map_err(|error| ContainerError::Io(error.to_string()))?;
         for entry in entries {
             let mut entry = entry.map_err(|error| ContainerError::Io(error.to_string()))?;
-            let path = entry
-                .path()
-                .map_err(|error| ContainerError::Io(error.to_string()))?;
+            let path = entry.path()
+                            .map_err(|error| ContainerError::Io(error.to_string()))?;
             if path == Path::new(name) {
                 let mut bytes = Vec::new();
-                entry
-                    .read_to_end(&mut bytes)
-                    .map_err(|error| ContainerError::Io(error.to_string()))?;
+                entry.read_to_end(&mut bytes)
+                     .map_err(|error| ContainerError::Io(error.to_string()))?;
                 return Ok(bytes);
             }
         }

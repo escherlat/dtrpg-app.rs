@@ -17,8 +17,8 @@ pub enum ContainerFormat {
 /// Metadata exposed for one archive entry.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ContainerEntry {
-    pub name: String,
-    pub size_bytes: u64,
+    pub name:         String,
+    pub size_bytes:   u64,
     pub is_directory: bool,
 }
 
@@ -26,16 +26,14 @@ pub fn detect_format(path: &Path) -> Result<ContainerFormat, ContainerError> {
     if !path.is_file() {
         return Err(ContainerError::NotFound(path.display().to_string()));
     }
-    let extension_hint = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .map(str::to_ascii_lowercase)
-        .unwrap_or_default();
+    let extension_hint = path.file_name()
+                             .and_then(|name| name.to_str())
+                             .map(str::to_ascii_lowercase)
+                             .unwrap_or_default();
     let mut file = File::open(path).map_err(|error| ContainerError::Io(error.to_string()))?;
     let mut header = [0_u8; 512];
-    let length = file
-        .read(&mut header)
-        .map_err(|error| ContainerError::Io(error.to_string()))?;
+    let length = file.read(&mut header)
+                     .map_err(|error| ContainerError::Io(error.to_string()))?;
     let bytes = &header[..length];
 
     if bytes.starts_with(b"PK\x03\x04") || bytes.starts_with(b"PK\x05\x06") {

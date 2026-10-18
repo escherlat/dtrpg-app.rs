@@ -5,10 +5,10 @@ mod format;
 mod tar;
 mod zip;
 
+use std::path::{Path, PathBuf};
+
 pub use error::ContainerError;
 pub use format::{ContainerEntry, ContainerFormat, detect_format};
-
-use std::path::{Path, PathBuf};
 
 /// A container reader that does not require callers to know the archive format.
 pub trait ContainerReader {
@@ -45,18 +45,16 @@ pub fn list_entries(path: &Path) -> Result<Vec<ContainerEntry>, ContainerError> 
 fn safe_entry_path(destination: &Path, name: &str) -> Result<PathBuf, ContainerError> {
     let relative = Path::new(name);
     if relative.is_absolute()
-        || relative
-            .components()
-            .any(|component| matches!(component, std::path::Component::ParentDir))
+       || relative.components()
+                  .any(|component| matches!(component, std::path::Component::ParentDir))
     {
         return Err(ContainerError::UnsafeEntry(name.to_string()));
     }
     Ok(destination.join(relative))
 }
 
-pub(crate) fn write_extracted_entry(
-    destination: &Path, name: &str, bytes: &[u8],
-) -> Result<(), ContainerError> {
+pub(crate) fn write_extracted_entry(destination: &Path, name: &str, bytes: &[u8])
+                                    -> Result<(), ContainerError> {
     let path = safe_entry_path(destination, name)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|error| ContainerError::Io(error.to_string()))?;
@@ -67,10 +65,11 @@ pub(crate) fn write_extracted_entry(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use std::fs::File;
+
     use ::tar::Builder;
     use flate2::Compression;
     use flate2::write::GzEncoder;
-    use std::fs::File;
 
     use super::*;
 
@@ -117,9 +116,8 @@ mod tests {
         let reader = open(&path).unwrap();
         let mut names = Vec::new();
 
-        reader
-            .visit_entries(&mut |entry| names.push(entry.name))
-            .unwrap();
+        reader.visit_entries(&mut |entry| names.push(entry.name))
+              .unwrap();
 
         assert_eq!(names, ["docs/readme.txt"]);
     }
@@ -129,19 +127,15 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let destination = directory.path().join("out");
 
-        assert_eq!(
-            write_extracted_entry(&destination, "../escape.txt", b"nope"),
-            Err(ContainerError::UnsafeEntry("../escape.txt".to_string()))
-        );
+        assert_eq!(write_extracted_entry(&destination, "../escape.txt", b"nope"),
+                   Err(ContainerError::UnsafeEntry("../escape.txt".to_string())));
     }
 
     #[test]
     fn missing_archive_returns_not_found() {
         let path = Path::new("missing.tar");
 
-        assert_eq!(
-            detect_format(path),
-            Err(ContainerError::NotFound(path.display().to_string()))
-        );
+        assert_eq!(detect_format(path),
+                   Err(ContainerError::NotFound(path.display().to_string())));
     }
 }

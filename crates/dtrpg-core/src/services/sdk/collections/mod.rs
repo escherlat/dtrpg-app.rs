@@ -90,7 +90,8 @@ impl CollectionsService for RustSdkCollectionsService {
                 for item in &items_resp.data {
                     if let Some(id_value) = extract_member_id(item) {
                         member_ids.push(id_value);
-                    } else {
+                    }
+                    else {
                         tracing::warn!(
                             collection_id = id,
                             item = ?item,
@@ -105,12 +106,10 @@ impl CollectionsService for RustSdkCollectionsService {
                 items_page += 1;
             }
 
-            entries.push(CollectionEntry {
-                id,
-                name,
-                member_ids: Arc::from(member_ids.as_slice()),
-                created_at,
-            });
+            entries.push(CollectionEntry { id,
+                                           name,
+                                           member_ids: Arc::from(member_ids.as_slice()),
+                                           created_at });
         }
 
         Ok(entries)
@@ -119,12 +118,10 @@ impl CollectionsService for RustSdkCollectionsService {
     fn create_collection(&self, name: &str) -> Result<CollectionEntry, CollectionsServiceError> {
         let item = self.gateway.create_product_list(name.trim())?;
         let created_at = parse_rfc3339_to_epoch(&item.attributes.date_created).unwrap_or(0);
-        Ok(CollectionEntry {
-            id: item.attributes.product_list_id,
-            name: Arc::from(item.attributes.name.as_str()),
-            member_ids: Arc::from(&[][..]),
-            created_at,
-        })
+        Ok(CollectionEntry { id: item.attributes.product_list_id,
+                             name: Arc::from(item.attributes.name.as_str()),
+                             member_ids: Arc::from(&[][..]),
+                             created_at })
     }
 
     fn delete_collection(&self, id: u64) -> Result<(), CollectionsServiceError> {
@@ -135,9 +132,8 @@ impl CollectionsService for RustSdkCollectionsService {
         self.gateway.add_product_list_item(collection_id, item_id)
     }
 
-    fn remove_member(
-        &self, collection_id: u64, item_id: u64,
-    ) -> Result<(), CollectionsServiceError> {
+    fn remove_member(&self, collection_id: u64, item_id: u64)
+                     -> Result<(), CollectionsServiceError> {
         self.gateway
             .remove_product_list_item(collection_id, item_id)
     }
@@ -179,9 +175,9 @@ fn extract_product_list_item_id(item: &serde_json::Value) -> Option<u64> {
         })
         .or_else(|| {
             item.get("id").and_then(|v| {
-                v.as_u64()
-                    .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
-            })
+                              v.as_u64()
+                               .or_else(|| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+                          })
         })
 }
 
@@ -197,100 +193,85 @@ mod tests {
     use super::*;
 
     fn pagination_links(next: Option<&str>) -> PaginationLinks {
-        PaginationLinks {
-            self_: "self".to_string(),
-            first: None,
-            last: None,
-            prev: None,
-            next: next.map(String::from),
-        }
+        PaginationLinks { self_: "self".to_string(),
+                          first: None,
+                          last:  None,
+                          prev:  None,
+                          next:  next.map(String::from), }
     }
 
     fn product_list_item(id: u64, name: &str) -> ProductListItem {
-        ProductListItem {
-            id: id.to_string(),
-            resource_type: "product_list".to_string(),
-            attributes: ProductListAttributes {
-                customer_id: 100,
-                name: name.to_string(),
-                date_created: "2026-01-01".to_string(),
-                product_list_id: id,
-                slug: name.to_lowercase().replace(' ', "-"),
-                item_count: 2,
-            },
-        }
+        ProductListItem { id:            id.to_string(),
+                          resource_type: "product_list".to_string(),
+                          attributes:    ProductListAttributes { customer_id:     100,
+                                                                 name:            name.to_string(),
+                                                                 date_created:
+                                                                     "2026-01-01".to_string(),
+                                                                 product_list_id: id,
+                                                                 slug:
+                                                                     name.to_lowercase()
+                                                                         .replace(' ', "-"),
+                                                                 item_count:      2, }, }
     }
 
     struct FakeCollectionsGateway {
-        lists: Result<Vec<ProductListItem>, CollectionsServiceError>,
-        items: Result<Vec<serde_json::Value>, CollectionsServiceError>,
+        lists:         Result<Vec<ProductListItem>, CollectionsServiceError>,
+        items:         Result<Vec<serde_json::Value>, CollectionsServiceError>,
         create_result: Result<ProductListItem, CollectionsServiceError>,
-        add_result: Result<(), CollectionsServiceError>,
+        add_result:    Result<(), CollectionsServiceError>,
         remove_result: Result<(), CollectionsServiceError>,
     }
 
     impl FakeCollectionsGateway {
         fn seeded() -> Self {
-            Self {
-                lists: Ok(vec![product_list_item(7, "Favorites")]),
-                items: Ok(vec![
-                    json!({ "orderProductId": 42 }),
-                    json!({ "orderProductId": 99 }),
-                ]),
-                create_result: Ok(product_list_item(8, "New List")),
-                add_result: Ok(()),
-                remove_result: Ok(()),
-            }
+            Self { lists:         Ok(vec![product_list_item(7, "Favorites")]),
+                   items:         Ok(vec![json!({ "orderProductId": 42 }),
+                                          json!({ "orderProductId": 99 }),]),
+                   create_result: Ok(product_list_item(8, "New List")),
+                   add_result:    Ok(()),
+                   remove_result: Ok(()), }
         }
 
         fn session_error() -> Self {
-            let err = CollectionsServiceError::new(
-                CollectionsServiceErrorKind::Session,
-                "fake session error",
-            );
-            Self {
-                lists: Err(err.clone()),
-                items: Err(err.clone()),
-                create_result: Err(err.clone()),
-                add_result: Err(err.clone()),
-                remove_result: Err(err),
-            }
+            let err = CollectionsServiceError::new(CollectionsServiceErrorKind::Session,
+                                                   "fake session error");
+            Self { lists:         Err(err.clone()),
+                   items:         Err(err.clone()),
+                   create_result: Err(err.clone()),
+                   add_result:    Err(err.clone()),
+                   remove_result: Err(err), }
         }
 
         fn items_with_missing_field() -> Self {
-            Self {
-                lists: Ok(vec![product_list_item(7, "Favorites")]),
-                items: Ok(vec![
-                    json!({ "orderProductId": 42 }),
-                    json!({ "someOtherField": "abc" }),
-                    json!({ "orderProductId": 99 }),
-                ]),
-                create_result: Ok(product_list_item(8, "New List")),
-                add_result: Ok(()),
-                remove_result: Ok(()),
-            }
+            Self { lists:         Ok(vec![product_list_item(7, "Favorites")]),
+                   items:         Ok(vec![json!({ "orderProductId": 42 }),
+                                          json!({ "someOtherField": "abc" }),
+                                          json!({ "orderProductId": 99 }),]),
+                   create_result: Ok(product_list_item(8, "New List")),
+                   add_result:    Ok(()),
+                   remove_result: Ok(()), }
         }
     }
 
     impl SdkCollectionsGateway for FakeCollectionsGateway {
-        fn list_product_lists(
-            &self, _page: u32,
-        ) -> Result<ProductListCollectionResponse, CollectionsServiceError> {
-            self.lists
-                .clone()
-                .map(|data| ProductListCollectionResponse {
+        fn list_product_lists(&self, _page: u32)
+                              -> Result<ProductListCollectionResponse, CollectionsServiceError>
+        {
+            self.lists.clone().map(|data| {
+                                  ProductListCollectionResponse {
                     links: pagination_links(None),
                     meta: PaginationMeta {
                         items_per_page: 100,
                         current_page: 1,
                     },
                     data,
-                })
+                }
+                              })
         }
 
-        fn list_product_list_items(
-            &self, _product_list_id: u64, _page: u32,
-        ) -> Result<ProductListItemsResponse, CollectionsServiceError> {
+        fn list_product_list_items(&self, _product_list_id: u64, _page: u32)
+                                   -> Result<ProductListItemsResponse, CollectionsServiceError>
+        {
             self.items.clone().map(|data| ProductListItemsResponse {
                 links: pagination_links(None),
                 meta: PaginationMeta {
@@ -301,9 +282,8 @@ mod tests {
             })
         }
 
-        fn create_product_list(
-            &self, _name: &str,
-        ) -> Result<ProductListItem, CollectionsServiceError> {
+        fn create_product_list(&self, _name: &str)
+                               -> Result<ProductListItem, CollectionsServiceError> {
             self.create_result.clone()
         }
 
@@ -311,15 +291,13 @@ mod tests {
             self.lists.as_ref().map(|_| ()).map_err(Clone::clone)
         }
 
-        fn add_product_list_item(
-            &self, _product_list_id: u64, _product_id: u64,
-        ) -> Result<(), CollectionsServiceError> {
+        fn add_product_list_item(&self, _product_list_id: u64, _product_id: u64)
+                                 -> Result<(), CollectionsServiceError> {
             self.add_result.clone()
         }
 
-        fn remove_product_list_item(
-            &self, _product_list_id: u64, _order_product_id: u64,
-        ) -> Result<(), CollectionsServiceError> {
+        fn remove_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                                    -> Result<(), CollectionsServiceError> {
             self.remove_result.clone()
         }
     }
@@ -358,9 +336,8 @@ mod tests {
     #[test]
     fn create_collection_returns_correct_entry() {
         let service = RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::seeded()));
-        let entry = service
-            .create_collection("New List")
-            .expect("create collection");
+        let entry = service.create_collection("New List")
+                           .expect("create collection");
 
         assert_eq!(entry.id, 8);
         assert_eq!(entry.name.as_ref(), "New List");
@@ -371,9 +348,8 @@ mod tests {
     fn create_collection_propagates_session_error() {
         let service =
             RustSdkCollectionsService::new(Box::new(FakeCollectionsGateway::session_error()));
-        let err = service
-            .create_collection("Anything")
-            .expect_err("session error");
+        let err = service.create_collection("Anything")
+                         .expect_err("session error");
         assert_eq!(err.kind, CollectionsServiceErrorKind::Session);
     }
 

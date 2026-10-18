@@ -26,11 +26,13 @@ impl ProfileConfig {
 
     /// Loads the profile from disk, returning defaults on any error.
     pub fn load() -> Self {
-        let email = std::fs::read_to_string(Self::path())
-            .ok()
-            .and_then(|s| toml::from_str::<ProfileConfigFile>(&s).ok())
-            .and_then(|f| f.email)
-            .filter(|s| !s.trim().is_empty());
+        let email =
+            std::fs::read_to_string(Self::path()).ok()
+                                                 .and_then(|s| {
+                                                     toml::from_str::<ProfileConfigFile>(&s).ok()
+                                                 })
+                                                 .and_then(|f| f.email)
+                                                 .filter(|s| !s.trim().is_empty());
 
         Self { email }
     }
@@ -47,14 +49,13 @@ impl ProfileConfig {
     pub fn save(email: Option<&str>) {
         let path = Self::path();
         if let Some(parent) = path.parent()
-            && let Err(e) = std::fs::create_dir_all(parent)
+           && let Err(e) = std::fs::create_dir_all(parent)
         {
             tracing::warn!("profile: failed to create config dir: {e}");
             return;
         }
-        let file = ProfileConfigFile {
-            email: email.filter(|s| !s.trim().is_empty()).map(str::to_owned),
-        };
+        let file =
+            ProfileConfigFile { email: email.filter(|s| !s.trim().is_empty()).map(str::to_owned), };
         match toml::to_string_pretty(&file) {
             Ok(contents) => {
                 if let Err(e) = std::fs::write(&path, contents) {

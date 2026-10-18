@@ -44,7 +44,7 @@ use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
 use crate::util::reveal::reveal_in_file_manager;
 use crate::view_models::inspector::{
-    InspectorContentsState, InspectorPreviewState, InspectorTab, InspectorViewModel
+    InspectorContentsState, InspectorPreviewState, InspectorTab, InspectorViewModel,
 };
 
 /// Renders the expanded detail tab's content: a large cover, title,
