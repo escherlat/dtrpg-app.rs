@@ -58,10 +58,12 @@ struct PaletteToml {
     scrim:          Option<String>,
 }
 
-/// Loads a theme's colors from its embedded TOML file by id.
+/// Loads a theme's colors by id: a built-in id reads its embedded TOML, any
+/// other id reads `<themes_dir>/<id>.toml` (a user-authored theme, ADR-0005).
 ///
-/// An unknown id falls back to the compiled default (parchment), so a stale
-/// persisted selection never fails to produce a usable palette.
+/// An unknown, unreadable, or malformed id falls back to the compiled default
+/// (parchment), so a stale persisted selection never fails to produce a usable
+/// palette.
 pub fn load(id: &ThemeId) -> ColorTokens {
     let toml = match id.as_str() {
         "parchment" => include_str!("../../../../assets/themes/parchment.toml"),
@@ -70,9 +72,23 @@ pub fn load(id: &ThemeId) -> ColorTokens {
         "ink" => include_str!("../../../../assets/themes/ink.toml"),
         "moss" => include_str!("../../../../assets/themes/moss.toml"),
         "rosewood" => include_str!("../../../../assets/themes/rosewood.toml"),
-        _ => return compiled_default(id),
+        other => return load_user_theme(other).unwrap_or_else(|| compiled_default(id)),
     };
     parse_theme_toml(toml).unwrap_or_else(|_| compiled_default(id))
+}
+
+/// Reads a user theme file by id from the themes directory.
+///
+/// Returns `None` for an id containing path separators or `..` (a persisted
+/// id is never trusted as a filesystem path) or for an unreadable/invalid
+/// file.
+fn load_user_theme(id: &str) -> Option<ColorTokens> {
+    if id.contains(['/', '\\']) || id.is_empty() || id.contains("..") {
+        return None;
+    }
+    let path = dtrpg_core::data::paths::themes_dir().join(format!("{id}.toml"));
+    let content = std::fs::read_to_string(path).ok()?;
+    parse_theme_toml(&content).ok()
 }
 
 /// Loads a theme from an arbitrary TOML file.
@@ -96,13 +112,18 @@ fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
         surface: parse_hex_opt(palette.surface.as_deref()).unwrap_or(defaults.surface),
         surface_alt: parse_hex_opt(palette.surface_alt.as_deref()).unwrap_or(defaults.surface_alt),
         hover: parse_hex_opt(palette.hover.as_deref()).unwrap_or(defaults.hover),
-        text_primary: parse_hex_opt(palette.text_primary.as_deref()).unwrap_or(defaults.text_primary),
-        text_secondary: parse_hex_opt(palette.text_secondary.as_deref()).unwrap_or(defaults.text_secondary),
-        text_tertiary: parse_hex_opt(palette.text_tertiary.as_deref()).unwrap_or(defaults.text_tertiary),
+        text_primary: parse_hex_opt(palette.text_primary.as_deref())
+            .unwrap_or(defaults.text_primary),
+        text_secondary: parse_hex_opt(palette.text_secondary.as_deref())
+            .unwrap_or(defaults.text_secondary),
+        text_tertiary: parse_hex_opt(palette.text_tertiary.as_deref())
+            .unwrap_or(defaults.text_tertiary),
         border: parse_hex_opt(palette.border.as_deref()).unwrap_or(defaults.border),
-        border_strong: parse_hex_opt(palette.border_strong.as_deref()).unwrap_or(defaults.border_strong),
+        border_strong: parse_hex_opt(palette.border_strong.as_deref())
+            .unwrap_or(defaults.border_strong),
         accent: parse_hex_opt(palette.accent.as_deref()).unwrap_or(defaults.accent),
-        accent_soft: parse_hex_alpha_opt(palette.accent_soft.as_deref()).unwrap_or(defaults.accent_soft),
+        accent_soft: parse_hex_alpha_opt(palette.accent_soft.as_deref())
+            .unwrap_or(defaults.accent_soft),
         accent_on: parse_hex_opt(palette.accent_on.as_deref()).unwrap_or(defaults.accent_on),
         shadow: parse_hex_alpha_opt(palette.shadow.as_deref()).unwrap_or(defaults.shadow),
         scrim: parse_hex_alpha_opt(palette.scrim.as_deref()).unwrap_or(defaults.scrim),
@@ -240,6 +261,24 @@ mod tests {
         assert_eq!(colors.surface, ink.surface);
         let dark = crate::data::theme::semantic_colors(crate::data::theme::ThemeMode::Dark);
         assert_eq!(colors.error, dark.error);
+    }
+
+    #[test]
+    fn unknown_user_id_falls_back_to_parchment() {
+        let loaded = super::load(&ThemeId::from("no-such-theme"));
+        assert_eq!(loaded.surface,
+                   crate::data::theme::parchment_colors().surface);
+    }
+
+    #[test]
+    fn traversal_ids_never_reach_the_filesystem() {
+        // A crafted persisted id must not escape the themes directory; both
+        // resolve to the parchment fallback rather than reading arbitrary
+        // files.
+        for id in ["../secrets", "..", "a/b", "a\\b", ""] {
+            assert!(super::load_user_theme(id).is_none(),
+                    "id {id:?} must be rejected");
+        }
     }
 
     #[test]
