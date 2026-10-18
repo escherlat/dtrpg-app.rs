@@ -164,6 +164,7 @@ detail:
   inspector_summary_tab: "Summary"
   inspector_contents_loading: "Loading archive contents…"
   inspector_contents_unavailable: "Archive contents are unavailable."
+  inspector_contents_filter_placeholder: "Filter entries…"
   inspector_preview: "Preview"
   inspector_preview_loading: "Loading preview for {name}…"
   inspector_preview_unavailable: "No text preview for {name}"

@@ -146,6 +146,7 @@ detail:
   inspector_summary_tab: "Résumé"
   inspector_contents_loading: "Chargement du contenu de l'archive…"
   inspector_contents_unavailable: "Le contenu de l'archive est indisponible."
+  inspector_contents_filter_placeholder: "Filtrer les entrées…"
   inspector_preview: "Aperçu"
   inspector_preview_loading: "Chargement de l’aperçu de {name}…"
   inspector_preview_unavailable: "Aperçu texte indisponible pour {name}"
