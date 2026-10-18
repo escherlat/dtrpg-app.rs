@@ -3,6 +3,21 @@
 use super::*;
 
 impl LibraryController {
+    /// Returns the active v2 inspector tab for `entry_id`.
+    #[must_use]
+    pub fn inspector_tab_for(&self, entry_id: &str) -> InspectorTab {
+        self.inspector_tabs.get(entry_id).copied().unwrap_or_default()
+    }
+
+    /// Changes the active v2 inspector tab for `entry_id`.
+    pub fn set_inspector_tab(&mut self, entry_id: Arc<str>, tab: InspectorTab,
+                             cx: &mut Context<Self>) {
+        if self.inspector_tab_for(&entry_id) == tab {
+            return;
+        }
+        self.inspector_tabs.insert(entry_id, tab);
+        cx.emit(LibraryChanged);
+    }
     // ── Zip content preview (item tier) ──────────────────────────────────────
 
     /// Returns the active Zip preview's file row and anchor position for
