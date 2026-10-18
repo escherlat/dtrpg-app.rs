@@ -112,6 +112,15 @@ pub fn covers_dir() -> PathBuf {
     app_cache_dir().join("covers")
 }
 
+/// Returns the directory for user-authored theme files (ADR-0005).
+///
+/// Lives under [`app_data_dir`] (Application Support on macOS) because these
+/// are editable application data files the user drops in and maintains, not
+/// caches or small preference records. Contains one `*.toml` file per theme.
+pub fn themes_dir() -> PathBuf {
+    app_data_dir().join("themes")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,6 +153,12 @@ mod tests {
     #[test]
     fn covers_dir_is_under_app_cache_dir() {
         assert_eq!(covers_dir(), app_cache_dir().join("covers"));
+    }
+
+    #[test]
+    fn themes_dir_is_under_app_data_dir() {
+        assert!(themes_dir().starts_with(app_data_dir()));
+        assert!(themes_dir().ends_with("themes"));
     }
 
     #[cfg(target_os = "macos")]

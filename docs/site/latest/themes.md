@@ -73,8 +73,25 @@ scrim = "#1E160A 0.26"
 `mode` is `light` or `dark`; it selects the fixed semantic state colors and
 the fallback base for any palette field the file omits. Fields left out fall
 back to a built-in base of the same mode, so a partially specified theme file
-still loads. User-defined theme files loaded from disk use the same format
-via `theme_loader::load_from_path`.
+still loads.
+
+### User themes
+
+Drop your own `*.toml` theme files into the app's themes directory (created
+on first launch):
+
+- macOS: `~/Library/Application Support/com.pilgrimagesoftware.dtrpg/themes/`
+- Linux: `~/.local/share/dtrpg/themes/`
+
+Each file's stem becomes the theme's id (used for persistence), and its
+`name` field is what Settings > Appearance and the status-bar theme picker
+show. The same flat palette format applies; built-in ids are reserved, so a
+file named `parchment.toml` is ignored in favor of the built-in. The
+directory is read at startup and the pickers list whatever is there at that
+point - restart the app after adding, renaming, or removing files.
+
+A malformed file (no `name`, unparseable TOML) is skipped; a theme that loads
+but omits palette fields falls back per-key as described above.
 
 ### Semantic state colors are not themeable
 
