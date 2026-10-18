@@ -7,8 +7,8 @@ use dtrpg_core::api::LibraryApi;
 use dtrpg_core::data::paths::cache_dir;
 use dtrpg_core::services::sdk::{RustSdkCollectionsService, RustSdkLibraryService};
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::InitializeResult;
 use rmcp::model::Implementation;
+use rmcp::model::InitializeResult;
 use rmcp::model::ProtocolVersion;
 use rmcp::model::ServerCapabilities;
 use rmcp::{ServerHandler, ServiceExt, tool, tool_handler, tool_router};
@@ -17,16 +17,14 @@ use serde::{Deserialize, Serialize};
 
 #[allow(dead_code)]
 pub struct LibriMcpServer {
-    api: LibraryApi,
+    api:         LibraryApi,
     tool_router: rmcp::handler::server::router::tool::ToolRouter<Self>,
 }
 
 impl LibriMcpServer {
     fn new(api: LibraryApi) -> Self {
-        Self {
-            api,
-            tool_router: Self::tool_router(),
-        }
+        Self { api,
+               tool_router: Self::tool_router() }
     }
 }
 
@@ -51,7 +49,8 @@ impl LibriMcpServer {
     }
 
     #[tool(description = "Get a library item by id")]
-    async fn get_item(&self, Parameters(GetItemRequest { id }): Parameters<GetItemRequest>) -> String {
+    async fn get_item(&self, Parameters(GetItemRequest { id }): Parameters<GetItemRequest>)
+                      -> String {
         match self.api.index_get_item(&id) {
             Ok(Some(item)) => serde_json::to_string(&item).unwrap_or_default(),
             Ok(None) => format!("{{\"error\":\"item {} not found\"}}", id),
@@ -60,10 +59,9 @@ impl LibriMcpServer {
     }
 
     #[tool(description = "List entries in a local archive file")]
-    async fn list_archive_entries(
-        &self,
-        Parameters(ListArchiveEntriesRequest { path }): Parameters<ListArchiveEntriesRequest>,
-    ) -> String {
+    async fn list_archive_entries(&self,
+                                  Parameters(ListArchiveEntriesRequest { path }): Parameters<ListArchiveEntriesRequest>)
+                                  -> String {
         let p = PathBuf::from(&path);
         match self.api.list_archive_entries(&p) {
             Ok(entries) => serde_json::to_string(&entries).unwrap_or_default(),
@@ -87,13 +85,12 @@ impl ServerHandler for LibriMcpServer {
 #[tokio::main]
 #[allow(clippy::result_large_err)]
 async fn main() -> Result<(), rmcp::RmcpError> {
-    let api = LibraryApi::new(
-        Box::new(RustSdkLibraryService::unauthenticated()),
-        Box::new(RustSdkCollectionsService::unauthenticated()),
-        cache_dir(),
-    );
+    let api = LibraryApi::new(Box::new(RustSdkLibraryService::unauthenticated()),
+                              Box::new(RustSdkCollectionsService::unauthenticated()),
+                              cache_dir());
 
-    let service = LibriMcpServer::new(api).serve(rmcp::transport::stdio()).await?;
+    let service = LibriMcpServer::new(api).serve(rmcp::transport::stdio())
+                                          .await?;
     service.waiting().await?;
     Ok(())
 }

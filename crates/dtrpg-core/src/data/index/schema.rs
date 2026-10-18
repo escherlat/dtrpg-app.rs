@@ -118,7 +118,8 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
         ",
     )?;
     if previous_version == 1 {
-        conn.execute("ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0", [])?;
+        conn.execute("ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0",
+                     [])?;
     }
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())

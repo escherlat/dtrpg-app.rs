@@ -15,11 +15,11 @@ use crate::data::theme_catalog::ThemeId;
 
 #[derive(Debug, Deserialize)]
 struct ThemeToml {
-    name: String,
+    name:    String,
     /// Light or dark declaration; drives fixed semantic colors and the
     /// fallback base for missing palette keys. Defaults to light.
     #[serde(default)]
-    mode: Option<String>,
+    mode:    Option<String>,
     /// Palette fields live flat alongside `name`/`mode` in the file; flatten
     /// collects them so a theme file needs no nested table.
     #[serde(flatten)]
@@ -29,33 +29,33 @@ struct ThemeToml {
 #[derive(Debug, Default, Deserialize)]
 struct PaletteToml {
     #[serde(default)]
-    desktop_bg: Option<String>,
+    desktop_bg:     Option<String>,
     #[serde(default)]
-    surface: Option<String>,
+    surface:        Option<String>,
     #[serde(default)]
-    surface_alt: Option<String>,
+    surface_alt:    Option<String>,
     #[serde(default)]
-    hover: Option<String>,
+    hover:          Option<String>,
     #[serde(default)]
-    text_primary: Option<String>,
+    text_primary:   Option<String>,
     #[serde(default)]
     text_secondary: Option<String>,
     #[serde(default)]
-    text_tertiary: Option<String>,
+    text_tertiary:  Option<String>,
     #[serde(default)]
-    border: Option<String>,
+    border:         Option<String>,
     #[serde(default)]
-    border_strong: Option<String>,
+    border_strong:  Option<String>,
     #[serde(default)]
-    accent: Option<String>,
+    accent:         Option<String>,
     #[serde(default)]
-    accent_soft: Option<String>,
+    accent_soft:    Option<String>,
     #[serde(default)]
-    accent_on: Option<String>,
+    accent_on:      Option<String>,
     #[serde(default)]
-    shadow: Option<String>,
+    shadow:         Option<String>,
     #[serde(default)]
-    scrim: Option<String>,
+    scrim:          Option<String>,
 }
 
 /// Loads a theme's colors by id: a built-in id reads its embedded TOML, any
@@ -94,19 +94,17 @@ fn load_user_theme(id: &str) -> Option<ColorTokens> {
 /// Loads a theme from an arbitrary TOML file.
 /// Returns None if parsing fails.
 pub fn load_from_path(path: &PathBuf) -> Option<ColorTokens> {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|s| parse_theme_toml(&s).ok())
+    std::fs::read_to_string(path).ok()
+                                 .and_then(|s| parse_theme_toml(&s).ok())
 }
 
 fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
     let theme: ThemeToml = toml::from_str(s)?;
     let palette = theme.palette;
-    let mode = theme
-        .mode
-        .as_deref()
-        .and_then(|m| m.parse().ok())
-        .unwrap_or(ThemeMode::Light);
+    let mode = theme.mode
+                    .as_deref()
+                    .and_then(|m| m.parse().ok())
+                    .unwrap_or(ThemeMode::Light);
     let semantic = semantic_colors(mode);
     let defaults = fallback_base(&theme.name, mode);
     let tokens = ColorTokens {
@@ -153,12 +151,14 @@ fn parse_hex(s: &str) -> Option<Hsla> {
         let g = u8::from_str_radix(&s[2..4], 16).ok()?;
         let b = u8::from_str_radix(&s[4..6], 16).ok()?;
         Some(hex(r, g, b))
-    } else if s.len() == 3 {
+    }
+    else if s.len() == 3 {
         let r = u8::from_str_radix(&s[0..1], 16).ok()?;
         let g = u8::from_str_radix(&s[1..2], 16).ok()?;
         let b = u8::from_str_radix(&s[2..3], 16).ok()?;
         Some(hex(r * 17, g * 17, b * 17))
-    } else {
+    }
+    else {
         None
     }
 }
@@ -266,21 +266,18 @@ mod tests {
     #[test]
     fn unknown_user_id_falls_back_to_parchment() {
         let loaded = super::load(&ThemeId::from("no-such-theme"));
-        assert_eq!(
-            loaded.surface,
-            crate::data::theme::parchment_colors().surface
-        );
+        assert_eq!(loaded.surface,
+                   crate::data::theme::parchment_colors().surface);
     }
 
     #[test]
     fn traversal_ids_never_reach_the_filesystem() {
         // A crafted persisted id must not escape the themes directory; both
-        // resolve to the parchment fallback rather than reading arbitrary files.
+        // resolve to the parchment fallback rather than reading arbitrary
+        // files.
         for id in ["../secrets", "..", "a/b", "a\\b", ""] {
-            assert!(
-                super::load_user_theme(id).is_none(),
-                "id {id:?} must be rejected"
-            );
+            assert!(super::load_user_theme(id).is_none(),
+                    "id {id:?} must be rejected");
         }
     }
 
@@ -290,37 +287,23 @@ mod tests {
             let key = ThemeId::from(id);
             let loaded = super::load(&key);
             let compiled = super::compiled_default(&key);
-            let fields = [
-                ("desktop_bg", loaded.desktop_bg, compiled.desktop_bg),
-                ("surface", loaded.surface, compiled.surface),
-                ("surface_alt", loaded.surface_alt, compiled.surface_alt),
-                ("hover", loaded.hover, compiled.hover),
-                ("text_primary", loaded.text_primary, compiled.text_primary),
-                (
-                    "text_secondary",
-                    loaded.text_secondary,
-                    compiled.text_secondary,
-                ),
-                (
-                    "text_tertiary",
-                    loaded.text_tertiary,
-                    compiled.text_tertiary,
-                ),
-                ("border", loaded.border, compiled.border),
-                (
-                    "border_strong",
-                    loaded.border_strong,
-                    compiled.border_strong,
-                ),
-                ("accent", loaded.accent, compiled.accent),
-                ("accent_soft", loaded.accent_soft, compiled.accent_soft),
-                ("accent_on", loaded.accent_on, compiled.accent_on),
-                ("shadow", loaded.shadow, compiled.shadow),
-                ("scrim", loaded.scrim, compiled.scrim),
-                ("error", loaded.error, compiled.error),
-                ("warning_bg", loaded.warning_bg, compiled.warning_bg),
-                ("warning_text", loaded.warning_text, compiled.warning_text),
-            ];
+            let fields = [("desktop_bg", loaded.desktop_bg, compiled.desktop_bg),
+                          ("surface", loaded.surface, compiled.surface),
+                          ("surface_alt", loaded.surface_alt, compiled.surface_alt),
+                          ("hover", loaded.hover, compiled.hover),
+                          ("text_primary", loaded.text_primary, compiled.text_primary),
+                          ("text_secondary", loaded.text_secondary, compiled.text_secondary),
+                          ("text_tertiary", loaded.text_tertiary, compiled.text_tertiary),
+                          ("border", loaded.border, compiled.border),
+                          ("border_strong", loaded.border_strong, compiled.border_strong),
+                          ("accent", loaded.accent, compiled.accent),
+                          ("accent_soft", loaded.accent_soft, compiled.accent_soft),
+                          ("accent_on", loaded.accent_on, compiled.accent_on),
+                          ("shadow", loaded.shadow, compiled.shadow),
+                          ("scrim", loaded.scrim, compiled.scrim),
+                          ("error", loaded.error, compiled.error),
+                          ("warning_bg", loaded.warning_bg, compiled.warning_bg),
+                          ("warning_text", loaded.warning_text, compiled.warning_text)];
             for (name, l, c) in fields {
                 assert_eq!(l, c, "mismatch in {:?} field {}", key, name);
             }

@@ -17,7 +17,7 @@ pub struct FileOpenerEntry {
     /// File extension without a leading dot, lower-cased (e.g. `"pdf"`).
     pub extension: String,
     /// Absolute path to the application used to open files of this type.
-    pub app_path: PathBuf,
+    pub app_path:  PathBuf,
 }
 
 /// Outcome of calling [`FileOpenerConfig::add`].
@@ -46,13 +46,13 @@ pub struct FileOpenerConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CatalogViewPrefs {
     #[serde(default)]
-    sort: Option<String>,
+    sort:             Option<String>,
     #[serde(default)]
-    pub grouped: Option<bool>,
+    pub grouped:      Option<bool>,
     #[serde(default)]
-    presentation: Option<String>,
+    presentation:     Option<String>,
     #[serde(default)]
-    filter: Option<String>,
+    filter:           Option<String>,
     #[serde(default)]
     filter_publisher: Option<String>,
 }
@@ -74,9 +74,9 @@ impl CatalogViewPrefs {
     }
 
     /// Builds preferences from the controller's current view state.
-    pub fn from_state(
-        filter: &SidebarFilter, sort: SortMethod, grouped: bool, presentation: CatalogPresentation,
-    ) -> Self {
+    pub fn from_state(filter: &SidebarFilter, sort: SortMethod, grouped: bool,
+                      presentation: CatalogPresentation)
+                      -> Self {
         let (filter_name, filter_publisher) = match filter {
             SidebarFilter::AllTitles => (Some("AllTitles"), None),
             SidebarFilter::RecentlyUpdated => (Some("RecentlyUpdated"), None),
@@ -89,29 +89,21 @@ impl CatalogViewPrefs {
             // simply aren't remembered.
             SidebarFilter::Collection(..) => (None, None),
         };
-        Self {
-            sort: Some(
-                match sort {
-                    SortMethod::Title => "Title",
-                    SortMethod::Publisher => "Publisher",
-                    SortMethod::DateAdded => "DateAdded",
-                    SortMethod::PageCount => "PageCount",
-                    SortMethod::Custom { .. } => "Custom",
-                }
-                .to_string(),
-            ),
-            grouped: Some(grouped),
-            presentation: Some(
-                match presentation {
-                    CatalogPresentation::List => "List",
-                    CatalogPresentation::Thumbs => "Thumbs",
-                    CatalogPresentation::Grid => "Grid",
-                }
-                .to_string(),
-            ),
-            filter: filter_name.map(str::to_string),
-            filter_publisher,
-        }
+        Self { sort: Some(match sort {
+                              SortMethod::Title => "Title",
+                              SortMethod::Publisher => "Publisher",
+                              SortMethod::DateAdded => "DateAdded",
+                              SortMethod::PageCount => "PageCount",
+                              SortMethod::Custom { .. } => "Custom",
+                          }.to_string()),
+               grouped: Some(grouped),
+               presentation: Some(match presentation {
+                                      CatalogPresentation::List => "List",
+                                      CatalogPresentation::Thumbs => "Thumbs",
+                                      CatalogPresentation::Grid => "Grid",
+                                  }.to_string()),
+               filter: filter_name.map(str::to_string),
+               filter_publisher }
     }
 
     /// Resolves the persisted sort method, defaulting (with a `WARN` log)
@@ -124,10 +116,8 @@ impl CatalogViewPrefs {
             Some("DateAdded") => SortMethod::DateAdded,
             Some("PageCount") => SortMethod::PageCount,
             Some(other) => {
-                tracing::warn!(
-                    value = other,
-                    "unrecognized catalog sort preference; using default"
-                );
+                tracing::warn!(value = other,
+                               "unrecognized catalog sort preference; using default");
                 SortMethod::default()
             }
         }
@@ -142,10 +132,8 @@ impl CatalogViewPrefs {
             Some("Thumbs") => CatalogPresentation::Thumbs,
             Some("Grid") => CatalogPresentation::Grid,
             Some(other) => {
-                tracing::warn!(
-                    value = other,
-                    "unrecognized catalog presentation preference; using default"
-                );
+                tracing::warn!(value = other,
+                               "unrecognized catalog presentation preference; using default");
                 CatalogPresentation::default()
             }
         }
@@ -167,10 +155,8 @@ impl CatalogViewPrefs {
                 None => SidebarFilter::AllTitles,
             },
             Some(other) => {
-                tracing::warn!(
-                    value = other,
-                    "unrecognized catalog filter preference; using default"
-                );
+                tracing::warn!(value = other,
+                               "unrecognized catalog filter preference; using default");
                 SidebarFilter::AllTitles
             }
         }
@@ -191,10 +177,12 @@ pub(crate) struct AppConfigFile {
 /// Loads the shared app config file from disk, returning defaults if the
 /// file is absent or unparseable.
 pub(crate) fn load_app_config() -> AppConfigFile {
-    let Some(path) = config_path() else {
+    let Some(path) = config_path()
+    else {
         return AppConfigFile::default();
     };
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Ok(text) = std::fs::read_to_string(&path)
+    else {
         return AppConfigFile::default();
     };
     toml::from_str(&text).unwrap_or_default()
@@ -203,7 +191,8 @@ pub(crate) fn load_app_config() -> AppConfigFile {
 /// Saves the shared app config file to disk, creating parent directories if
 /// needed. Silently ignores I/O errors.
 pub(crate) fn save_app_config(cfg: &AppConfigFile) {
-    let Some(path) = config_path() else {
+    let Some(path) = config_path()
+    else {
         return;
     };
     if let Some(parent) = path.parent() {
@@ -224,9 +213,7 @@ impl FileOpenerConfig {
     /// Loads the config from disk, returning a default if the file is absent or
     /// unparseable.
     pub fn load() -> Self {
-        Self {
-            entries: load_app_config().file_openers,
-        }
+        Self { entries: load_app_config().file_openers, }
     }
 
     /// Saves the config to disk, creating parent directories if needed.
@@ -261,14 +248,11 @@ impl FileOpenerConfig {
     /// Adds `entry`, normalizing the extension.  Replaces an existing entry for
     /// the same extension.  Returns whether the entry was new or a replacement.
     pub fn add(&mut self, entry: FileOpenerEntry) -> AddOutcome {
-        let normalized = FileOpenerEntry {
-            extension: normalize_ext(&entry.extension),
-            app_path: entry.app_path,
-        };
-        if let Some(existing) = self
-            .entries
-            .iter_mut()
-            .find(|e| e.extension == normalized.extension)
+        let normalized = FileOpenerEntry { extension: normalize_ext(&entry.extension),
+                                           app_path:  entry.app_path, };
+        if let Some(existing) = self.entries
+                                    .iter_mut()
+                                    .find(|e| e.extension == normalized.extension)
         {
             existing.app_path = normalized.app_path;
             return AddOutcome::Replaced;
@@ -320,9 +304,8 @@ pub(crate) fn config_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     let base = std::env::var("APPDATA").ok().map(PathBuf::from)?;
     #[cfg(not(target_os = "windows"))]
-    let base = std::env::var("HOME")
-        .ok()
-        .map(|h| PathBuf::from(h).join(".config"))?;
+    let base = std::env::var("HOME").ok()
+                                    .map(|h| PathBuf::from(h).join(".config"))?;
     Some(base.join("dtrpg").join("app_config.toml"))
 }
 
@@ -333,10 +316,8 @@ mod tests {
     use super::*;
 
     fn entry(ext: &str, path: &str) -> FileOpenerEntry {
-        FileOpenerEntry {
-            extension: ext.to_owned(),
-            app_path: PathBuf::from(path),
-        }
+        FileOpenerEntry { extension: ext.to_owned(),
+                          app_path:  PathBuf::from(path), }
     }
 
     fn config_with(entries: Vec<FileOpenerEntry>) -> FileOpenerConfig {
@@ -349,36 +330,26 @@ mod tests {
     #[test]
     fn find_override_exact_match() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(
-            cfg.find_override("pdf"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
+        assert_eq!(cfg.find_override("pdf"),
+                   Some(Path::new("/Applications/Preview.app")));
     }
 
     #[test]
     fn find_override_case_insensitive() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(
-            cfg.find_override("PDF"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
-        assert_eq!(
-            cfg.find_override("Pdf"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
+        assert_eq!(cfg.find_override("PDF"),
+                   Some(Path::new("/Applications/Preview.app")));
+        assert_eq!(cfg.find_override("Pdf"),
+                   Some(Path::new("/Applications/Preview.app")));
     }
 
     #[test]
     fn find_override_dot_prefixed_input() {
         let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(
-            cfg.find_override(".pdf"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
-        assert_eq!(
-            cfg.find_override(".PDF"),
-            Some(Path::new("/Applications/Preview.app"))
-        );
+        assert_eq!(cfg.find_override(".pdf"),
+                   Some(Path::new("/Applications/Preview.app")));
+        assert_eq!(cfg.find_override(".PDF"),
+                   Some(Path::new("/Applications/Preview.app")));
     }
 
     #[test]
@@ -420,10 +391,8 @@ mod tests {
         let result = cfg.add(entry("pdf", "/Applications/Acrobat.app"));
         assert_eq!(result, AddOutcome::Replaced);
         assert_eq!(cfg.entries().len(), 1);
-        assert_eq!(
-            cfg.entries()[0].app_path,
-            PathBuf::from("/Applications/Acrobat.app")
-        );
+        assert_eq!(cfg.entries()[0].app_path,
+                   PathBuf::from("/Applications/Acrobat.app"));
     }
 
     // ── validate_all
@@ -431,10 +400,8 @@ mod tests {
 
     #[test]
     fn validate_all_flags_missing_paths() {
-        let cfg = config_with(vec![
-            entry("pdf", "/nonexistent/Preview.app"),
-            entry("epub", "/nonexistent/Calibre.app"),
-        ]);
+        let cfg = config_with(vec![entry("pdf", "/nonexistent/Preview.app"),
+                                   entry("epub", "/nonexistent/Calibre.app"),]);
         let stale = cfg.validate_all();
         assert_eq!(stale.len(), 2);
     }

@@ -48,8 +48,8 @@ pub fn init_globals(cx: &mut App) {
 fn initial_theme(cx: &App) -> LibriTheme {
     let prefs = UiPreferences::load();
     let id = prefs.theme_key()
-                   .and_then(ThemeCatalog::resolve)
-                   .unwrap_or_default();
+                  .and_then(ThemeCatalog::resolve)
+                  .unwrap_or_default();
 
     let installed = cx.text_system().all_font_names();
     let body_font = resolve_installed_font(&installed, prefs.body_font_name(), DEFAULT_BODY_FONT);

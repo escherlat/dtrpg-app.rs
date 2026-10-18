@@ -43,10 +43,10 @@ fn cover_filename(item_id: &str, ext: &str) -> String {
 /// fall through to a live fetch without surfacing errors to the user.
 pub fn load_cached_cover(root: &Path, item_id: &str) -> Option<Vec<u8>> {
     KNOWN_EXTENSIONS.iter().find_map(|ext| {
-        let path = root.join(cover_filename(item_id, ext));
-        let bytes = fs::read(&path).ok()?;
-        if bytes.is_empty() { None } else { Some(bytes) }
-    })
+                               let path = root.join(cover_filename(item_id, ext));
+                               let bytes = fs::read(&path).ok()?;
+                               if bytes.is_empty() { None } else { Some(bytes) }
+                           })
 }
 
 /// Writes `bytes` to `{root}/{hash}.{ext}`, creating `root` if needed, where
@@ -75,7 +75,7 @@ pub fn save_cached_cover(root: &Path, item_id: &str, bytes: &[u8]) {
         }
         let stale = root.join(cover_filename(item_id, known));
         if let Err(e) = fs::remove_file(&stale)
-            && e.kind() != std::io::ErrorKind::NotFound
+           && e.kind() != std::io::ErrorKind::NotFound
         {
             tracing::warn!(path = %stale.display(), error = %e,
                            "cover cache: failed to remove stale extension");
@@ -148,17 +148,11 @@ mod tests {
     /// Table of (magic bytes, expected extension) covering every known
     /// format, so each write goes to the extension matching its content.
     fn format_cases() -> Vec<(&'static str, Vec<u8>, &'static str)> {
-        vec![
-            ("jpeg", vec![0xFF, 0xD8, 0xFF, 1, 2, 3], "jpg"),
-            ("png", vec![0x89, b'P', b'N', b'G', 1, 2], "png"),
-            (
-                "webp",
-                vec![b'R', b'I', b'F', b'F', 0, 0, 0, 0, b'W', b'E', b'B', b'P'],
-                "webp",
-            ),
-            ("gif", vec![b'G', b'I', b'F', b'8', b'9', b'a'], "gif"),
-            ("bmp", vec![b'B', b'M', 0, 0], "bmp"),
-        ]
+        vec![("jpeg", vec![0xFF, 0xD8, 0xFF, 1, 2, 3], "jpg"),
+             ("png", vec![0x89, b'P', b'N', b'G', 1, 2], "png"),
+             ("webp", vec![b'R', b'I', b'F', b'F', 0, 0, 0, 0, b'W', b'E', b'B', b'P'], "webp"),
+             ("gif", vec![b'G', b'I', b'F', b'8', b'9', b'a'], "gif"),
+             ("bmp", vec![b'B', b'M', 0, 0], "bmp"),]
     }
 
     #[test]
@@ -172,10 +166,8 @@ mod tests {
             let exists = expected_path.is_file();
             let _ = fs::remove_dir_all(&dir);
 
-            assert!(
-                exists,
-                "expected {name} bytes to be written with .{ext} extension"
-            );
+            assert!(exists,
+                    "expected {name} bytes to be written with .{ext} extension");
         }
     }
 
@@ -198,10 +190,8 @@ mod tests {
         let loaded = load_cached_cover(&dir, id);
         let _ = fs::remove_dir_all(&dir);
 
-        assert!(
-            !jpg_still_there,
-            "stale .jpg should be removed when the format changes"
-        );
+        assert!(!jpg_still_there,
+                "stale .jpg should be removed when the format changes");
         assert_eq!(loaded, Some(png), "lookup must return the fresh PNG bytes");
     }
 
@@ -215,11 +205,9 @@ mod tests {
             let loaded = load_cached_cover(&dir, id);
             let _ = fs::remove_dir_all(&dir);
 
-            assert_eq!(
-                loaded,
-                Some(bytes),
-                "lookup should find .{ext} file for {name}"
-            );
+            assert_eq!(loaded,
+                       Some(bytes),
+                       "lookup should find .{ext} file for {name}");
         }
     }
 }

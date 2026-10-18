@@ -23,10 +23,9 @@ pub(super) fn last_page_from_links(links: &PaginationLinks) -> Option<u32> {
     let last_url = links.last.as_deref()?;
     // Find "page=" in the query string and parse the digits that follow.
     let page_part = last_url.split("page=").nth(1)?;
-    let digits: String = page_part
-        .chars()
-        .take_while(|c| c.is_ascii_digit())
-        .collect();
+    let digits: String = page_part.chars()
+                                  .take_while(|c| c.is_ascii_digit())
+                                  .collect();
     digits.parse::<u32>().ok().filter(|&n| n > 0)
 }
 
@@ -42,14 +41,12 @@ pub(super) fn last_page_from_links(links: &PaginationLinks) -> Option<u32> {
 /// that case. Each ordered product's `relationships.publisher.data.id` is the
 /// correct key into this map — see [`resolve_publisher`].
 pub(super) fn publisher_lookup(included: &[IncludedItem]) -> HashMap<String, String> {
-    included
-        .iter()
-        .filter_map(|entry| {
-            entry
-                .as_publisher()
-                .map(|publisher| (entry.id.clone(), publisher.name))
-        })
-        .collect()
+    included.iter()
+            .filter_map(|entry| {
+                entry.as_publisher()
+                     .map(|publisher| (entry.id.clone(), publisher.name))
+            })
+            .collect()
 }
 
 /// Builds a lookup from JSON:API resource id (e.g.
@@ -61,14 +58,12 @@ pub(super) fn publisher_lookup(included: &[IncludedItem]) -> HashMap<String, Str
 /// each ordered product's `relationships.product.data.id` is the key into this
 /// map.
 pub(super) fn product_lookup(included: &[IncludedItem]) -> HashMap<String, OrderProductInfo> {
-    included
-        .iter()
-        .filter_map(|entry| {
-            entry
-                .as_product()
-                .map(|product| (entry.id.clone(), product))
-        })
-        .collect()
+    included.iter()
+            .filter_map(|entry| {
+                entry.as_product()
+                     .map(|product| (entry.id.clone(), product))
+            })
+            .collect()
 }
 
 /// Derives an uppercase format label (e.g. `"PDF"`, `"EPUB"`) from a file's
@@ -76,9 +71,8 @@ pub(super) fn product_lookup(included: &[IncludedItem]) -> HashMap<String, Order
 ///
 /// Returns `None` if `filename` has no extension.
 fn file_extension_label(filename: &str) -> Option<String> {
-    filename
-        .rsplit_once('.')
-        .map(|(_, ext)| ext.to_ascii_uppercase())
+    filename.rsplit_once('.')
+            .map(|(_, ext)| ext.to_ascii_uppercase())
 }
 
 // Prefer the publisher name embedded directly on `attributes.publisher`
@@ -106,9 +100,9 @@ fn resolve_publisher(item: &OrderProductItem, publishers: &HashMap<String, Strin
 // `relationships.product` against the response's sideloaded `included` array
 // rather than embedding it directly on `attributes` — fall back to the
 // embedded field in case a future/legacy response shape does embed it inline.
-fn resolve_product_info<'a>(
-    item: &'a OrderProductItem, products: &'a HashMap<String, OrderProductInfo>,
-) -> Option<&'a OrderProductInfo> {
+fn resolve_product_info<'a>(item: &'a OrderProductItem,
+                            products: &'a HashMap<String, OrderProductInfo>)
+                            -> Option<&'a OrderProductInfo> {
     item.relationships
         .as_ref()
         .and_then(|r| r.product.as_ref())
@@ -122,13 +116,13 @@ fn resolve_product_info<'a>(
 // no pre-generated thumbnail exists for this product.
 fn resolve_cover_url(product_info: Option<&OrderProductInfo>) -> Option<String> {
     product_info.and_then(|p| {
-        p.thumbnail
-            .as_deref()
-            .or(p.thumbnail_100.as_deref())
-            .or(p.image.as_deref())
-            .or(p.web_image.as_deref())
-            .map(|path| format!("{DTRPG_IMAGES_BASE_URL}{path}"))
-    })
+                    p.thumbnail
+                     .as_deref()
+                     .or(p.thumbnail_100.as_deref())
+                     .or(p.image.as_deref())
+                     .or(p.web_image.as_deref())
+                     .map(|path| format!("{DTRPG_IMAGES_BASE_URL}{path}"))
+                })
 }
 
 // The detail panel (~480px wide) wants the largest available source so it
@@ -137,43 +131,43 @@ fn resolve_cover_url(product_info: Option<&OrderProductInfo>) -> Option<String> 
 // API never populated a full-size or WebP image for.
 fn resolve_detail_cover_url(product_info: Option<&OrderProductInfo>) -> Option<String> {
     product_info.and_then(|p| {
-        p.image
-            .as_deref()
-            .or(p.web_image.as_deref())
-            .or(p.thumbnail.as_deref())
-            .or(p.thumbnail_100.as_deref())
-            .map(|path| format!("{DTRPG_IMAGES_BASE_URL}{path}"))
-    })
+                    p.image
+                     .as_deref()
+                     .or(p.web_image.as_deref())
+                     .or(p.thumbnail.as_deref())
+                     .or(p.thumbnail_100.as_deref())
+                     .map(|path| format!("{DTRPG_IMAGES_BASE_URL}{path}"))
+                })
 }
 
 fn resolve_kind(attributes: &OrderProductAttributes) -> String {
-    attributes
-        .filters
-        .as_ref()
-        .and_then(|filters| filters.iter().find(|f| f.parent_filter_id == 0))
-        .map(|f| {
-            if f.parent_name.is_empty() {
-                f.name.clone()
-            } else {
-                f.parent_name.clone()
-            }
-        })
-        .unwrap_or_else(|| "Library item".to_string())
+    attributes.filters
+              .as_ref()
+              .and_then(|filters| filters.iter().find(|f| f.parent_filter_id == 0))
+              .map(|f| {
+                  if f.parent_name.is_empty() {
+                      f.name.clone()
+                  }
+                  else {
+                      f.parent_name.clone()
+                  }
+              })
+              .unwrap_or_else(|| "Library item".to_string())
 }
 
 // File `title` is the document's display name (e.g. "Player's Handbook"), not
 // a format type — derive the format from the file extension instead.
 fn resolve_format(files: &[OrderProductFile]) -> String {
-    let mut format_parts: Vec<String> = files
-        .iter()
-        .filter_map(|f| file_extension_label(&f.filename))
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
+    let mut format_parts: Vec<String> = files.iter()
+                                             .filter_map(|f| file_extension_label(&f.filename))
+                                             .collect::<HashSet<_>>()
+                                             .into_iter()
+                                             .collect();
     format_parts.sort();
     if format_parts.is_empty() {
         "PDF".to_string()
-    } else {
+    }
+    else {
         format_parts.join(" + ")
     }
 }
@@ -194,43 +188,39 @@ fn resolve_format(files: &[OrderProductFile]) -> String {
 // never merging two files with different titles.
 fn map_files(files: &[OrderProductFile]) -> Vec<LibraryItemFile> {
     let mut seen_files: HashSet<(u64, &str)> = HashSet::new();
-    files
-        .iter()
-        .filter(|f| seen_files.insert((f.order_product_download_id, f.title.as_str())))
-        .map(|f| LibraryItemFile {
-            id: f.order_product_download_id.to_string().into(),
-            index: f.index,
-            name: f.title.as_str().into(),
-            format: file_extension_label(&f.filename)
-                .unwrap_or_else(|| "FILE".to_string())
-                .into(),
-            size_mb: f.size as f64 / BYTES_PER_MB,
-            downloaded: false,
-                offloaded: false,
-        })
-        .collect()
+    files.iter()
+         .filter(|f| seen_files.insert((f.order_product_download_id, f.title.as_str())))
+         .map(|f| LibraryItemFile { id:         f.order_product_download_id.to_string().into(),
+                                    index:      f.index,
+                                    name:       f.title.as_str().into(),
+                                    format:
+                                        file_extension_label(&f.filename).unwrap_or_else(|| {
+                                                                             "FILE".to_string()
+                                                                         })
+                                                                         .into(),
+                                    size_mb:    f.size as f64 / BYTES_PER_MB,
+                                    downloaded: false,
+                                    offloaded:  false, })
+         .collect()
 }
 
 fn resolve_year(attributes: &OrderProductAttributes) -> u32 {
-    attributes
-        .file_last_modified
-        .as_deref()
-        .or(attributes.date_purchased.as_deref())
-        .and_then(|date| date.get(..4))
-        .and_then(|y| y.parse::<u32>().ok())
-        .unwrap_or(0)
+    attributes.file_last_modified
+              .as_deref()
+              .or(attributes.date_purchased.as_deref())
+              .and_then(|date| date.get(..4))
+              .and_then(|y| y.parse::<u32>().ok())
+              .unwrap_or(0)
 }
 
-pub(super) fn map_order_product(
-    item: &OrderProductItem, publishers: &HashMap<String, String>,
-    products: &HashMap<String, OrderProductInfo>, order: u32,
-) -> LibraryItem {
+pub(super) fn map_order_product(item: &OrderProductItem, publishers: &HashMap<String, String>,
+                                products: &HashMap<String, OrderProductInfo>, order: u32)
+                                -> LibraryItem {
     let attributes = &item.attributes;
 
-    let numeric_id = attributes
-        .order_product_id
-        .max(item.id.parse::<u64>().unwrap_or_default())
-        .max(attributes.product_id);
+    let numeric_id = attributes.order_product_id
+                               .max(item.id.parse::<u64>().unwrap_or_default())
+                               .max(attributes.product_id);
 
     let publisher = resolve_publisher(item, publishers);
     let product_info = resolve_product_info(item, products);
@@ -259,47 +249,42 @@ pub(super) fn map_order_product(
     // fallback: every ordered product belongs to an order, and the order's
     // creation date is at least as good a "when this entered the library"
     // signal as the purchase date.
-    let date_purchased_epoch = attributes
-        .date_purchased
-        .as_deref()
-        .or_else(|| {
-            attributes
-                .order
-                .as_ref()
-                .and_then(|o| o.date_created.as_deref())
-        })
-        .and_then(parse_rfc3339_to_epoch);
-    let file_last_modified_epoch = attributes
-        .file_last_modified
-        .as_deref()
-        .and_then(parse_rfc3339_to_epoch);
+    let date_purchased_epoch = attributes.date_purchased
+                                         .as_deref()
+                                         .or_else(|| {
+                                             attributes.order
+                                                       .as_ref()
+                                                       .and_then(|o| o.date_created.as_deref())
+                                         })
+                                         .and_then(parse_rfc3339_to_epoch);
+    let file_last_modified_epoch = attributes.file_last_modified
+                                             .as_deref()
+                                             .and_then(parse_rfc3339_to_epoch);
 
-    LibraryItem {
-        id: item.id.as_str().into(),
-        numeric_id,
-        order_product_id: attributes.order_product_id,
-        product_id: attributes.product_id,
-        title: attributes.name.as_str().into(),
-        publisher: publisher.as_str().into(),
-        line: "".into(),
-        kind: kind.as_str().into(),
-        format: format.as_str().into(),
-        pages: 0,
-        size_mb,
-        year,
-        added_order: order,
-        status: ItemStatus::Cloud,
-        color: DEFAULT_COLOR.into(),
-        desc: "".into(),
-        cover_url: cover_url.map(Into::into),
-        detail_cover_url: detail_cover_url.map(Into::into),
-        date_added: date_purchased_epoch,
-        date_updated: file_last_modified_epoch,
-        thumbnail_last_attempted: None,
-        is_available: true,
-        availability_last_checked: None,
-        files,
-    }
+    LibraryItem { id: item.id.as_str().into(),
+                  numeric_id,
+                  order_product_id: attributes.order_product_id,
+                  product_id: attributes.product_id,
+                  title: attributes.name.as_str().into(),
+                  publisher: publisher.as_str().into(),
+                  line: "".into(),
+                  kind: kind.as_str().into(),
+                  format: format.as_str().into(),
+                  pages: 0,
+                  size_mb,
+                  year,
+                  added_order: order,
+                  status: ItemStatus::Cloud,
+                  color: DEFAULT_COLOR.into(),
+                  desc: "".into(),
+                  cover_url: cover_url.map(Into::into),
+                  detail_cover_url: detail_cover_url.map(Into::into),
+                  date_added: date_purchased_epoch,
+                  date_updated: file_last_modified_epoch,
+                  thumbnail_last_attempted: None,
+                  is_available: true,
+                  availability_last_checked: None,
+                  files }
 }
 
 #[cfg(test)]
@@ -317,58 +302,46 @@ mod tests {
     use crate::services::{LibraryService, LibraryServiceError};
 
     struct FakeSdkGateway {
-        list_result: Result<OrderProductListResponse, LibraryServiceError>,
+        list_result:   Result<OrderProductListResponse, LibraryServiceError>,
         detail_result: Result<OrderProductItemResponse, LibraryServiceError>,
     }
 
     impl FakeSdkGateway {
         fn seeded_with(item: OrderProductItem) -> Self {
-            Self {
-                list_result: Ok(OrderProductListResponse {
-                    links: pagination_links(None),
-                    meta: PaginationMeta {
-                        items_per_page: 100,
-                        current_page: 1,
-                    },
-                    data: vec![item.clone()],
-                    included: Some(vec![IncludedItem {
-                        id: "/api/vBeta/publishers/7".to_string(),
-                        resource_type: "Publisher".to_string(),
-                        attributes: serde_json::json!({
-                            "name": "Lantern Press",
-                            "publisherId": 7,
-                            "slug": "lantern-press",
-                        }),
-                    }]),
-                }),
-                detail_result: Ok(OrderProductItemResponse {
-                    data: item,
-                    included: None,
-                }),
-            }
+            Self { list_result:
+                       Ok(OrderProductListResponse { links:    pagination_links(None),
+                                                     meta:     PaginationMeta { items_per_page: 100,
+                                                                                current_page:   1, },
+                                                     data:     vec![item.clone()],
+                                                     included: Some(vec![
+                    IncludedItem { id:            "/api/vBeta/publishers/7".to_string(),
+                                   resource_type: "Publisher".to_string(),
+                                   attributes:    serde_json::json!({
+                                       "name": "Lantern Press",
+                                       "publisherId": 7,
+                                       "slug": "lantern-press",
+                                   }), },
+                ]), }),
+                   detail_result: Ok(OrderProductItemResponse { data:     item,
+                                                                included: None, }), }
         }
     }
 
     impl SdkLibraryGateway for FakeSdkGateway {
-        fn list_order_products(
-            &self, _params: dtrpg_sdk::LibraryItemsParams,
-        ) -> Result<OrderProductListResponse, LibraryServiceError> {
+        fn list_order_products(&self, _params: dtrpg_sdk::LibraryItemsParams)
+                               -> Result<OrderProductListResponse, LibraryServiceError> {
             self.list_result.clone()
         }
 
-        fn get_order_product(
-            &self, _id: u64,
-        ) -> Result<OrderProductItemResponse, LibraryServiceError> {
+        fn get_order_product(&self, _id: u64)
+                             -> Result<OrderProductItemResponse, LibraryServiceError> {
             self.detail_result.clone()
         }
 
-        fn prepare_download(
-            &self, _order_product_id: u64, _index: u32,
-        ) -> Result<serde_json::Value, LibraryServiceError> {
-            Err(LibraryServiceError::new(
-                crate::services::LibraryServiceErrorKind::NotFound,
-                "not used",
-            ))
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            Err(LibraryServiceError::new(crate::services::LibraryServiceErrorKind::NotFound,
+                                         "not used"))
         }
     }
 
@@ -422,13 +395,11 @@ mod tests {
     }
 
     fn pagination_links(next: Option<String>) -> PaginationLinks {
-        PaginationLinks {
-            self_: "self".to_string(),
-            first: None,
-            last: None,
-            prev: None,
-            next,
-        }
+        PaginationLinks { self_: "self".to_string(),
+                          first: None,
+                          last: None,
+                          prev: None,
+                          next }
     }
 
     #[test]
@@ -450,10 +421,9 @@ mod tests {
         // all.
         let mut item = order_product_item(515_276, "The Wellspring");
         item.attributes.date_purchased = None;
-        item.attributes.order = Some(OrderProductOrder {
-            date_created: Some("2026-01-03T09:00:00Z".to_string()),
-            order_id: 900,
-        });
+        item.attributes.order =
+            Some(OrderProductOrder { date_created: Some("2026-01-03T09:00:00Z".to_string()),
+                                     order_id:     900, });
 
         let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
@@ -464,10 +434,9 @@ mod tests {
     #[test]
     fn map_order_product_prefers_date_purchased_over_order_date_created() {
         let mut item = order_product_item(515_276, "The Wellspring");
-        item.attributes.order = Some(OrderProductOrder {
-            date_created: Some("2020-01-01T00:00:00Z".to_string()),
-            order_id: 900,
-        });
+        item.attributes.order =
+            Some(OrderProductOrder { date_created: Some("2020-01-01T00:00:00Z".to_string()),
+                                     order_id:     900, });
 
         let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
@@ -507,11 +476,9 @@ mod tests {
         // Dates are surfaced as structured `date_added`/`date_updated` fields
         // and rendered by the detail panel as relative labels with an
         // absolute-date tooltip — never as raw text in `desc`.
-        assert!(
-            !mapped.desc.contains('T'),
-            "desc leaked a raw RFC3339 timestamp: {}",
-            mapped.desc
-        );
+        assert!(!mapped.desc.contains('T'),
+                "desc leaked a raw RFC3339 timestamp: {}",
+                mapped.desc);
         assert!(!mapped.desc.contains("2026-01"), "desc: {}", mapped.desc);
     }
 
@@ -521,15 +488,14 @@ mod tests {
         // File `title` is the document's display name, distinct from its
         // extension — the mapped format must come from the extension,
         // not this field.
-        item.attributes.files = vec![OrderProductFile {
-            index: 0,
-            order_product_download_id: 1234,
-            title: "The Wellspring".to_string(),
-            filename: "the-wellspring.epub".to_string(),
-            size: 1_048_576,
-            size_mb: "1.0".to_string(),
-            checksums: vec![],
-        }];
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.epub".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], }];
 
         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
         let items = service.list_items().expect("list items");
@@ -540,26 +506,21 @@ mod tests {
     #[test]
     fn map_order_product_joins_multiple_distinct_extensions() {
         let mut item = order_product_item(515_276, "The Wellspring");
-        item.attributes.files = vec![
-            OrderProductFile {
-                index: 0,
-                order_product_download_id: 1234,
-                title: "The Wellspring".to_string(),
-                filename: "the-wellspring.pdf".to_string(),
-                size: 1_048_576,
-                size_mb: "1.0".to_string(),
-                checksums: vec![],
-            },
-            OrderProductFile {
-                index: 1,
-                order_product_download_id: 1235,
-                title: "The Wellspring".to_string(),
-                filename: "the-wellspring.epub".to_string(),
-                size: 1_048_576,
-                size_mb: "1.0".to_string(),
-                checksums: vec![],
-            },
-        ];
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },
+                 OrderProductFile { index:                     1,
+                                    order_product_download_id: 1235,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.epub".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },];
 
         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
         let items = service.list_items().expect("list items");
@@ -570,26 +531,21 @@ mod tests {
     #[test]
     fn map_order_product_populates_per_item_files_for_multi_item_entries() {
         let mut item = order_product_item(515_276, "Moria");
-        item.attributes.files = vec![
-            OrderProductFile {
-                index: 0,
-                order_product_download_id: 1234,
-                title: "Moria Rulebook".to_string(),
-                filename: "moria-rulebook.pdf".to_string(),
-                size: 1_048_576,
-                size_mb: "1.0".to_string(),
-                checksums: vec![],
-            },
-            OrderProductFile {
-                index: 1,
-                order_product_download_id: 1235,
-                title: "Moria Map Sheet".to_string(),
-                filename: "moria-map.pdf".to_string(),
-                size: 524_288,
-                size_mb: "0.5".to_string(),
-                checksums: vec![],
-            },
-        ];
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "Moria Rulebook".to_string(),
+                                    filename:                  "moria-rulebook.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },
+                 OrderProductFile { index:                     1,
+                                    order_product_download_id: 1235,
+                                    title:                     "Moria Map Sheet".to_string(),
+                                    filename:                  "moria-map.pdf".to_string(),
+                                    size:                      524_288,
+                                    size_mb:                   "0.5".to_string(),
+                                    checksums:                 vec![], },];
 
         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
         let items = service.list_items().expect("list items");
@@ -604,29 +560,24 @@ mod tests {
     #[test]
     fn map_order_product_dedupes_repeated_download_ids() {
         let mut item = order_product_item(515_276, "The Wellspring");
-        item.attributes.files = vec![
-            OrderProductFile {
-                index: 0,
-                order_product_download_id: 1234,
-                title: "The Wellspring".to_string(),
-                filename: "the-wellspring.pdf".to_string(),
-                size: 1_048_576,
-                size_mb: "1.0".to_string(),
-                checksums: vec![],
-            },
-            // Same `orderProductDownloadId` as above — the API has been
-            // observed to repeat a download record; the mapper must not
-            // surface it as a second, distinct item.
-            OrderProductFile {
-                index: 1,
-                order_product_download_id: 1234,
-                title: "The Wellspring".to_string(),
-                filename: "the-wellspring.pdf".to_string(),
-                size: 1_048_576,
-                size_mb: "1.0".to_string(),
-                checksums: vec![],
-            },
-        ];
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },
+                 // Same `orderProductDownloadId` as above — the API has been
+                 // observed to repeat a download record; the mapper must not
+                 // surface it as a second, distinct item.
+                 OrderProductFile { index:                     1,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },];
 
         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
         let items = service.list_items().expect("list items");
@@ -643,26 +594,21 @@ mod tests {
         // would collapse this real 2-file bundle down to 1 and hide its
         // item-count badge in the catalog grid/list views.
         let mut item = order_product_item(515_276, "Moria");
-        item.attributes.files = vec![
-            OrderProductFile {
-                index: 0,
-                order_product_download_id: 1234,
-                title: "Moria Rulebook".to_string(),
-                filename: "moria-rulebook.pdf".to_string(),
-                size: 1_048_576,
-                size_mb: "1.0".to_string(),
-                checksums: vec![],
-            },
-            OrderProductFile {
-                index: 1,
-                order_product_download_id: 1234,
-                title: "Moria Map Sheet".to_string(),
-                filename: "moria-map.pdf".to_string(),
-                size: 524_288,
-                size_mb: "0.5".to_string(),
-                checksums: vec![],
-            },
-        ];
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "Moria Rulebook".to_string(),
+                                    filename:                  "moria-rulebook.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], },
+                 OrderProductFile { index:                     1,
+                                    order_product_download_id: 1234,
+                                    title:                     "Moria Map Sheet".to_string(),
+                                    filename:                  "moria-map.pdf".to_string(),
+                                    size:                      524_288,
+                                    size_mb:                   "0.5".to_string(),
+                                    checksums:                 vec![], },];
 
         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
         let items = service.list_items().expect("list items");
@@ -674,15 +620,14 @@ mod tests {
     #[test]
     fn map_order_product_single_file_is_not_multi_item() {
         let mut item = order_product_item(515_276, "The Wellspring");
-        item.attributes.files = vec![OrderProductFile {
-            index: 0,
-            order_product_download_id: 1234,
-            title: "The Wellspring".to_string(),
-            filename: "the-wellspring.pdf".to_string(),
-            size: 1_048_576,
-            size_mb: "1.0".to_string(),
-            checksums: vec![],
-        }];
+        item.attributes.files =
+            vec![OrderProductFile { index:                     0,
+                                    order_product_download_id: 1234,
+                                    title:                     "The Wellspring".to_string(),
+                                    filename:                  "the-wellspring.pdf".to_string(),
+                                    size:                      1_048_576,
+                                    size_mb:                   "1.0".to_string(),
+                                    checksums:                 vec![], }];
 
         let service = RustSdkLibraryService::new(Box::new(FakeSdkGateway::seeded_with(item)));
         let items = service.list_items().expect("list items");
@@ -716,38 +661,31 @@ mod tests {
         });
 
         let mut products = HashMap::new();
-        products.insert(
-            "/api/vBeta/products/515276".to_string(),
-            OrderProductInfo {
-                image: Some("4952/515276.jpg".to_string()),
-                web_image: Some("4952/515276.webp".to_string()),
-                thumbnail: Some("4952/515276-thumb140.jpg".to_string()),
-                thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
-                bundle_id: 0,
-                date_created: Some("2025-03-13T16:07:01-05:00".to_string()),
-                product_id: 515_276,
-                description: None,
-                filesize: Some(24.13),
-            },
-        );
+        products.insert("/api/vBeta/products/515276".to_string(),
+                        OrderProductInfo { image:         Some("4952/515276.jpg".to_string()),
+                                           web_image:     Some("4952/515276.webp".to_string()),
+                                           thumbnail:
+                                               Some("4952/515276-thumb140.jpg".to_string()),
+                                           thumbnail_100:
+                                               Some("4952/515276-thumb100.jpg".to_string()),
+                                           bundle_id:     0,
+                                           date_created:
+                                               Some("2025-03-13T16:07:01-05:00".to_string()),
+                                           product_id:    515_276,
+                                           description:   None,
+                                           filesize:      Some(24.13), });
 
         let mut publishers = HashMap::new();
-        publishers.insert(
-            "/api/vBeta/publishers/4952".to_string(),
-            "Monte Cook Games".to_string(),
-        );
+        publishers.insert("/api/vBeta/publishers/4952".to_string(),
+                          "Monte Cook Games".to_string());
 
         let mapped = map_order_product(&item, &publishers, &products, 0);
 
         assert_eq!(mapped.publisher.as_ref(), "Monte Cook Games");
-        assert_eq!(
-            mapped.cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg")
-        );
-        assert_eq!(
-            mapped.detail_cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276.jpg")
-        );
+        assert_eq!(mapped.cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg"));
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276.jpg"));
     }
 
     #[test]
@@ -757,88 +695,72 @@ mod tests {
         // resolve without a `relationships`/`included` sideload.
         let mut item = order_product_item(515_276, "The Wellspring");
         item.attributes.royalty_publisher_id = 4952;
-        item.attributes.publisher = Some(dtrpg_sdk::OrderProductPublisher {
-            name: "Monte Cook Games".to_string(),
-            publisher_id: 4952,
-            slug: "monte-cook-games".to_string(),
-        });
-        item.attributes.product = Some(OrderProductInfo {
-            image: Some("4952/515276.jpg".to_string()),
-            web_image: Some("4952/515276.webp".to_string()),
-            thumbnail: Some("4952/515276-thumb140.jpg".to_string()),
-            thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
-            bundle_id: 0,
-            date_created: Some("2025-03-13T16:07:01-05:00".to_string()),
-            product_id: 515_276,
-            description: None,
-            filesize: Some(24.13),
-        });
+        item.attributes.publisher =
+            Some(dtrpg_sdk::OrderProductPublisher { name:         "Monte Cook Games".to_string(),
+                                                    publisher_id: 4952,
+                                                    slug:         "monte-cook-games".to_string(), });
+        item.attributes.product =
+            Some(OrderProductInfo { image:         Some("4952/515276.jpg".to_string()),
+                                    web_image:     Some("4952/515276.webp".to_string()),
+                                    thumbnail:     Some("4952/515276-thumb140.jpg".to_string()),
+                                    thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
+                                    bundle_id:     0,
+                                    date_created:  Some("2025-03-13T16:07:01-05:00".to_string()),
+                                    product_id:    515_276,
+                                    description:   None,
+                                    filesize:      Some(24.13), });
 
         let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
         assert_eq!(mapped.publisher.as_ref(), "Monte Cook Games");
-        assert_eq!(
-            mapped.cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg")
-        );
-        assert_eq!(
-            mapped.detail_cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276.jpg")
-        );
+        assert_eq!(mapped.cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg"));
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276.jpg"));
     }
 
     #[test]
     fn map_order_product_detail_cover_url_prefers_web_image_over_thumbnail() {
         let mut item = order_product_item(515_276, "The Wellspring");
-        item.attributes.product = Some(OrderProductInfo {
-            image: None,
-            web_image: Some("4952/515276.webp".to_string()),
-            thumbnail: Some("4952/515276-thumb140.jpg".to_string()),
-            thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
-            bundle_id: 0,
-            date_created: Some("2025-03-13T16:07:01-05:00".to_string()),
-            product_id: 515_276,
-            description: None,
-            filesize: Some(24.13),
-        });
+        item.attributes.product =
+            Some(OrderProductInfo { image:         None,
+                                    web_image:     Some("4952/515276.webp".to_string()),
+                                    thumbnail:     Some("4952/515276-thumb140.jpg".to_string()),
+                                    thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
+                                    bundle_id:     0,
+                                    date_created:  Some("2025-03-13T16:07:01-05:00".to_string()),
+                                    product_id:    515_276,
+                                    description:   None,
+                                    filesize:      Some(24.13), });
 
         let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
-        assert_eq!(
-            mapped.detail_cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276.webp")
-        );
-        assert_eq!(
-            mapped.cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg")
-        );
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276.webp"));
+        assert_eq!(mapped.cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb140.jpg"));
     }
 
     #[test]
     fn map_order_product_detail_cover_url_falls_back_to_thumbnail_only() {
         let mut item = order_product_item(515_276, "The Wellspring");
-        item.attributes.product = Some(OrderProductInfo {
-            image: None,
-            web_image: None,
-            thumbnail: None,
-            thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
-            bundle_id: 0,
-            date_created: Some("2025-03-13T16:07:01-05:00".to_string()),
-            product_id: 515_276,
-            description: None,
-            filesize: Some(24.13),
-        });
+        item.attributes.product =
+            Some(OrderProductInfo { image:         None,
+                                    web_image:     None,
+                                    thumbnail:     None,
+                                    thumbnail_100: Some("4952/515276-thumb100.jpg".to_string()),
+                                    bundle_id:     0,
+                                    date_created:  Some("2025-03-13T16:07:01-05:00".to_string()),
+                                    product_id:    515_276,
+                                    description:   None,
+                                    filesize:      Some(24.13), });
 
         let mapped = map_order_product(&item, &HashMap::new(), &HashMap::new(), 0);
 
-        assert_eq!(
-            mapped.detail_cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276-thumb100.jpg")
-        );
-        assert_eq!(
-            mapped.cover_url.as_deref(),
-            Some("https://api.drivethrurpg.com/images/4952/515276-thumb100.jpg")
-        );
+        assert_eq!(mapped.detail_cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb100.jpg"));
+        assert_eq!(mapped.cover_url.as_deref(),
+                   Some("https://api.drivethrurpg.com/images/4952/515276-thumb100.jpg"));
     }
 
     #[test]
@@ -855,10 +777,8 @@ mod tests {
             order: None,
         });
         let mut publishers = HashMap::new();
-        publishers.insert(
-            "/api/vBeta/publishers/7".to_string(),
-            "Lantern Press".to_string(),
-        );
+        publishers.insert("/api/vBeta/publishers/7".to_string(),
+                          "Lantern Press".to_string());
 
         let mapped = map_order_product(&item, &publishers, &HashMap::new(), 0);
 
@@ -887,10 +807,8 @@ mod tests {
         });
 
         let mut publishers = HashMap::new();
-        publishers.insert(
-            "/api/vBeta/publishers/342".to_string(),
-            "RPGnet".to_string(),
-        );
+        publishers.insert("/api/vBeta/publishers/342".to_string(),
+                          "RPGnet".to_string());
 
         let mapped = map_order_product(&item, &publishers, &HashMap::new(), 0);
 
@@ -926,13 +844,13 @@ mod tests {
 
     #[test]
     fn last_page_from_links_returns_none_when_no_page_param() {
-        let links = PaginationLinks {
-            self_: "self".to_string(),
-            first: None,
-            last: Some("https://api.example.com/orders?pageSize=100".to_string()),
-            prev: None,
-            next: None,
-        };
+        let links =
+            PaginationLinks { self_: "self".to_string(),
+                              first: None,
+                              last:
+                                  Some("https://api.example.com/orders?pageSize=100".to_string()),
+                              prev:  None,
+                              next:  None, };
         assert_eq!(last_page_from_links(&links), None);
     }
 }

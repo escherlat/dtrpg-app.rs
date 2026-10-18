@@ -15,9 +15,8 @@ pub const RECENTLY_UPDATED_WINDOW_MIN_DAYS: u32 = 7;
 /// Upper bound for the "Recently Updated window" stepper, in days.
 pub const RECENTLY_UPDATED_WINDOW_MAX_DAYS: u32 = 90;
 
-pub const MONTH_ABBRS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+pub const MONTH_ABBRS: [&str; 12] =
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 pub const APP_NAME: &str = "dtrpg";
 

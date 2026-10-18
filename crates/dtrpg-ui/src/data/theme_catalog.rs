@@ -64,7 +64,7 @@ const BUILTIN_IDS: [&str; 6] = ["parchment", "slate", "sage", "ink", "moss", "ro
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserTheme {
     /// Theme id, matching the file stem.
-    pub id: String,
+    pub id:   String,
     /// Display name from the file's `name` field.
     pub name: String,
 }
@@ -162,11 +162,10 @@ fn label_with(id: &ThemeId, users: &[UserTheme]) -> String {
         "ink" => t!("theme.ink").to_string(),
         "moss" => t!("theme.moss").to_string(),
         "rosewood" => t!("theme.rosewood").to_string(),
-        other => users
-            .iter()
-            .find(|u| u.id == other)
-            .map(|u| u.name.clone())
-            .unwrap_or_else(|| other.to_string()),
+        other => users.iter()
+                      .find(|u| u.id == other)
+                      .map(|u| u.name.clone())
+                      .unwrap_or_else(|| other.to_string()),
     }
 }
 
@@ -177,7 +176,8 @@ fn label_with(id: &ThemeId, users: &[UserTheme]) -> String {
 /// built-in id (built-ins take precedence over a same-named user file).
 pub fn discover(dir: &Path) -> Vec<UserTheme> {
     let mut users = Vec::new();
-    let Ok(entries) = std::fs::read_dir(dir) else {
+    let Ok(entries) = std::fs::read_dir(dir)
+    else {
         return users;
     };
     for entry in entries.flatten() {
@@ -185,22 +185,23 @@ pub fn discover(dir: &Path) -> Vec<UserTheme> {
         if path.extension().and_then(|e| e.to_str()) != Some("toml") {
             continue;
         }
-        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+        let Some(id) = path.file_stem().and_then(|s| s.to_str())
+        else {
             continue;
         };
         if BUILTIN_IDS.contains(&id) {
             continue;
         }
-        let Ok(content) = std::fs::read_to_string(&path) else {
+        let Ok(content) = std::fs::read_to_string(&path)
+        else {
             continue;
         };
-        let Ok(parsed) = toml::from_str::<ThemeNameOnly>(&content) else {
+        let Ok(parsed) = toml::from_str::<ThemeNameOnly>(&content)
+        else {
             continue;
         };
-        users.push(UserTheme {
-            id: id.to_string(),
-            name: parsed.name,
-        });
+        users.push(UserTheme { id:   id.to_string(),
+                               name: parsed.name, });
     }
     users.sort_by(|a, b| a.id.cmp(&b.id));
     users
@@ -234,10 +235,8 @@ mod tests {
 
     #[test]
     fn resolve_with_accepts_user_ids_and_rejects_unknown() {
-        let users = vec![UserTheme {
-            id: "midnight".into(),
-            name: "Midnight".into(),
-        }];
+        let users = vec![UserTheme { id:   "midnight".into(),
+                                     name: "Midnight".into(), }];
         assert!(resolve_with("midnight", &users).is_some());
         assert!(resolve_with("absent", &users).is_none());
         // Built-ins resolve regardless of the user list.
@@ -246,14 +245,10 @@ mod tests {
 
     #[test]
     fn label_with_prefers_user_name_then_raw_id_fallback() {
-        let users = vec![UserTheme {
-            id: "midnight".into(),
-            name: "Midnight Rose".into(),
-        }];
-        assert_eq!(
-            label_with(&ThemeId::from("midnight"), &users),
-            "Midnight Rose"
-        );
+        let users = vec![UserTheme { id:   "midnight".into(),
+                                     name: "Midnight Rose".into(), }];
+        assert_eq!(label_with(&ThemeId::from("midnight"), &users),
+                   "Midnight Rose");
         // An id no longer known falls back to the raw id.
         assert_eq!(label_with(&ThemeId::from("gone"), &users), "gone");
         // A built-in resolves through i18n, not the user list.
@@ -263,30 +258,20 @@ mod tests {
     #[test]
     fn discover_reads_valid_themes_and_skips_the_rest() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("midnight.toml"),
-            "name = \"Midnight\"\nmode = \"dark\"\nsurface = \"#101010\"\n",
-        )
-        .unwrap();
+        std::fs::write(dir.path().join("midnight.toml"),
+                       "name = \"Midnight\"\nmode = \"dark\"\nsurface = \"#101010\"\n").unwrap();
         // A built-in id collision is skipped.
-        std::fs::write(
-            dir.path().join("parchment.toml"),
-            "name = \"Shadow Parchment\"\n",
-        )
-        .unwrap();
+        std::fs::write(dir.path().join("parchment.toml"),
+                       "name = \"Shadow Parchment\"\n").unwrap();
         // No name declared -> skipped.
         std::fs::write(dir.path().join("nameless.toml"), "mode = \"light\"\n").unwrap();
         // Not a theme file -> skipped.
         std::fs::write(dir.path().join("notes.txt"), "ignore me").unwrap();
 
         let found = discover(dir.path());
-        assert_eq!(
-            found,
-            vec![UserTheme {
-                id: "midnight".into(),
-                name: "Midnight".into(),
-            }]
-        );
+        assert_eq!(found,
+                   vec![UserTheme { id:   "midnight".into(),
+                                    name: "Midnight".into(), }]);
     }
 
     #[test]
