@@ -99,3 +99,44 @@ settings capability text, and title-bar platform behavior through
 `dtrpg_core::platform`; those views no longer contain platform-selection
 branches. Filesystem tag projection remains the dependent tags feature's
 responsibility, using the source-of-truth rule defined above.
+
+## Audit of the remaining `cfg(target_os)` blocks
+
+Completed 2026-10-18 (stage 4 of `libri-v2-architecture`, tasks 4.4 and 4.5).
+Every remaining block was checked for whether it is platform behavior, which
+belongs behind the trait, or a path or build constant, which does not.
+
+| Site | What it does | Decision |
+|---|---|---|
+| `dtrpg-core` `data/constants.rs`, `data/paths.rs` | Per-OS default directories | Stays: a constant, not behavior |
+| `dtrpg-core` `logging.rs` | Per-OS log directory | Stays: a path |
+| `dtrpg-core` `data/file_openers.rs` | Config file location (`%APPDATA%` or `~/.config`) | Stays: a path |
+| `dtrpg-ui` `util/symlink.rs` | `symlink` versus `symlink_file`, in one function | Stays: one standard-library call with a single caller path, isolated in a util and not in a view |
+| `dtrpg-ui` `util/datetime.rs` | Locale-aware date formatting through `objc2` on macOS | Stays: presentation formatting, and moving it would add an Objective-C dependency to `dtrpg-core` |
+
+None of these is a view, and none decides what the user is offered, so none
+needs a capability. The requirement that views contain no platform branches
+holds.
+
+## Per-OS verification
+
+Checked against the table above, the implementations differed from it in
+three places, now fixed:
+
+- **Windows file state** reported every existing file as local although
+  `Capabilities::file_state` is `true`. It now reads the recall and offline
+  attributes (`FileState::from_windows_attributes`).
+- **Windows reveal** treated `explorer`'s exit status 1 as a failure. Explorer
+  exits with 1 even when it opens the window, so only a failure to start it
+  is an error now.
+- **macOS file state** asked `mdls` for an `NSURL` key that `mdls` does not
+  expose, so it always answered local. It now reads the `SF_DATALESS` bit of
+  `st_flags` (`FileState::from_macos_flags`), and treats a missing file with a
+  hidden `.name.icloud` sibling as a placeholder, which is how iCloud Drive
+  offloaded files before macOS 14. This reads the file system directly, so no
+  `objc2` call is needed for file state; `NSURLUbiquitousItemDownloadingStatusKey`
+  in the table is the documented equivalent, not the mechanism.
+
+The decoding is pure and tested on every platform. Reading the real flags
+from a real offloaded file is not covered by an automated test, because CI
+cannot produce one.
