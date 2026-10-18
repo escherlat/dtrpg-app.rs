@@ -28,14 +28,6 @@ base64 = { workspace = true }
 fs4 = { version = "1.1.0", default-features = false, features = ["sync"] }
 reqwest = { workspace = true }
 rusqlite = { version = "0.40.0", default-features = false, features = ["bundled"] }
-tar.workspace = true
-flate2.workspace = true
-bzip2.workspace = true
-xz2.workspace = true
-zip.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true
 
 [features]
 # Enables Sentry crash/error reporting. Compiled in only for CI-built release

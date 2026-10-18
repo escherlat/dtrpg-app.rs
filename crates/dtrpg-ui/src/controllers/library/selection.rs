@@ -89,13 +89,13 @@ impl LibraryController {
     /// Emits [`LibraryChanged`].
     pub fn clear_item_selection(&mut self, entry_id: &str, cx: &mut Context<Self>) {
         let had_selection = self.selected_item_file.remove(entry_id).is_some();
-        let had_container_preview = self.container_preview
+        let had_zip_preview = self.zip_preview
                                   .as_ref()
                                   .is_some_and(|p| p.entry_id.as_ref() == entry_id);
-        if had_container_preview {
-            self.container_preview = None;
+        if had_zip_preview {
+            self.zip_preview = None;
         }
-        if had_selection || had_container_preview {
+        if had_selection || had_zip_preview {
             cx.emit(LibraryChanged);
         }
     }
