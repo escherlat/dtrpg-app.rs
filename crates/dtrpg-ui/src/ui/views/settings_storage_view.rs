@@ -434,7 +434,7 @@ fn render_storage_roots(roots: Vec<StorageRoot>, entity: Entity<SettingsControll
                     Button::new("add-storage-root")
                         .ghost()
                         .outline()
-                        .icon(IconName::Folder)
+                        .icon(IconName::Plus)
                         .tooltip(t!("settings.storage_add_root_tooltip").to_string())
                         .on_click({
                             let entity = entity.clone();
