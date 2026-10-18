@@ -10,6 +10,7 @@ use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
 use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use dtrpg_core::data::profile::ProfileConfig;
+use dtrpg_core::data::storage::placement::PlacementCondition;
 use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
 use dtrpg_core::data::storage::{StorageConfig, StorageError, validate_writable};
@@ -103,6 +104,8 @@ pub struct SettingsSnapshot {
     pub storage_roots:                  Vec<StorageRoot>,
     /// Ordered placement rules used for future downloads.
     pub storage_rules:                  Vec<PlacementRule>,
+    /// Input state for a new publisher placement rule.
+    pub publisher_rule_input:           Option<Entity<InputState>>,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -220,6 +223,7 @@ pub struct SettingsController {
     /// Input state for the "Max concurrent downloads" number field; set by
     /// the root view after creation.
     max_concurrent_downloads_input: Option<Entity<InputState>>,
+    publisher_rule_input:           Option<Entity<InputState>>,
     /// Font picker state for the Appearance page's body-font row; set by the
     /// root view after creation.
     body_font_select:               Option<FontSelectState>,
@@ -314,6 +318,7 @@ impl SettingsController {
                               focus_email_pending: false,
                               recently_updated_window_input: None,
                               max_concurrent_downloads_input: None,
+                              publisher_rule_input: None,
                               body_font_select: None,
                               value_font_select: None,
                               label_font_select: None,
@@ -356,6 +361,7 @@ impl SettingsController {
                focus_email_pending: false,
                recently_updated_window_input: None,
                max_concurrent_downloads_input: None,
+               publisher_rule_input: None,
                body_font_select: None,
                value_font_select: None,
                label_font_select: None,
@@ -387,6 +393,11 @@ impl SettingsController {
     /// created by the root view.
     pub fn set_max_concurrent_downloads_input(&mut self, input: Entity<InputState>) {
         self.max_concurrent_downloads_input = Some(input);
+    }
+
+    /// Attaches the publisher rule input state created by the root view.
+    pub fn set_publisher_rule_input(&mut self, input: Entity<InputState>) {
+        self.publisher_rule_input = Some(input);
     }
 
     /// Attaches the body-font picker state entity created by the root view.
@@ -537,6 +548,18 @@ impl SettingsController {
         else {
             self.storage.move_rule_up(index);
         }
+        cx.emit(SettingsChanged);
+    }
+
+    /// Adds a publisher rule targeting the most recently configured root.
+    pub fn add_publisher_rule(&mut self, publisher: String, cx: &mut Context<Self>) {
+        let publisher = publisher.trim();
+        if publisher.is_empty() {
+            return;
+        }
+        let target = self.storage.roots().last().map_or(0, |root| root.id);
+        self.storage
+            .add_rule(PlacementCondition::Publisher(publisher.to_owned()), target);
         cx.emit(SettingsChanged);
     }
 
@@ -938,6 +961,7 @@ impl SettingsController {
                            storage_root_path: self.storage.root_path(),
                            storage_roots: self.storage.roots(),
                            storage_rules: self.storage.rules().to_vec(),
+                           publisher_rule_input: self.publisher_rule_input.clone(),
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,

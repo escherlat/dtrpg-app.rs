@@ -42,7 +42,8 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                               max_concurrent_downloads: usize,
                               max_concurrent_downloads_input: Option<Entity<InputState>>,
                               create_collections: bool, storage_roots: Vec<StorageRoot>,
-                              storage_rules: Vec<PlacementRule>)
+                              storage_rules: Vec<PlacementRule>,
+                              publisher_rule_input: Option<Entity<InputState>>)
                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -198,18 +199,45 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
            .child(div().h(px(1.0)).bg(border))
            .child(render_storage_roots(storage_roots, entity.clone(), colors))
            .child(div().h(px(1.0)).bg(border))
-           .child(render_storage_rules(storage_rules, entity, colors))
+           .child(render_storage_rules(storage_rules, entity, colors, publisher_rule_input))
 }
 
 /// Renders saved placement rules in evaluation order. Rule creation is kept
 /// in the core configuration API; this view makes persisted rules visible and
 /// safely supports removing or reordering them.
 fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsController>,
-                        colors: &ColorTokens)
+                        colors: &ColorTokens, publisher_input: Option<Entity<InputState>>)
                         -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
+    let add_entity = entity.clone();
+    let add_row =
+        div().flex()
+             .items_center()
+             .gap(px(6.0))
+             .child(match publisher_input.clone() {
+                        Some(input) => Input::new(&input).into_any_element(),
+                        None => div().text_xs()
+                                     .text_color(text_secondary)
+                                     .child("Publisher")
+                                     .into_any_element(),
+                    })
+             .child(Button::new("add-publisher-rule").ghost()
+                                                     .outline()
+                                                     .child(t!("settings.storage_add_rule"))
+                                                     .on_click(move |_, _, cx| {
+                                                         let Some(input) = publisher_input.clone()
+                                                         else {
+                                                             return;
+                                                         };
+                                                         let publisher =
+                                                             input.read(cx).value().to_string();
+                                                         add_entity.update(cx, |ctrl, cx| {
+                                                             ctrl.add_publisher_rule(publisher, cx)
+                                                         });
+                                                     }));
+
     div().flex()
          .flex_col()
          .gap(px(8.0))
@@ -217,6 +245,7 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(text_primary)
                      .child(t!("settings.storage_rules_title")))
+         .child(add_row)
          .children(rules.into_iter().enumerate().map(|(index, rule)| {
              let entity_up = entity.clone();
              let entity_down = entity.clone();

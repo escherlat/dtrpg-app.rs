@@ -349,6 +349,11 @@ impl LibraryRootView {
                     ctrl.set_max_concurrent_downloads_input(max_concurrent_downloads_input)
                 });
 
+        let publisher_rule_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
+        settings.update(cx, |ctrl, _cx| {
+                    ctrl.set_publisher_rule_input(publisher_rule_input)
+                });
+
         // ── Appearance page font pickers ─────────────────────────────────────
         //
         // Built once here (like the inputs above) rather than in
