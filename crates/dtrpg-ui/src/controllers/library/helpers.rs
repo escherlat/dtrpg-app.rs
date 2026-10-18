@@ -273,18 +273,6 @@ pub(crate) fn filter_download_targets(catalog: &[LibraryItem], filter: &SidebarF
            .collect()
 }
 
-/// Removes the queued download for `(id, index)` from `queue`, if present.
-///
-/// Returns `true` if an entry was removed. Only the matching `(id, index)`
-/// pair is removed — other queued files for the same entry (different
-/// index) or for other entries are left untouched.
-pub(crate) fn dequeue_file(queue: &mut VecDeque<(Arc<str>, u32, String)>, id: &str, index: u32)
-                           -> bool {
-    let before = queue.len();
-    queue.retain(|(qid, qidx, _)| !(qid.as_ref() == id && *qidx == index));
-    queue.len() != before
-}
-
 /// Returns `true` if a user-requested full reload should be suppressed
 /// because the cache was written too recently, per
 /// `FORCE_RELOAD_COOLDOWN_SECS`.
@@ -389,26 +377,6 @@ pub(crate) fn apply_check_result(item: &mut LibraryItem,
         }
         Err(_) => {}
     }
-}
-
-/// Returns `true` if `id` should be pushed onto the check queue: not already
-/// queued and not already in flight.
-pub(crate) fn should_enqueue_check(check_queue: &VecDeque<Arc<str>>,
-                                   checking_items: &HashSet<Arc<str>>, id: &Arc<str>)
-                                   -> bool {
-    !checking_items.contains(id) && !check_queue.contains(id)
-}
-
-/// Returns how many more thumbnail fetches and/or file downloads can be
-/// dispatched without exceeding `max_concurrent_downloads`, given the current
-/// count of each already in flight.
-///
-/// Thumbnail and download slots share one aggregate limit, so this always
-/// checks their sum rather than either count individually.
-pub(crate) fn remaining_slots(max_concurrent_downloads: usize, active_thumbnail_fetches: usize,
-                              active_downloads: usize)
-                              -> usize {
-    max_concurrent_downloads.saturating_sub(active_thumbnail_fetches + active_downloads)
 }
 
 /// Returns `true` if a check-batch request (manual or automatic) should be

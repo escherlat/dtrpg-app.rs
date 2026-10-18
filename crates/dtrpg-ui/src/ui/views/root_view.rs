@@ -1298,7 +1298,7 @@ impl Render for LibraryRootView {
             })
             .on_action(move |_: &CheckItemAvailability, _, cx| {
                 controller_for_check_availability
-                    .update(cx, |ctrl, cx| ctrl.request_check_batch(cx));
+                    .update(cx, |ctrl, cx| ctrl.request_manual_check_batch(cx));
             })
             .on_action(move |_: &ViewAsList, _, cx| {
                 controller_for_view_list.update(cx, |ctrl, cx| {

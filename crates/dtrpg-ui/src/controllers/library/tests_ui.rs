@@ -85,12 +85,9 @@ mod item_row_selection_tests {
 
 #[cfg(test)]
 mod download_queue_tests {
-    use std::collections::VecDeque;
-    use std::sync::Arc;
-
     use dtrpg_core::data::library::LibraryItemFile;
 
-    use super::super::{dequeue_file, missing_file_indices};
+    use super::super::missing_file_indices;
 
     fn file(downloaded: bool) -> LibraryItemFile {
         LibraryItemFile { id: "f".into(),
@@ -121,42 +118,6 @@ mod download_queue_tests {
         let files = vec![file(true), file(true)];
 
         assert!(missing_file_indices(&files).is_empty());
-    }
-
-    #[test]
-    fn dequeue_file_removes_only_the_matching_entry() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> =
-            VecDeque::from([(Arc::from("entry-a"), 0, "File 0".to_string()),
-                            (Arc::from("entry-a"), 1, "File 1".to_string())]);
-
-        let removed = dequeue_file(&mut queue, "entry-a", 0);
-
-        assert!(removed);
-        assert_eq!(queue.len(), 1);
-        assert_eq!(queue[0].1, 1);
-    }
-
-    #[test]
-    fn dequeue_file_leaves_other_entries_untouched() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> =
-            VecDeque::from([(Arc::from("entry-a"), 0, "A".to_string()),
-                            (Arc::from("entry-b"), 0, "B".to_string())]);
-
-        dequeue_file(&mut queue, "entry-a", 0);
-
-        assert_eq!(queue.len(), 1);
-        assert_eq!(queue[0].0.as_ref(), "entry-b");
-    }
-
-    #[test]
-    fn dequeue_file_returns_false_when_nothing_matches() {
-        let mut queue: VecDeque<(Arc<str>, u32, String)> =
-            VecDeque::from([(Arc::from("entry-a"), 0, "A".to_string())]);
-
-        let removed = dequeue_file(&mut queue, "entry-a", 5);
-
-        assert!(!removed);
-        assert_eq!(queue.len(), 1);
     }
 }
 
