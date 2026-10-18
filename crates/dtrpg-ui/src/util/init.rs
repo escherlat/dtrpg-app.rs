@@ -27,6 +27,9 @@ use crate::ui::library::cover::CoverCache;
 /// Must be called before any view renders.
 pub fn init_globals(cx: &mut App) {
     i18n::init();
+    // Discovers user themes first so `initial_theme` can resolve a persisted
+    // user-theme id, and so the render path never reads the themes directory.
+    ThemeCatalog::refresh();
     cx.set_global(initial_theme(cx));
     cx.set_global(CoverCache::new());
     // `StorageConfig::load`/`UiPreferences::load`/`UiState::load` already

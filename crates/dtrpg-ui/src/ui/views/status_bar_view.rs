@@ -127,7 +127,7 @@ pub fn render_status_bar(snap: StatusBarSnapshot, entity: Entity<LibraryControll
                                                    theme = theme_label(&snap.theme_key)).to_string())
                                        .dropdown_menu(move |menu, _, _| {
                                            let mut m = menu;
-                                           for id in ThemeCatalog::builtins() {
+                                           for id in ThemeCatalog::all_ids() {
                                                let e = entity.clone();
                                                let lbl = theme_label(&id);
                                                let checked = id == snap.theme_key;

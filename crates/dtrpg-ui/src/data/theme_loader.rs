@@ -58,10 +58,12 @@ struct PaletteToml {
     scrim: Option<String>,
 }
 
-/// Loads a theme's colors from its embedded TOML file by id.
+/// Loads a theme's colors by id: a built-in id reads its embedded TOML, any
+/// other id reads `<themes_dir>/<id>.toml` (a user-authored theme, ADR-0005).
 ///
-/// An unknown id falls back to the compiled default (parchment), so a stale
-/// persisted selection never fails to produce a usable palette.
+/// An unknown, unreadable, or malformed id falls back to the compiled default
+/// (parchment), so a stale persisted selection never fails to produce a usable
+/// palette.
 pub fn load(id: &ThemeId) -> ColorTokens {
     let toml = match id.as_str() {
         "parchment" => include_str!("../../../../assets/themes/parchment.toml"),
@@ -70,21 +72,41 @@ pub fn load(id: &ThemeId) -> ColorTokens {
         "ink" => include_str!("../../../../assets/themes/ink.toml"),
         "moss" => include_str!("../../../../assets/themes/moss.toml"),
         "rosewood" => include_str!("../../../../assets/themes/rosewood.toml"),
-        _ => return compiled_default(id),
+        other => return load_user_theme(other).unwrap_or_else(|| compiled_default(id)),
     };
     parse_theme_toml(toml).unwrap_or_else(|_| compiled_default(id))
+}
+
+/// Reads a user theme file by id from the themes directory.
+///
+/// Returns `None` for an id containing path separators or `..` (a persisted
+/// id is never trusted as a filesystem path) or for an unreadable/invalid
+/// file.
+fn load_user_theme(id: &str) -> Option<ColorTokens> {
+    if id.contains(['/', '\\']) || id.is_empty() || id.contains("..") {
+        return None;
+    }
+    let path = dtrpg_core::data::paths::themes_dir().join(format!("{id}.toml"));
+    let content = std::fs::read_to_string(path).ok()?;
+    parse_theme_toml(&content).ok()
 }
 
 /// Loads a theme from an arbitrary TOML file.
 /// Returns None if parsing fails.
 pub fn load_from_path(path: &PathBuf) -> Option<ColorTokens> {
-    std::fs::read_to_string(path).ok().and_then(|s| parse_theme_toml(&s).ok())
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| parse_theme_toml(&s).ok())
 }
 
 fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
     let theme: ThemeToml = toml::from_str(s)?;
     let palette = theme.palette;
-    let mode = theme.mode.as_deref().and_then(|m| m.parse().ok()).unwrap_or(ThemeMode::Light);
+    let mode = theme
+        .mode
+        .as_deref()
+        .and_then(|m| m.parse().ok())
+        .unwrap_or(ThemeMode::Light);
     let semantic = semantic_colors(mode);
     let defaults = fallback_base(&theme.name, mode);
     let tokens = ColorTokens {
@@ -92,13 +114,18 @@ fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
         surface: parse_hex_opt(palette.surface.as_deref()).unwrap_or(defaults.surface),
         surface_alt: parse_hex_opt(palette.surface_alt.as_deref()).unwrap_or(defaults.surface_alt),
         hover: parse_hex_opt(palette.hover.as_deref()).unwrap_or(defaults.hover),
-        text_primary: parse_hex_opt(palette.text_primary.as_deref()).unwrap_or(defaults.text_primary),
-        text_secondary: parse_hex_opt(palette.text_secondary.as_deref()).unwrap_or(defaults.text_secondary),
-        text_tertiary: parse_hex_opt(palette.text_tertiary.as_deref()).unwrap_or(defaults.text_tertiary),
+        text_primary: parse_hex_opt(palette.text_primary.as_deref())
+            .unwrap_or(defaults.text_primary),
+        text_secondary: parse_hex_opt(palette.text_secondary.as_deref())
+            .unwrap_or(defaults.text_secondary),
+        text_tertiary: parse_hex_opt(palette.text_tertiary.as_deref())
+            .unwrap_or(defaults.text_tertiary),
         border: parse_hex_opt(palette.border.as_deref()).unwrap_or(defaults.border),
-        border_strong: parse_hex_opt(palette.border_strong.as_deref()).unwrap_or(defaults.border_strong),
+        border_strong: parse_hex_opt(palette.border_strong.as_deref())
+            .unwrap_or(defaults.border_strong),
         accent: parse_hex_opt(palette.accent.as_deref()).unwrap_or(defaults.accent),
-        accent_soft: parse_hex_alpha_opt(palette.accent_soft.as_deref()).unwrap_or(defaults.accent_soft),
+        accent_soft: parse_hex_alpha_opt(palette.accent_soft.as_deref())
+            .unwrap_or(defaults.accent_soft),
         accent_on: parse_hex_opt(palette.accent_on.as_deref()).unwrap_or(defaults.accent_on),
         shadow: parse_hex_alpha_opt(palette.shadow.as_deref()).unwrap_or(defaults.shadow),
         scrim: parse_hex_alpha_opt(palette.scrim.as_deref()).unwrap_or(defaults.scrim),
@@ -130,7 +157,7 @@ fn parse_hex(s: &str) -> Option<Hsla> {
         let r = u8::from_str_radix(&s[0..1], 16).ok()?;
         let g = u8::from_str_radix(&s[1..2], 16).ok()?;
         let b = u8::from_str_radix(&s[2..3], 16).ok()?;
-        Some(hex(r*17, g*17, b*17))
+        Some(hex(r * 17, g * 17, b * 17))
     } else {
         None
     }
@@ -237,6 +264,27 @@ mod tests {
     }
 
     #[test]
+    fn unknown_user_id_falls_back_to_parchment() {
+        let loaded = super::load(&ThemeId::from("no-such-theme"));
+        assert_eq!(
+            loaded.surface,
+            crate::data::theme::parchment_colors().surface
+        );
+    }
+
+    #[test]
+    fn traversal_ids_never_reach_the_filesystem() {
+        // A crafted persisted id must not escape the themes directory; both
+        // resolve to the parchment fallback rather than reading arbitrary files.
+        for id in ["../secrets", "..", "a/b", "a\\b", ""] {
+            assert!(
+                super::load_user_theme(id).is_none(),
+                "id {id:?} must be rejected"
+            );
+        }
+    }
+
+    #[test]
     fn builtin_toml_matches_compiled_defaults() {
         for id in ["parchment", "slate", "sage", "ink", "moss", "rosewood"] {
             let key = ThemeId::from(id);
@@ -248,10 +296,22 @@ mod tests {
                 ("surface_alt", loaded.surface_alt, compiled.surface_alt),
                 ("hover", loaded.hover, compiled.hover),
                 ("text_primary", loaded.text_primary, compiled.text_primary),
-                ("text_secondary", loaded.text_secondary, compiled.text_secondary),
-                ("text_tertiary", loaded.text_tertiary, compiled.text_tertiary),
+                (
+                    "text_secondary",
+                    loaded.text_secondary,
+                    compiled.text_secondary,
+                ),
+                (
+                    "text_tertiary",
+                    loaded.text_tertiary,
+                    compiled.text_tertiary,
+                ),
                 ("border", loaded.border, compiled.border),
-                ("border_strong", loaded.border_strong, compiled.border_strong),
+                (
+                    "border_strong",
+                    loaded.border_strong,
+                    compiled.border_strong,
+                ),
                 ("accent", loaded.accent, compiled.accent),
                 ("accent_soft", loaded.accent_soft, compiled.accent_soft),
                 ("accent_on", loaded.accent_on, compiled.accent_on),

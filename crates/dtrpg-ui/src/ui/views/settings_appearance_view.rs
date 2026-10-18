@@ -206,7 +206,7 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
                                                       .label(theme_label(&theme_id))
                                                       .dropdown_menu(move |menu, _, _| {
                                                           let mut m = menu;
-                                                          for id in ThemeCatalog::builtins() {
+                                                          for id in ThemeCatalog::all_ids() {
                                                               let e = entity_theme.clone();
                                                               let lbl = theme_label(&id);
                                                               let checked = id == theme_id;
