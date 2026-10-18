@@ -2,6 +2,8 @@
 
 use super::*;
 
+use crate::data::theme_catalog::ThemeId;
+
 impl LibraryController {
     /// Returns distinct publisher names currently present in the catalog for
     /// placement-rule auto-completion.
@@ -27,22 +29,22 @@ impl LibraryController {
     /// popovers, scrollbars, the sidebar, and the catalog `DataTable` all
     /// track the newly selected Libri palette instead of staying on whichever
     /// palette was active at startup.
-    pub fn set_theme(&self, key: ThemeKey, cx: &mut Context<Self>) {
+    pub fn set_theme(&self, id: ThemeId, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
-        let new_theme = LibriTheme::new(key, current.density, current.fonts.clone());
+        let new_theme = LibriTheme::new(id.clone(), current.density, current.fonts.clone());
         let colors = new_theme.colors.clone();
         cx.set_global(new_theme);
         cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
               apply_theme_colors(theme, &colors);
           });
-        dtrpg_core::data::ui_preferences::UiPreferences::load().save_theme_key(key.as_str());
+        dtrpg_core::data::ui_preferences::UiPreferences::load().save_theme_key(id.as_str());
         cx.notify();
     }
 
     /// Applies a new density (updates the GPUI global).
     pub fn set_density(&self, density: Density, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
-        let new_theme = LibriTheme::new(current.key, density, current.fonts.clone());
+        let new_theme = LibriTheme::new(current.id.clone(), density, current.fonts.clone());
         cx.set_global(new_theme);
         cx.notify();
     }
@@ -66,7 +68,7 @@ impl LibraryController {
         let current = cx.global::<LibriTheme>();
         let mut fonts = current.fonts.clone();
         fonts.body_font = font.clone();
-        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
         cx.set_global(new_theme);
         cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
               theme.font_family = font.clone();
@@ -82,7 +84,7 @@ impl LibraryController {
         let current = cx.global::<LibriTheme>();
         let mut fonts = current.fonts.clone();
         fonts.value_font = font.clone();
-        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
         cx.set_global(new_theme);
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_value_font_name(&font);
         cx.notify();
@@ -95,7 +97,7 @@ impl LibraryController {
         let current = cx.global::<LibriTheme>();
         let mut fonts = current.fonts.clone();
         fonts.label_font = font.clone();
-        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
         cx.set_global(new_theme);
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_label_font_name(&font);
         cx.notify();
@@ -108,7 +110,7 @@ impl LibraryController {
         let current = cx.global::<LibriTheme>();
         let mut fonts = current.fonts.clone();
         fonts.mono_font = font.clone();
-        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
         cx.set_global(new_theme);
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_mono_font_name(&font);
         cx.notify();
@@ -123,7 +125,7 @@ impl LibraryController {
         let current = cx.global::<LibriTheme>();
         let mut fonts = current.fonts.clone();
         fonts.ui_text_size = size;
-        let new_theme = LibriTheme::new(current.key, current.density, fonts);
+        let new_theme = LibriTheme::new(current.id.clone(), current.density, fonts);
         cx.set_global(new_theme);
         // Persisted as the scale multiplier shown in Settings > Appearance
         // (e.g. 1.1), not the derived absolute pixel size, so the file's

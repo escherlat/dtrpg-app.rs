@@ -7,6 +7,8 @@ use dtrpg_core::data::constants::{
 };
 use gpui::{Hsla, Pixels, SharedString, px}; // Pixels kept for GPUI layout fields
 
+use crate::data::theme_catalog::ThemeId;
+
 // ── Color tokens
 // ──────────────────────────────────────────────────────────────
 
@@ -179,52 +181,6 @@ impl DensityConstants {
     }
 }
 
-// ── Theme key
-// ─────────────────────────────────────────────────────────────────
-
-/// Identifies one of the six named themes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ThemeKey {
-    #[default]
-    Parchment,
-    Slate,
-    Sage,
-    Ink,
-    Moss,
-    Rosewood,
-}
-
-impl ThemeKey {
-    /// Stable, lowercase identifier used for persistence — independent of the
-    /// enum variant name so a future rename doesn't silently invalidate saved
-    /// preferences.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            ThemeKey::Parchment => "parchment",
-            ThemeKey::Slate => "slate",
-            ThemeKey::Sage => "sage",
-            ThemeKey::Ink => "ink",
-            ThemeKey::Moss => "moss",
-            ThemeKey::Rosewood => "rosewood",
-        }
-    }
-
-    /// Resolves a persisted key back to a `ThemeKey`, or `None` if it doesn't
-    /// match any known theme (e.g. a prefs file from a version with fewer
-    /// themes, or written after this one removes one).
-    pub fn from_persisted_key(key: &str) -> Option<Self> {
-        match key {
-            "parchment" => Some(ThemeKey::Parchment),
-            "slate" => Some(ThemeKey::Slate),
-            "sage" => Some(ThemeKey::Sage),
-            "ink" => Some(ThemeKey::Ink),
-            "moss" => Some(ThemeKey::Moss),
-            "rosewood" => Some(ThemeKey::Rosewood),
-            _ => None,
-        }
-    }
-}
-
 // ── LibriTheme
 // ────────────────────────────────────────────────────────────────
 
@@ -270,7 +226,8 @@ impl Default for FontSelections {
 /// font selections.
 #[derive(Debug, Clone)]
 pub struct LibriTheme {
-    pub key:               ThemeKey,
+    /// Stable id of the active theme (see [`ThemeId`]).
+    pub id:                ThemeId,
     pub colors:            ColorTokens,
     pub density:           Density,
     pub density_constants: DensityConstants,
@@ -280,14 +237,14 @@ pub struct LibriTheme {
 impl gpui::Global for LibriTheme {}
 
 impl LibriTheme {
-    /// Constructs the theme for `key`, `density`, and `fonts`.
-    pub fn new(key: ThemeKey, density: Density, fonts: FontSelections) -> Self {
-        let colors = crate::data::theme_loader::load_builtin(key);
+    /// Constructs the theme for `id`, `density`, and `fonts`.
+    pub fn new(id: ThemeId, density: Density, fonts: FontSelections) -> Self {
+        let colors = crate::data::theme_loader::load(&id);
         let density_constants = match density {
             Density::Comfortable => DensityConstants::comfortable(),
             Density::Compact => DensityConstants::compact(),
         };
-        Self { key,
+        Self { id,
                colors,
                density,
                density_constants,
@@ -296,7 +253,7 @@ impl LibriTheme {
 
     /// Returns the default theme (parchment, comfortable, default fonts).
     pub fn default_theme() -> Self {
-        Self::new(ThemeKey::Parchment,
+        Self::new(ThemeId::default(),
                   Density::Comfortable,
                   FontSelections::default())
     }
