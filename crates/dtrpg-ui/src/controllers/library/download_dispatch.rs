@@ -160,6 +160,9 @@ impl LibraryController {
         // `reconcile_catalog` does (see `catalog-live-data-swap`).
         if succeeded {
             self.save_catalog_in_background(cx);
+            if let Some(dest) = dest.clone() {
+                self.project_tags_after_download(&item_id, dest, cx);
+            }
         }
 
         let activity_id = job.activity_id;

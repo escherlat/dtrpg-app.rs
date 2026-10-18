@@ -12,8 +12,9 @@
 //! through [`project_item_tags`] instead.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use crate::data::index::{IndexError, LibraryIndex};
 use crate::platform::PlatformIntegration;
 
 /// A downloaded file and the item it belongs to.
@@ -94,6 +95,43 @@ pub fn reconcile_file_tags<P>(platform: &P, tags_by_item: &HashMap<String, Vec<S
         }
     }
     report
+}
+
+/// Reads every item's tags from the library index under `index_root`, then
+/// runs [`reconcile_file_tags`] over `files`.
+///
+/// # Errors
+///
+/// Returns [`IndexError`] if the index cannot be opened or read. Nothing is
+/// written to any file in that case.
+pub fn reconcile_with_index<P>(platform: &P, index_root: &Path, files: &[TaggedFile])
+                               -> Result<ReconcileReport, IndexError>
+    where P: PlatformIntegration + ?Sized {
+    if !platform.capabilities().filesystem_tags {
+        return Ok(ReconcileReport::default());
+    }
+    let tags_by_item = LibraryIndex::open_and_migrate(index_root)?.all_item_tags()?;
+    Ok(reconcile_file_tags(platform, &tags_by_item, files))
+}
+
+/// Writes the tags the library index holds for `item_id` onto `paths`, for a
+/// file that has just been downloaded, and returns the files it could not
+/// write. An item with no tags leaves its files alone.
+///
+/// # Errors
+///
+/// Returns [`IndexError`] if the index cannot be opened or read.
+pub fn project_indexed_tags<P>(platform: &P, index_root: &Path, item_id: &str, paths: &[PathBuf])
+                               -> Result<Vec<ProjectionFailure>, IndexError>
+    where P: PlatformIntegration + ?Sized {
+    if !platform.capabilities().filesystem_tags {
+        return Ok(Vec::new());
+    }
+    let tags = LibraryIndex::open_and_migrate(index_root)?.tags_for_item(item_id)?;
+    if tags.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(project_item_tags(platform, &tags, paths))
 }
 
 /// Makes the tags of each of `paths` exactly `tags`, and returns the files that

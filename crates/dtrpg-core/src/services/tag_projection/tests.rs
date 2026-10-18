@@ -268,3 +268,145 @@ fn projecting_does_nothing_where_the_platform_keeps_no_tags_on_files() {
     assert!(failures.is_empty());
     assert_eq!(platform.write_count(), 0);
 }
+
+#[test]
+fn reconciling_with_the_index_reads_the_tags_from_it() {
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::LibraryItem;
+
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let mut index = LibraryIndex::open_and_migrate(dir.path()).unwrap();
+        index.replace_all_items(&[LibraryItem::new("a",
+                                                   "Title",
+                                                   "Publisher",
+                                                   "",
+                                                   "Core",
+                                                   "PDF",
+                                                   100,
+                                                   10.0,
+                                                   2024,
+                                                   0,
+                                                   ItemStatus::Downloaded,
+                                                   "#1C2A44",
+                                                   "A game.",
+                                                   None)])
+             .unwrap();
+        index.add_tag("a", "solo").unwrap();
+    }
+    let platform = InMemory::new(true);
+
+    let report = reconcile_with_index(&platform, dir.path(), &[file("a", "/a/one.pdf")]).unwrap();
+
+    assert_eq!(report.restored.len(), 1);
+    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo"]);
+}
+
+#[test]
+fn reconciling_with_the_index_does_not_open_it_where_tags_are_not_kept_on_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let platform = InMemory::new(false);
+
+    let report = reconcile_with_index(&platform, dir.path(), &[file("a", "/a/one.pdf")]).unwrap();
+
+    assert_eq!(report, ReconcileReport::default());
+    assert!(!dir.path().join("library_index.sqlite3").exists());
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn a_real_file_gets_the_tags_the_index_holds() {
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::LibraryItem;
+    use crate::platform::Platform;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut index = LibraryIndex::open_and_migrate(dir.path()).unwrap();
+    index.replace_all_items(&[LibraryItem::new("a",
+                                               "Title",
+                                               "Publisher",
+                                               "",
+                                               "Core",
+                                               "PDF",
+                                               100,
+                                               10.0,
+                                               2024,
+                                               0,
+                                               ItemStatus::Downloaded,
+                                               "#1C2A44",
+                                               "A game.",
+                                               None)])
+         .unwrap();
+    index.add_tag("a", "solo").unwrap();
+    index.add_tag("a", "to run").unwrap();
+    let path = dir.path().join("book.pdf");
+    std::fs::write(&path, b"data").unwrap();
+    Platform.write_tags(&path, &strings(&["stray"])).unwrap();
+    let files = [TaggedFile { item_id: "a".to_owned(),
+                              path:    path.clone(), }];
+
+    let report = reconcile_with_index(&Platform, dir.path(), &files).unwrap();
+
+    assert_eq!(report.restored, std::slice::from_ref(&path));
+    assert_eq!(Platform.read_tags(&path).unwrap(), ["solo", "to run"]);
+}
+
+fn index_with_one_item(dir: &Path) -> LibraryIndex {
+    use crate::data::enums::ItemStatus;
+    use crate::data::library::LibraryItem;
+
+    let mut index = LibraryIndex::open_and_migrate(dir).unwrap();
+    index.replace_all_items(&[LibraryItem::new("a",
+                                               "Title",
+                                               "Publisher",
+                                               "",
+                                               "Core",
+                                               "PDF",
+                                               100,
+                                               10.0,
+                                               2024,
+                                               0,
+                                               ItemStatus::Downloaded,
+                                               "#1C2A44",
+                                               "A game.",
+                                               None)])
+         .unwrap();
+    index
+}
+
+#[test]
+fn a_downloaded_file_gets_the_tags_its_item_has() {
+    let dir = tempfile::tempdir().unwrap();
+    index_with_one_item(dir.path()).add_tag("a", "solo")
+                                   .unwrap();
+    let platform = InMemory::new(true);
+
+    let failures =
+        project_indexed_tags(&platform, dir.path(), "a", &[PathBuf::from("/a/one.pdf")]).unwrap();
+
+    assert!(failures.is_empty());
+    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo"]);
+}
+
+#[test]
+fn a_downloaded_file_of_an_untagged_item_is_not_written() {
+    let dir = tempfile::tempdir().unwrap();
+    index_with_one_item(dir.path());
+    let platform = InMemory::new(true);
+
+    project_indexed_tags(&platform, dir.path(), "a", &[PathBuf::from("/a/one.pdf")]).unwrap();
+
+    assert_eq!(platform.write_count(), 0);
+}
+
+#[test]
+fn a_downloaded_file_is_not_written_where_the_platform_keeps_no_tags_on_files() {
+    let dir = tempfile::tempdir().unwrap();
+    index_with_one_item(dir.path()).add_tag("a", "solo")
+                                   .unwrap();
+    let platform = InMemory::new(false);
+
+    project_indexed_tags(&platform, dir.path(), "a", &[PathBuf::from("/a/one.pdf")]).unwrap();
+
+    assert_eq!(platform.write_count(), 0);
+}

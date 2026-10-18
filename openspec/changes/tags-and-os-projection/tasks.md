@@ -32,12 +32,19 @@ The comparison and rewriting are `dtrpg_core::services::tag_projection` (`reconc
 `project_item_tags` for a change or a finished download). They take the platform as a parameter and are tested
 against one kept in memory. The launch pass leaves a file alone when its item has no tags in the index, so tags
 the user set in Finder before using Libri's are not wiped on first launch; removing an item's last tag in Libri
-clears its files through `project_item_tags`. Wiring them into the app (3.1, 3.3, 3.4) is the next slice.
+clears its files through `project_item_tags`.
 
-- [ ] 3.1 On launch, in the background, compare each downloaded file with the index and rewrite the differences
+In the app, the launch pass runs once, in the background, after the first full catalog load and the verification of
+downloads that follows it (`LibraryController`, `file_tags.rs`); a partial page does not trigger it. It reports a
+count in the activity panel, as "Tags restored from your library (files: N)" (the wording avoids a plural), an error
+entry when files could not be written, and logs each file. A finished download gets its item's tags in the
+background. Not covered by an automated test: a download actually writing tags (the scripted library does not
+create the file), and the panel entries appearing after a real launch.
+
+- [x] 3.1 On launch, in the background, compare each downloaded file with the index and rewrite the differences
 - [x] 3.2 Skip and log files that cannot be written; never fail the launch
-- [ ] 3.3 Report the number of restored files in the activity panel
-- [ ] 3.4 Project an item's tags when one of its files finishes downloading
+- [x] 3.3 Report the number of restored files in the activity panel
+- [x] 3.4 Project an item's tags when one of its files finishes downloading
 
 ## 4. UI
 
