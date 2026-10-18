@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use dtrpg_core::data::enums::ItemStatus;
 use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
+use dtrpg_core::util::container::ContainerEntry;
 
 /// Inspector sections shown by the v2 detail surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -12,7 +13,16 @@ pub enum InspectorTab {
     Overview,
     Files,
     Collections,
+    Contents,
     Summary,
+}
+
+/// State of the lazily loaded archive contents tab.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InspectorContentsState {
+    Unavailable,
+    Loading,
+    Loaded(Vec<ContainerEntry>),
 }
 
 /// Presentation data for one file in the inspector.

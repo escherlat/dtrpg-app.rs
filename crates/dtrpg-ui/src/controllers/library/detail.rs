@@ -18,6 +18,53 @@ impl LibraryController {
         self.inspector_tabs.insert(entry_id, tab);
         cx.emit(LibraryChanged);
     }
+    /// Returns the current archive contents state for `entry_id`.
+    #[must_use]
+    pub fn inspector_contents_for(&self, entry_id: &str) -> InspectorContentsState {
+        self.inspector_contents
+            .get(entry_id)
+            .cloned()
+            .unwrap_or(InspectorContentsState::Unavailable)
+    }
+
+    /// Loads the first container file for an entry off the render path.
+    pub fn load_inspector_contents(&mut self, entry_id: Arc<str>, cx: &mut Context<Self>) {
+        if matches!(self.inspector_contents.get(&entry_id), Some(InspectorContentsState::Loading)) {
+            return;
+        }
+        let Some(item) = self.item_by_id(&entry_id).cloned()
+        else {
+            return;
+        };
+        let Some(file) = item.files.iter().find(|file| {
+            matches!(file.format.to_ascii_uppercase().as_str(),
+                     "ZIP" | "TAR" | "TAR.GZ" | "TGZ" | "TAR.BZ2" | "TBZ2" | "TAR.XZ" | "TXZ")
+        })
+        else {
+            self.inspector_contents.insert(entry_id, InspectorContentsState::Unavailable);
+            cx.emit(LibraryChanged);
+            return;
+        };
+        let path = resolved_item_dir(&StorageConfig::load(), &item).join(file.name.as_ref());
+        self.inspector_contents.insert(Arc::clone(&entry_id), InspectorContentsState::Loading);
+        cx.emit(LibraryChanged);
+        cx.spawn(async move |this, async_cx| {
+              let result = async_cx.background_executor()
+                                   .spawn(async move { dtrpg_core::util::container::list_entries(&path) })
+                                   .await;
+              this.update(async_cx, |controller, cx| {
+                     let state = match result {
+                         Ok(entries) => InspectorContentsState::Loaded(entries),
+                         Err(_) => InspectorContentsState::Unavailable,
+                     };
+                     controller.inspector_contents.insert(entry_id, state);
+                     cx.emit(LibraryChanged);
+                 })
+                 .ok();
+          })
+          .detach();
+    }
+
     // ── Zip content preview (item tier) ──────────────────────────────────────
 
     /// Returns the active Zip preview's file row and anchor position for

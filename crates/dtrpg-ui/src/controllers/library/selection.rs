@@ -90,13 +90,14 @@ impl LibraryController {
     pub fn clear_item_selection(&mut self, entry_id: &str, cx: &mut Context<Self>) {
         let had_selection = self.selected_item_file.remove(entry_id).is_some();
         let had_inspector_tab = self.inspector_tabs.remove(entry_id).is_some();
+        let had_inspector_contents = self.inspector_contents.remove(entry_id).is_some();
         let had_zip_preview = self.zip_preview
                                   .as_ref()
                                   .is_some_and(|p| p.entry_id.as_ref() == entry_id);
         if had_zip_preview {
             self.zip_preview = None;
         }
-        if had_selection || had_inspector_tab || had_zip_preview {
+        if had_selection || had_inspector_tab || had_inspector_contents || had_zip_preview {
             cx.emit(LibraryChanged);
         }
     }
