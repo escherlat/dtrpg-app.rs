@@ -1,6 +1,7 @@
 //! Service traits, error types, and SDK-backed implementations for library
 //! and collections data access.
 
+pub mod avatar;
 pub mod collections;
 pub mod covers;
 pub mod login;
