@@ -15,6 +15,16 @@ library index.
 - **WHEN** the user adds "Solo" to an item that already has "solo"
 - **THEN** the item SHALL have one tag, not two
 
+#### Scenario: A tag that cannot be written to a file is rejected
+
+- **WHEN** the user adds a tag that is empty, longer than 64 characters, or contains a comma
+- **THEN** the tag SHALL be rejected with a message, and the item SHALL be unchanged
+
+#### Scenario: Tags survive a catalog refresh
+
+- **WHEN** the library catalog is refreshed from the server
+- **THEN** every item still in the catalog SHALL keep its tags
+
 #### Scenario: Removing a tag
 
 - **WHEN** the user removes a tag from an item

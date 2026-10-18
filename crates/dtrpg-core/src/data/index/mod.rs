@@ -10,6 +10,7 @@ mod collections;
 mod items;
 mod migrate;
 mod schema;
+mod tags;
 
 use std::path::Path;
 
@@ -26,6 +27,17 @@ pub enum IndexError {
     /// The underlying SQLite operation failed.
     #[error("library index error: {0}")]
     Sqlite(#[from] rusqlite::Error),
+    /// A tag could not be stored as given.
+    #[error("invalid tag {tag:?}: {reason}")]
+    InvalidTag {
+        /// The tag as it was passed in.
+        tag:    String,
+        /// Why it was rejected.
+        reason: &'static str,
+    },
+    /// The item to tag is not in the catalog.
+    #[error("no item with id {0:?} in the library index")]
+    NoSuchItem(String),
 }
 
 /// The library index: one SQLite connection, opened once per process and
@@ -162,6 +174,67 @@ impl LibraryIndex {
     /// Returns [`IndexError::Sqlite`] if the query fails.
     pub fn list_collections(&self) -> Result<Vec<CollectionEntry>, IndexError> {
         collections::list_collections(&self.conn)
+    }
+
+    /// Returns every tag that some item has, ordered ignoring case.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn list_tags(&self) -> Result<Vec<String>, IndexError> {
+        tags::list_tags(&self.conn)
+    }
+
+    /// Returns the tags of the item `item_id`, ordered ignoring case.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn tags_for_item(&self, item_id: &str) -> Result<Vec<String>, IndexError> {
+        tags::tags_for_item(&self.conn, item_id)
+    }
+
+    /// Tags the item `item_id` with `tag`; returns `false` if it already had
+    /// the tag. Tags are free text, unique ignoring case.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::InvalidTag`] if `tag` is empty, too long, or
+    /// contains a comma or control character, [`IndexError::NoSuchItem`] if
+    /// the item is not in the catalog, and [`IndexError::Sqlite`] if a write
+    /// fails.
+    pub fn add_tag(&mut self, item_id: &str, tag: &str) -> Result<bool, IndexError> {
+        tags::add_tag(&mut self.conn, item_id, tag)
+    }
+
+    /// Removes `tag` from the item `item_id`; returns `false` if it did not
+    /// have the tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if a write fails.
+    pub fn remove_tag(&mut self, item_id: &str, tag: &str) -> Result<bool, IndexError> {
+        tags::remove_tag(&mut self.conn, item_id, tag)
+    }
+
+    /// Renames the tag `from` to `to` on every item and returns how many items
+    /// that was. If `to` already exists, the two tags are merged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::InvalidTag`] if `to` cannot be stored, and
+    /// [`IndexError::Sqlite`] if a write fails.
+    pub fn rename_tag(&mut self, from: &str, to: &str) -> Result<usize, IndexError> {
+        tags::rename_tag(&mut self.conn, from, to)
+    }
+
+    /// Removes the tag `tag` from every item and returns how many items had it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if a write fails.
+    pub fn delete_tag(&mut self, tag: &str) -> Result<usize, IndexError> {
+        tags::delete_tag(&mut self.conn, tag)
     }
 }
 

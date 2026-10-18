@@ -1,8 +1,14 @@
 ## 1. Index and API
 
-- [ ] 1.1 Index methods for tags: list all, list for an item, add, remove, rename, delete; unique ignoring case
-- [ ] 1.2 The same methods on `LibraryApi`
-- [ ] 1.3 Keep the FTS `tags` column in step with `item_tags`
+Index schema version 3 drops the foreign key from `item_tags.item_id`. The bundled SQLite enforces foreign keys,
+so rewriting the catalog (which deletes every item row) would have deleted every tag, and the catalog is saved in
+checkpoints while pages are still loading. A tag on an item missing from a partial catalog is kept and is there
+again when the item returns; `list_tags` only lists tags on items that are in the catalog. Tags cannot contain a
+comma, because Linux stores a file's tags as a comma-separated list.
+
+- [x] 1.1 Index methods for tags: list all, list for an item, add, remove, rename, delete; unique ignoring case
+- [x] 1.2 The same methods on `LibraryApi`
+- [x] 1.3 Keep the FTS `tags` column in step with `item_tags`
 
 ## 2. Projection
 
