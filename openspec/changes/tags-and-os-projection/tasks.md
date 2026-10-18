@@ -46,6 +46,27 @@ create the file), and the panel entries appearing after a real launch.
 - [x] 3.3 Report the number of restored files in the activity panel
 - [x] 3.4 Project an item's tags when one of its files finishes downloading
 
+## 3b. Colors, reading tags back, and settings
+
+Settled 2026-10-18 after the Libri v2 design was accepted (ADR 0008 supersedes the "index wins" rule of ADR 0004).
+Index schema version 4 adds a color to tags, when an item's tags last changed, and per-file snapshots of the tags
+the file and the index last agreed on. `TagColor` is Finder's seven colors, so none is approximated.
+`reconcile_files` decides per file from the snapshot, the file and the index (`tag_projection/decision.rs`), and
+`NativePreferences` holds the three switches from the mockup's Native Integration page. The launch pass reports
+files written and files read back separately.
+
+- [x] 3b.1 `TagColor`, a color on tags in the index, and `LibraryIndex::{tag_colors, set_tag_color}`
+- [x] 3b.2 Record when an item's tags changed, and each file's snapshot; forget the snapshot of a file that is gone
+      or was downloaded again
+- [x] 3b.3 `FileTag` with a color; macOS reads and writes Finder's color number; Linux keeps none
+- [x] 3b.4 Decide which side wins from the snapshot; later change wins, the index wins on a tie or an unknown time
+- [x] 3b.5 Read a file's tags back into the index, taking a color from the file only where the index has none
+- [x] 3b.6 `NativePreferences`: write to files, read from files, reconcile on launch; the launch pass and a
+      finished download honor them
+- [x] 3b.7 ADR 0008, and the spec
+- [ ] 3b.8 `LibraryApi` methods for tag colors (with the UI slice, which is their caller)
+- [ ] 3b.9 The Native Integration settings page with the three switches (with the UI slice)
+
 ## 4. UI
 
 - [ ] 4.1 Tag editor in the detail panel
@@ -58,4 +79,4 @@ create the file), and the panel entries appearing after a real launch.
 - [ ] 5.2 Projection encode and decode tests for both formats, on every platform
 - [ ] 5.3 Reconciliation tests against a temporary directory on Linux, with `user.xdg.tags`
 - [ ] 5.4 Manual check on a real Mac: tag in Libri, see it in Finder; remove it in Finder, relaunch, see it return
-- [ ] 5.5 Documentation page, including that edits made outside Libri are overwritten on launch
+- [ ] 5.5 Documentation page, including how edits made outside Libri are read back and when the later change wins

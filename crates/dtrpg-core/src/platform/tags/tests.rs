@@ -4,8 +4,8 @@
 
 use super::*;
 
-fn names(tags: &[&str]) -> Vec<String> {
-    tags.iter().map(|tag| (*tag).to_owned()).collect()
+fn names(tags: &[&str]) -> Vec<FileTag> {
+    tags.iter().map(|tag| FileTag::plain(*tag)).collect()
 }
 
 fn macos_names(tags: &[MacosTag]) -> Vec<&str> {
@@ -63,6 +63,47 @@ fn rewriting_macos_tags_keeps_the_color_of_a_tag_that_stays() {
 }
 
 #[test]
+fn a_tags_color_is_written_as_its_finder_number() {
+    let bytes = encode_macos(&[FileTag::colored("Red", TagColor::Red)], &[]).unwrap();
+
+    let decoded = decode_macos(&bytes).unwrap();
+
+    assert_eq!(decoded[0].suffix.as_deref(), Some("6"));
+    assert_eq!(macos_color(&decoded[0]), Some(TagColor::Red));
+}
+
+#[test]
+fn a_tags_own_color_wins_over_the_one_the_file_had() {
+    let existing = [MacosTag { name:   "solo".to_owned(),
+                               suffix: Some("6".to_owned()), }];
+
+    let bytes = encode_macos(&[FileTag::colored("solo", TagColor::Blue)], &existing).unwrap();
+
+    assert_eq!(macos_color(&decode_macos(&bytes).unwrap()[0]),
+               Some(TagColor::Blue));
+}
+
+#[test]
+fn every_color_survives_being_written_and_read() {
+    for color in TagColor::ALL {
+        let bytes = encode_macos(&[FileTag::colored("solo", color)], &[]).unwrap();
+
+        assert_eq!(macos_color(&decode_macos(&bytes).unwrap()[0]), Some(color));
+    }
+}
+
+#[test]
+fn a_suffix_that_is_not_a_color_is_no_color() {
+    let tag = |suffix: Option<&str>| MacosTag { name:   "solo".to_owned(),
+                                                suffix: suffix.map(str::to_owned), };
+
+    assert_eq!(macos_color(&tag(None)), None);
+    assert_eq!(macos_color(&tag(Some("0"))), None);
+    assert_eq!(macos_color(&tag(Some("9"))), None);
+    assert_eq!(macos_color(&tag(Some("red"))), None);
+}
+
+#[test]
 fn macos_bytes_that_are_not_a_list_of_strings_are_invalid() {
     let not_a_plist = decode_macos(b"not a property list").unwrap_err();
     assert_eq!(not_a_plist.kind(), io::ErrorKind::InvalidData);
@@ -85,6 +126,14 @@ fn linux_tags_are_a_comma_separated_list() {
     assert_eq!(encode_linux(&names(&["solo", "to run"])), b"solo,to run");
     assert_eq!(decode_linux(b"solo,to run").unwrap(),
                names(&["solo", "to run"]));
+}
+
+#[test]
+fn linux_keeps_no_colors() {
+    let bytes = encode_linux(&[FileTag::colored("solo", TagColor::Red)]);
+
+    assert_eq!(bytes, b"solo");
+    assert_eq!(decode_linux(&bytes).unwrap(), names(&["solo"]));
 }
 
 #[test]
@@ -172,4 +221,32 @@ fn tags_on_a_missing_file_are_an_error() {
 
     assert!(read(&missing).is_err());
     assert!(write(&missing, &names(&["solo"])).is_err());
+}
+
+#[test]
+fn a_files_change_time_is_when_its_metadata_last_changed() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = file_in(&dir);
+    let now = crate::util::datetime::now_secs();
+
+    let changed = changed_at(&path).unwrap();
+
+    assert!((now - 5..=now + 5).contains(&changed),
+            "{changed} is not near {now}");
+    assert!(changed_at(&dir.path().join("missing.pdf")).is_err());
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn a_color_is_kept_on_a_real_file_on_macos() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = file_in(&dir);
+
+    write(&path,
+          &[FileTag::colored("solo", TagColor::Orange),
+            FileTag::plain("to run")]).unwrap();
+
+    assert_eq!(read(&path).unwrap(),
+               [FileTag::colored("solo", TagColor::Orange),
+                FileTag::plain("to run")]);
 }

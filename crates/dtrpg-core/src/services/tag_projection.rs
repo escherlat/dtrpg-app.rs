@@ -1,21 +1,26 @@
-//! Projects an item's tags, which the library index owns, onto its files.
+//! Keeps the tags on downloaded files in step with the library index.
 //!
-//! The index is the source of truth for tags (ADR 0004). Where the platform
-//! keeps tags on files, the files are made to match the index, both when an
-//! item's tags change and once on launch, in case a tag was edited outside
-//! Libri while it was closed.
+//! The index is the source of truth for tags, and a file's tags follow it
+//! (ADR 0004). A tag edited on a file outside Libri, in Finder for example, is
+//! read back into the index, unless the index changed the same file's tags
+//! since the two last agreed, in which case the later change wins (ADR 0008).
 //!
-//! An item with no tags in the index is left alone by the launch pass. A file
-//! may carry tags the user set in Finder before ever using Libri's, and
-//! clearing them because the index happens to know nothing about them would
-//! destroy data. Removing an item's last tag in Libri clears its files
-//! through [`project_item_tags`] instead.
+//! What the two last agreed on is recorded per file (the snapshot). It tells
+//! a tag removed from the file from one the file never had, which the current
+//! tags alone cannot.
 
-use std::collections::HashMap;
+mod decision;
+
+use std::collections::HashSet;
+use std::io;
 use std::path::{Path, PathBuf};
 
+use decision::{Decision, Sides, comparable, decide};
+
 use crate::data::index::{IndexError, LibraryIndex};
-use crate::platform::PlatformIntegration;
+use crate::data::tag_color::TagColor;
+use crate::platform::{FileTag, PlatformIntegration};
+use crate::util::datetime::now_secs;
 
 /// A downloaded file and the item it belongs to.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -31,128 +36,217 @@ pub struct TaggedFile {
 pub struct ProjectionFailure {
     /// The file.
     pub path:  PathBuf,
-    /// Why, as the operating system said it.
+    /// Why, as the operating system or the index said it.
     pub error: String,
 }
 
-/// What a launch pass did.
+/// Which way tags may move between the index and files.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyncSettings {
+    /// Whether the index's tags may be written to files.
+    pub write_to_files:  bool,
+    /// Whether the tags on files may be read into the index.
+    pub read_from_files: bool,
+}
+
+impl Default for SyncSettings {
+    fn default() -> Self {
+        Self { write_to_files:  true,
+               read_from_files: true, }
+    }
+}
+
+/// What a pass over the files did.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReconcileReport {
-    /// How many files had their tags compared.
+    /// How many files were compared.
     pub checked:  usize,
-    /// The files whose tags were rewritten to match the index.
-    pub restored: Vec<PathBuf>,
-    /// The files that could not be compared or rewritten.
+    /// The files that were given the index's tags.
+    pub written:  Vec<PathBuf>,
+    /// The files whose tags were read into the index.
+    pub imported: Vec<PathBuf>,
+    /// The files that could not be compared or changed.
     pub failed:   Vec<ProjectionFailure>,
 }
 
-/// Returns `tags` lower-cased and sorted, to compare two lists of tags that
-/// are the same set however they are spelled or ordered.
-fn comparable(tags: &[String]) -> Vec<String> {
-    let mut tags: Vec<String> = tags.iter().map(|tag| tag.to_lowercase()).collect();
-    tags.sort();
-    tags.dedup();
-    tags
+/// Why one file could not be brought in step.
+#[derive(Debug, thiserror::Error)]
+enum SyncError {
+    #[error(transparent)]
+    File(#[from] io::Error),
+    #[error(transparent)]
+    Index(#[from] IndexError),
 }
 
-/// Makes each file's tags match the index, and reports what it changed.
+/// The file's tag names, for comparing.
+fn names(tags: &[FileTag]) -> Vec<String> {
+    tags.iter().map(|tag| tag.name.clone()).collect()
+}
+
+/// The index's tags for `item_id`, each with its color, ready to write.
+fn index_file_tags(index: &LibraryIndex, item_id: &str) -> Result<Vec<FileTag>, IndexError> {
+    let colors = index.tag_colors()?;
+    Ok(index.tags_for_item(item_id)?
+            .into_iter()
+            .map(|name| FileTag { color: colors.get(&name.to_lowercase()).copied(),
+                                  name })
+            .collect())
+}
+
+/// Records that `path` and the index now agree on `tags`.
+fn record(index: &LibraryIndex, file: &TaggedFile, tags: &[String]) -> Result<(), IndexError> {
+    index.record_file_tag_sync(&file.path.to_string_lossy(),
+                               &file.item_id,
+                               tags,
+                               now_secs())
+}
+
+/// Brings one file's tags and the index in step, and says which way tags moved.
+fn sync_file<P>(platform: &P, index: &mut LibraryIndex, file: &TaggedFile,
+                settings: SyncSettings)
+                -> Result<Option<Decision>, SyncError>
+    where P: PlatformIntegration + ?Sized {
+    let on_file = platform.read_tags(&file.path)?;
+    let in_index = index_file_tags(index, &file.item_id)?;
+    let snapshot = index.file_tag_snapshot(&file.path.to_string_lossy())?;
+    let (on_file_names, in_index_names) = (names(&on_file), names(&in_index));
+    let mut sides = Sides { snapshot:         snapshot.as_deref(),
+                            file:             &on_file_names,
+                            index:            &in_index_names,
+                            file_changed_at:  None,
+                            index_changed_at: index.tags_changed_at(&file.item_id)?, };
+    // The file's change time is only needed to settle a conflict.
+    if decide(sides) == Decision::WriteFile || decide(sides) == Decision::ReadFile {
+        sides.file_changed_at = platform.tags_changed_at(&file.path)?;
+    }
+    let decision = decide(sides);
+    match decision {
+        Decision::InSync => {}
+        Decision::Agreed => record(index, file, &on_file_names)?,
+        Decision::WriteFile if settings.write_to_files => {
+            platform.write_tags(&file.path, &in_index)?;
+            record(index, file, &in_index_names)?;
+        }
+        Decision::ReadFile if settings.read_from_files => {
+            let wanted: Vec<(String, Option<TagColor>)> =
+                on_file.iter()
+                       .map(|tag| (tag.name.clone(), tag.color))
+                       .collect();
+            let changed_at = sides.file_changed_at.unwrap_or_else(now_secs);
+            index.set_item_tags(&file.item_id, &wanted, changed_at)?;
+            record(index, file, &on_file_names)?;
+        }
+        Decision::WriteFile | Decision::ReadFile => return Ok(None),
+    }
+    Ok(Some(decision))
+}
+
+/// Brings the tags of each of `files` and `index` in step, and reports what it
+/// did.
 ///
-/// `tags_by_item` maps an item's id to its tags in the index. A file whose
-/// item has no tags there is skipped, as is every file on a platform that
-/// keeps no tags on files. A file that cannot be read or written is reported
-/// in [`ReconcileReport::failed`] and does not stop the others.
-#[must_use]
-pub fn reconcile_file_tags<P>(platform: &P, tags_by_item: &HashMap<String, Vec<String>>,
-                              files: &[TaggedFile])
-                              -> ReconcileReport
+/// A file that cannot be read or changed is reported in
+/// [`ReconcileReport::failed`] and does not stop the others. Nothing is done on
+/// a platform that keeps no tags on files.
+pub fn reconcile_files<P>(platform: &P, index: &mut LibraryIndex, files: &[TaggedFile],
+                          settings: SyncSettings)
+                          -> Result<ReconcileReport, IndexError>
     where P: PlatformIntegration + ?Sized {
     let mut report = ReconcileReport::default();
     if !platform.capabilities().filesystem_tags {
-        return report;
+        return Ok(report);
     }
+    let present: HashSet<String> = files.iter()
+                                        .map(|file| file.path.to_string_lossy().into_owned())
+                                        .collect();
+    index.forget_file_tag_syncs_except(&present)?;
     for file in files {
-        let Some(wanted) = tags_by_item.get(&file.item_id)
-                                       .filter(|tags| !tags.is_empty())
-        else {
-            continue;
-        };
         report.checked += 1;
-        let result = platform.read_tags(&file.path).and_then(|found| {
-                                                       if comparable(&found) == comparable(wanted) {
-                                                           Ok(false)
-                                                       }
-                                                       else {
-                                                           platform.write_tags(&file.path, wanted)
-                                                                   .map(|()| true)
-                                                       }
-                                                   });
-        match result {
-            Ok(true) => report.restored.push(file.path.clone()),
-            Ok(false) => {}
+        match sync_file(platform, index, file, settings) {
+            Ok(Some(Decision::WriteFile)) => report.written.push(file.path.clone()),
+            Ok(Some(Decision::ReadFile)) => report.imported.push(file.path.clone()),
+            Ok(_) => {}
             Err(error) => report.failed
                                 .push(ProjectionFailure { path:  file.path.clone(),
                                                           error: error.to_string(), }),
         }
     }
-    report
+    Ok(report)
 }
 
-/// Reads every item's tags from the library index under `index_root`, then
-/// runs [`reconcile_file_tags`] over `files`.
+/// Opens the library index under `index_root` and runs [`reconcile_files`]
+/// over `files`.
 ///
 /// # Errors
 ///
-/// Returns [`IndexError`] if the index cannot be opened or read. Nothing is
-/// written to any file in that case.
-pub fn reconcile_with_index<P>(platform: &P, index_root: &Path, files: &[TaggedFile])
+/// Returns [`IndexError`] if the index cannot be opened or read.
+pub fn reconcile_with_index<P>(platform: &P, index_root: &Path, files: &[TaggedFile],
+                               settings: SyncSettings)
                                -> Result<ReconcileReport, IndexError>
     where P: PlatformIntegration + ?Sized {
     if !platform.capabilities().filesystem_tags {
         return Ok(ReconcileReport::default());
     }
-    let tags_by_item = LibraryIndex::open_and_migrate(index_root)?.all_item_tags()?;
-    Ok(reconcile_file_tags(platform, &tags_by_item, files))
+    let mut index = LibraryIndex::open_and_migrate(index_root)?;
+    reconcile_files(platform, &mut index, files, settings)
 }
 
-/// Writes the tags the library index holds for `item_id` onto `paths`, for a
-/// file that has just been downloaded, and returns the files it could not
-/// write. An item with no tags leaves its files alone.
+/// Gives `paths`, files of `item_id`, the tags the index holds for the item,
+/// and returns the files it could not write. A file that already has them is
+/// left alone, so a new download with no tags is not written when the item has
+/// none either.
+///
+/// This is for a change made in Libri, or a file that has just been
+/// downloaded, so the index wins and no time is compared. Whatever the files
+/// last agreed on with the index is forgotten, so a file that replaced an
+/// older one at the same path is not read as having lost its tags.
 ///
 /// # Errors
 ///
 /// Returns [`IndexError`] if the index cannot be opened or read.
-pub fn project_indexed_tags<P>(platform: &P, index_root: &Path, item_id: &str, paths: &[PathBuf])
+pub fn project_indexed_tags<P>(platform: &P, index_root: &Path, item_id: &str,
+                               paths: &[PathBuf], settings: SyncSettings)
                                -> Result<Vec<ProjectionFailure>, IndexError>
     where P: PlatformIntegration + ?Sized {
     if !platform.capabilities().filesystem_tags {
         return Ok(Vec::new());
     }
-    let tags = LibraryIndex::open_and_migrate(index_root)?.tags_for_item(item_id)?;
-    if tags.is_empty() {
+    let index = LibraryIndex::open_and_migrate(index_root)?;
+    // A file at a path the library has seen before may be a new file, so what
+    // the old one agreed on says nothing about it, whether or not it is
+    // written.
+    for path in paths {
+        index.forget_file_tag_sync(&path.to_string_lossy())?;
+    }
+    if !settings.write_to_files {
         return Ok(Vec::new());
     }
-    Ok(project_item_tags(platform, &tags, paths))
-}
-
-/// Makes the tags of each of `paths` exactly `tags`, and returns the files that
-/// could not be written. An empty `tags` clears them. Nothing is attempted on a
-/// platform that keeps no tags on files.
-#[must_use]
-pub fn project_item_tags<P>(platform: &P, tags: &[String], paths: &[PathBuf])
-                            -> Vec<ProjectionFailure>
-    where P: PlatformIntegration + ?Sized {
-    if !platform.capabilities().filesystem_tags {
-        return Vec::new();
+    let in_index = index_file_tags(&index, item_id)?;
+    let mut failures = Vec::new();
+    for path in paths {
+        let file = TaggedFile { item_id: item_id.to_owned(),
+                                path:    path.clone(), };
+        let result = platform.read_tags(path).and_then(|on_file| {
+                                                 if comparable(&names(&on_file))
+                                                    == comparable(&names(&in_index))
+                                                 {
+                                                     Ok(())
+                                                 }
+                                                 else {
+                                                     platform.write_tags(path, &in_index)
+                                                 }
+                                             });
+        let result =
+            result.map_err(SyncError::from)
+                  .and_then(|()| Ok(record(&index, &file, &names(&in_index))?));
+        if let Err(error) = result {
+            failures.push(ProjectionFailure { path:  path.clone(),
+                                              error: error.to_string(), });
+        }
     }
-    paths.iter()
-         .filter_map(|path| {
-             platform.write_tags(path, tags)
-                     .err()
-                     .map(|error| ProjectionFailure { path:  path.clone(),
-                                                      error: error.to_string(), })
-         })
-         .collect()
+    Ok(failures)
 }
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_conflicts;

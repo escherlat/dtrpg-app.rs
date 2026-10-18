@@ -100,6 +100,16 @@ impl LibraryIndex {
         tag_sync::record(&self.conn, path, item_id, tags, synced_at)
     }
 
+    /// Forgets the sync record of the file at `path`, so its tags are synced
+    /// afresh next time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the statement fails.
+    pub fn forget_file_tag_sync(&self, path: &str) -> Result<(), IndexError> {
+        tag_sync::forget(&self.conn, path)
+    }
+
     /// Forgets the sync record of every file not in `present` and returns how
     /// many it forgot.
     ///

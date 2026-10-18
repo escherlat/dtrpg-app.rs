@@ -16,9 +16,10 @@ fn downloaded(mut item: LibraryItem, files: &[usize]) -> LibraryItem {
     item
 }
 
-fn report(restored: &[&str], failed: &[&str]) -> ReconcileReport {
-    ReconcileReport { checked:  restored.len() + failed.len(),
-                      restored: restored.iter().map(PathBuf::from).collect(),
+fn report(written: &[&str], imported: &[&str], failed: &[&str]) -> ReconcileReport {
+    ReconcileReport { checked:  written.len() + imported.len() + failed.len(),
+                      written:  written.iter().map(PathBuf::from).collect(),
+                      imported: imported.iter().map(PathBuf::from).collect(),
                       failed:
                           failed.iter()
                                 .map(|path| ProjectionFailure { path:  PathBuf::from(path),
@@ -50,12 +51,14 @@ fn only_downloaded_files_are_listed_with_the_item_they_belong_to() {
 }
 
 #[gpui::test]
-fn files_that_were_restored_are_counted_in_the_activity_panel(cx: &mut TestAppContext) {
+fn files_that_were_given_the_librarys_tags_are_counted_in_the_activity_panel(cx: &mut TestAppContext)
+{
     let fixture = fixture_with_items(cx);
 
-    fixture.controller.update(cx, |ctrl, cx| {
-                          ctrl.report_file_tags(Ok(report(&["/a/one.pdf", "/a/two.pdf"], &[])), cx)
-                      });
+    fixture.controller
+           .update(cx, |ctrl, cx| {
+               ctrl.report_file_tags(Ok(report(&["/a/one.pdf", "/a/two.pdf"], &[], &[])), cx)
+           });
 
     let items = fixture.activity.read_with(cx, |a, _| a.snapshot().items);
     assert_eq!(items.len(), 1);
@@ -64,11 +67,30 @@ fn files_that_were_restored_are_counted_in_the_activity_panel(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn files_whose_tags_were_read_into_the_library_are_counted_separately(cx: &mut TestAppContext) {
+    let fixture = fixture_with_items(cx);
+
+    fixture.controller.update(cx, |ctrl, cx| {
+                          ctrl.report_file_tags(Ok(report(&["/a/one.pdf"],
+                                                          &["/a/two.pdf",
+                                                            "/a/three.pdf",
+                                                            "/a/four.pdf"],
+                                                          &[])),
+                                                cx)
+                      });
+
+    let items = fixture.activity.read_with(cx, |a, _| a.snapshot().items);
+    assert_eq!(items.len(), 2);
+    assert!(items.iter().any(|item| item.label.contains('3')));
+    assert!(items.iter().any(|item| item.label.contains('1')));
+}
+
+#[gpui::test]
 fn files_that_could_not_be_written_are_reported_as_an_error(cx: &mut TestAppContext) {
     let fixture = fixture_with_items(cx);
 
     fixture.controller.update(cx, |ctrl, cx| {
-                          ctrl.report_file_tags(Ok(report(&[], &["/a/one.pdf"])), cx)
+                          ctrl.report_file_tags(Ok(report(&[], &[], &["/a/one.pdf"])), cx)
                       });
 
     let items = fixture.activity.read_with(cx, |a, _| a.snapshot().items);
@@ -81,7 +103,7 @@ fn the_activity_panel_says_nothing_when_every_file_already_matched(cx: &mut Test
     let fixture = fixture_with_items(cx);
 
     fixture.controller.update(cx, |ctrl, cx| {
-                          ctrl.report_file_tags(Ok(report(&[], &[])), cx)
+                          ctrl.report_file_tags(Ok(report(&[], &[], &[])), cx)
                       });
 
     assert_eq!(activity_counts(&fixture, cx), (0, 0));

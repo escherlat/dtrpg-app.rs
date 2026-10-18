@@ -51,6 +51,16 @@ pub(super) fn record(conn: &Connection, path: &str, item_id: &str, tags: &[Strin
     Ok(())
 }
 
+/// Forgets the record for `path`, so its tags are synced afresh next time.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the statement fails.
+pub(super) fn forget(conn: &Connection, path: &str) -> Result<(), IndexError> {
+    conn.execute("DELETE FROM file_tag_sync WHERE path = ?1", params![path])?;
+    Ok(())
+}
+
 /// Forgets every record for a path not in `present`, and returns how many that
 /// was. A file that is gone and comes back is then synced afresh, rather than
 /// compared with tags it had before it left.

@@ -298,6 +298,20 @@ fn a_snapshot_with_no_tags_is_different_from_no_snapshot() {
 }
 
 #[test]
+fn one_files_snapshot_can_be_forgotten_alone() {
+    let index = index_with(&["a"]);
+    index.record_file_tag_sync("/a/one.pdf", "a", &names(&["solo"]), 1)
+         .unwrap();
+    index.record_file_tag_sync("/a/two.pdf", "a", &names(&["solo"]), 1)
+         .unwrap();
+
+    index.forget_file_tag_sync("/a/one.pdf").unwrap();
+
+    assert_eq!(index.file_tag_snapshot("/a/one.pdf").unwrap(), None);
+    assert!(index.file_tag_snapshot("/a/two.pdf").unwrap().is_some());
+}
+
+#[test]
 fn snapshots_of_files_that_are_gone_are_forgotten() {
     let mut index = index_with(&["a"]);
     index.record_file_tag_sync("/a/one.pdf", "a", &names(&["solo"]), 1)

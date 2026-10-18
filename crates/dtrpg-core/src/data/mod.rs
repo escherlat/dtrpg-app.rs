@@ -10,6 +10,7 @@ pub mod enums;
 pub mod file_openers;
 pub mod index;
 pub mod library;
+pub mod native_preferences;
 pub mod notification;
 pub mod paths;
 pub mod profile;
