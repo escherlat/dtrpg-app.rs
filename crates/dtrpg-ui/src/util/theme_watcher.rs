@@ -77,7 +77,11 @@ async fn theme_reload_loop(mut rx: UnboundedReceiver<()>, cx: &mut gpui::AsyncAp
 /// now selectable elsewhere), or one that was removed - an id no longer in
 /// the catalog falls back to the default theme for display without
 /// persisting the fallback, matching startup behavior.
-fn apply_theme_changes(cx: &mut App) {
+///
+/// `pub` for the Settings gallery's Reload button, which runs the same
+/// refresh on demand; `Context` derefs to `App`, so callers pass their
+/// controller context directly.
+pub fn apply_theme_changes(cx: &mut App) {
     ThemeCatalog::refresh();
     let current = cx.global::<LibriTheme>();
     let id = ThemeCatalog::resolve(current.id.as_str()).unwrap_or_default();

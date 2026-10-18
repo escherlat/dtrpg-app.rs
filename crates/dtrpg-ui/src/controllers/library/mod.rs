@@ -72,6 +72,7 @@ mod helpers;
 mod lifecycle;
 mod preferences;
 mod selection;
+mod theme_files;
 mod thumbnail_jobs;
 mod thumbnails;
 

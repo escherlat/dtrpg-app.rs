@@ -1,7 +1,7 @@
 //! Appearance settings section: searchable font pickers for the four font
 //! roles (body, value, label, monospace) covering every font installed on
-//! the user's system, a shared UI text scale stepper, and the active color
-//! theme picker.
+//! the user's system, a shared UI text scale stepper, and the theme gallery
+//! (`settings_theme_gallery`).
 //!
 //! Font/theme changes apply immediately via `LibraryController`'s
 //! `set_body_font`/`set_value_font`/`set_label_font`/`set_mono_font`/
@@ -17,8 +17,6 @@ use gpui::{
     Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled,
     div, px,
 };
-use gpui_kit::component::button::Button;
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::select::Select;
 use gpui_kit::component::tooltip::Tooltip;
 use rust_i18n::t;
@@ -27,7 +25,7 @@ use crate::controllers::library::LibraryController;
 use crate::controllers::settings::FontSelectState;
 use crate::data::theme::ColorTokens;
 use crate::data::theme::LibriTheme;
-use crate::data::theme_catalog::{ThemeCatalog, theme_label};
+use crate::ui::views::settings_theme_gallery::render_theme_gallery;
 use crate::ui::widgets::small_caps_text;
 
 /// Width of the label column shared by every row in this section, so the
@@ -183,7 +181,7 @@ pub struct AppearanceFontSelects {
 
 /// Renders the Appearance settings section: body/value/label/monospace font
 /// pickers (searchable, listing every font installed on the user's system),
-/// a shared text-scale stepper, and the active theme picker.
+/// a shared text-scale stepper, and the theme gallery.
 pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &ColorTokens,
                                  theme: &LibriTheme, font_selects: AppearanceFontSelects)
                                  -> impl IntoElement + 'static + use<> {
@@ -200,33 +198,7 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
     let label_mono_pt = LABEL_MONO_FONT_SIZE_PT * scale;
     let label_font_family = theme.fonts.label_font.to_string();
 
-    let entity_theme = entity.clone();
-
-    let theme_button = Button::new("appearance-theme").outline()
-                                                      .label(theme_label(&theme_id))
-                                                      .dropdown_menu(move |menu, _, _| {
-                                                          let mut m = menu;
-                                                          for id in ThemeCatalog::all_ids() {
-                                                              let e = entity_theme.clone();
-                                                              let lbl = theme_label(&id);
-                                                              let checked = id == theme_id;
-                                                              m = m.item(
-                    PopupMenuItem::new(lbl)
-                        .checked(checked)
-                        .on_click(move |_, _, cx| {
-                            e.update(cx, |ctrl, cx| ctrl.set_theme(id.clone(), cx));
-                        }),
-                );
-                                                          }
-                                                          m
-                                                      });
-    let theme_row = div().flex()
-                         .items_center()
-                         .gap(px(12.0))
-                         .child(row_label(t!("settings.appearance_theme_label"),
-                                          colors,
-                                          &label_font_family))
-                         .child(theme_button);
+    let entity_gallery = entity.clone();
 
     div().flex()
          .flex_col()
@@ -259,5 +231,5 @@ pub fn render_appearance_section(entity: Entity<LibraryController>, colors: &Col
                                 &label_font_family))
          .child(text_scale_row(scale, entity, colors, &label_font_family))
          .child(div().h(px(1.0)).bg(border))
-         .child(theme_row)
+         .child(render_theme_gallery(entity_gallery, colors, &theme_id, &label_font_family))
 }

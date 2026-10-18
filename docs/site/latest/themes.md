@@ -94,6 +94,23 @@ theme's file changed, its live colors - no restart needed.
 A malformed file (no `name`, unparseable TOML) is skipped; a theme that loads
 but omits palette fields falls back per-key as described above.
 
+Settings > Appearance shows every theme as a card with a miniature preview of
+its palette; clicking a card selects that theme. User themes carry a "user"
+tag. Below the grid:
+
+- **Duplicate & edit** copies the active theme into the themes directory as
+  `<id>-copy.toml`, names it `<name> copy`, selects the copy, and reveals it in
+  your file manager so you can edit it. Edits apply live.
+- **Import…** copies a theme file you pick into the themes directory,
+  uniquifying the id if the name is already taken, and selects it. The file is
+  validated before it is copied.
+- **Reveal themes folder** opens the themes directory, creating it if needed.
+- **Reload** re-reads the themes directory immediately instead of waiting for
+  the file watcher.
+
+A duplicated or imported file re-serializes the palette without the original's
+comments and key order; the source file is untouched.
+
 ### Semantic state colors are not themeable
 
 The error and warning colors are deliberately **not** part of the themeable

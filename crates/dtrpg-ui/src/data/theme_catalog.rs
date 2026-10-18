@@ -99,12 +99,15 @@ impl ThemeCatalog {
     /// Discovers user themes from the themes directory and refreshes the
     /// in-process cache. Creates the directory if missing so users have a
     /// place to drop theme files. Called at startup and by any future
-    /// hot-reload trigger — not on the render path.
+    /// hot-reload trigger — not on the render path. Also rebuilds the
+    /// gallery's preview cache for the full id set, so preview colors never
+    /// require loading files on the render path.
     pub fn refresh() {
         let dir = themes_dir();
         let _ = std::fs::create_dir_all(&dir);
         let users = discover(&dir);
         *USER_THEMES.write().unwrap_or_else(|e| e.into_inner()) = users;
+        crate::data::theme_loader::rebuild_previews(Self::all_ids());
     }
 
     /// Every known theme id — built-ins followed by user themes — in display
