@@ -350,8 +350,12 @@ impl LibraryRootView {
                 });
 
         let publisher_rule_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
+        let collection_rule_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
+        let size_rule_input = cx.new(|cx| InputState::new(window, cx).default_value(""));
         settings.update(cx, |ctrl, _cx| {
-                    ctrl.set_publisher_rule_input(publisher_rule_input)
+                    ctrl.set_publisher_rule_input(publisher_rule_input);
+                    ctrl.set_collection_rule_input(collection_rule_input);
+                    ctrl.set_size_rule_input(size_rule_input);
                 });
 
         // ── Appearance page font pickers ─────────────────────────────────────

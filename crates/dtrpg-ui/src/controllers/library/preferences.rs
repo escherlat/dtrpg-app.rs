@@ -3,6 +3,18 @@
 use super::*;
 
 impl LibraryController {
+    /// Returns distinct publisher names currently present in the catalog for
+    /// placement-rule auto-completion.
+    pub fn publisher_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.catalog
+                                         .iter()
+                                         .map(|item| item.publisher.to_string())
+                                         .collect();
+        names.sort_unstable_by_key(|name| name.to_ascii_lowercase());
+        names.dedup();
+        names
+    }
+
     // ── Theme / density mutations (dispatched via callbacks)
     // ──────────────────
 
