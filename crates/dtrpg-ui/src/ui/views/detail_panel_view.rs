@@ -1378,7 +1378,9 @@ struct InspectorRenderContext<'a> {
     cx: &'a mut App,
 }
 
-fn render_inspector_contents(state: &InspectorContentsState, colors: &ColorTokens) -> AnyElement {
+fn render_inspector_contents(state: &InspectorContentsState, entry_id: &Arc<str>,
+                               entity: Entity<LibraryController>, colors: &ColorTokens,
+                               cx: &App) -> AnyElement {
     match state {
         InspectorContentsState::Unavailable => div()
             .p(px(20.0))
@@ -1392,35 +1394,64 @@ fn render_inspector_contents(state: &InspectorContentsState, colors: &ColorToken
             .text_color(colors.text_secondary)
             .child(t!("detail.inspector_contents_loading").to_string())
             .into_any_element(),
-        InspectorContentsState::Loaded(entries) => div()
-            .p(px(20.0))
-            .flex()
-            .flex_col()
-            .gap(px(4.0))
-            .children(entries.iter().map(|entry| {
-                let depth = entry.name.trim_end_matches('/').matches('/').count();
-                let label = entry.name.trim_end_matches('/').rsplit('/').next().unwrap_or(&entry.name);
+        InspectorContentsState::Loaded(entries) => {
+            let selected_count = entity.read(cx).selected_inspector_entry_count(entry_id);
+            let extracting = entity.read(cx).is_inspector_extracting(entry_id);
+            let rows = entries.iter().map(|entry| {
+                let name = entry.name.clone();
+                let selected = entity.read(cx).is_inspector_entry_selected(entry_id, &name);
+                let is_directory = entry.is_directory;
+                let size_bytes = entry.size_bytes;
+                let click_entity = entity.clone();
+                let click_id = Arc::clone(entry_id);
+                let depth = name.trim_end_matches('/').matches('/').count();
+                let label = name.trim_end_matches('/').rsplit('/').next().unwrap_or(&name).to_string();
                 div()
+                    .id(SharedString::from(format!("inspector-entry-{name}")))
                     .pl(px(depth as f32 * 14.0))
                     .flex()
                     .items_center()
-                    .justify_between()
-                    .text_sm()
-                    .text_color(colors.text_primary)
-                    .child(if entry.is_directory {
-                        format!("▸ {label}")
-                    } else {
-                        label.to_string()
+                    .gap(px(8.0))
+                    .cursor_pointer()
+                    .on_click(move |_, _, cx| {
+                        if !is_directory {
+                            click_entity.update(cx, |controller, cx| {
+                                controller.toggle_inspector_entry(Arc::clone(&click_id), name.clone(), cx);
+                            });
+                        }
                     })
-                    .child(div().text_xs().text_color(colors.text_tertiary).child(
-                        if entry.is_directory {
-                            String::new()
-                        } else {
-                            format!("{} bytes", entry.size_bytes)
-                        },
+                    .child(if is_directory { "▸" } else if selected { "☑" } else { "□" })
+                    .child(div().flex_1().text_sm().text_color(colors.text_primary).child(
+                        if is_directory { format!("{label}/") } else { label },
                     ))
-            }))
-            .into_any_element(),
+                    .child(div().text_xs().text_color(colors.text_tertiary).child(
+                        if is_directory { String::new() } else { format!("{} bytes", size_bytes) },
+                    ))
+            });
+            div()
+                .p(px(20.0))
+                .flex()
+                .flex_col()
+                .gap(px(8.0))
+                .children(rows)
+                .child(
+                    Button::new("inspector-extract-selected")
+                        .ghost()
+                        .disabled(selected_count == 0 || extracting)
+                        .loading(extracting)
+                        .child(t!("detail.inspector_extract_selected").to_string())
+                        .on_click({
+                            let click_entity = entity.clone();
+                            let click_id = Arc::clone(entry_id);
+                            move |_, _, cx| {
+                                click_entity.update(cx, |controller, cx| {
+                                    controller.extract_inspector_entries(Arc::clone(&click_id), cx);
+                                });
+                            }
+                        }),
+                )
+                .into_any_element()
+        }
     }
 }
 
@@ -1437,7 +1468,7 @@ fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorTab,
                                                  context.cx).into_any_element(),
         InspectorTab::Collections => render_collections_section(item, context.entity.clone(), context.colors, context.cx)
             .into_any_element(),
-        InspectorTab::Contents => render_inspector_contents(&contents, context.colors),
+        InspectorTab::Contents => render_inspector_contents(&contents, &item.id, context.entity.clone(), context.colors, context.cx),
         InspectorTab::Summary => div().flex()
                                       .flex_col()
                                       .gap(px(12.0))

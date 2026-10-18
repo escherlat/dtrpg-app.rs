@@ -164,6 +164,7 @@ detail:
   inspector_summary_tab: "Summary"
   inspector_contents_loading: "Loading archive contents…"
   inspector_contents_unavailable: "Archive contents are unavailable."
+  inspector_extract_selected: "Extract selected…"
   inspector_summary_empty: "No summary is available for this item."
 
 settings:

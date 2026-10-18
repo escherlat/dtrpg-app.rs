@@ -91,7 +91,9 @@ impl LibraryController {
         let had_selection = self.selected_item_file.remove(entry_id).is_some();
         let had_inspector_tab = self.inspector_tabs.remove(entry_id).is_some();
         let had_inspector_contents = self.inspector_contents.remove(entry_id).is_some();
-        if had_selection || had_inspector_tab || had_inspector_contents {
+        let had_inspector_selection = self.inspector_selected_entries.remove(entry_id).is_some();
+        let had_inspector_extraction = self.inspector_extractions.remove(entry_id).is_some();
+        if had_selection || had_inspector_tab || had_inspector_contents || had_inspector_selection || had_inspector_extraction {
             cx.emit(LibraryChanged);
         }
     }
