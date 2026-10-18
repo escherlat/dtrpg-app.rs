@@ -41,12 +41,84 @@ pub struct ColorTokens {
     pub shadow:         Hsla,
     /// Overlay scrim.
     pub scrim:          Hsla,
-    /// Error / destructive state (red).
+    /// Error / destructive state (red). Fixed by mode, never read from a
+    /// theme file (see [`semantic_colors`]).
     pub error:          Hsla,
-    /// Warning banner background (amber, low opacity).
+    /// Warning banner background (amber, low opacity). Fixed by mode.
     pub warning_bg:     Hsla,
-    /// Warning banner text / icon color (amber, full opacity).
+    /// Warning banner text / icon color (amber, full opacity). Fixed by mode.
     pub warning_text:   Hsla,
+}
+
+// ── Semantic state colors
+// ────────────────────────────────────────────────────────
+
+/// Light or dark variant a theme declares. Used to select the fixed semantic
+/// state colors and the fallback base for a partially-specified theme file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeMode {
+    Light,
+    Dark,
+}
+
+impl ThemeMode {
+    /// The canonical lowercase spelling used in theme files.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ThemeMode::Light => "light",
+            ThemeMode::Dark => "dark",
+        }
+    }
+}
+
+impl std::str::FromStr for ThemeMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "light" => Ok(ThemeMode::Light),
+            "dark" => Ok(ThemeMode::Dark),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for ThemeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Semantic state colors (error / warning) that no theme file may override,
+/// so a theme can never make a failed download look healthy or an error
+/// indistinguishable from a success state (ADR-0005).
+#[derive(Debug, Clone, Copy)]
+pub struct SemanticColors {
+    /// Error / destructive state (red).
+    pub error:       Hsla,
+    /// Warning banner background (amber, low opacity).
+    pub warning_bg:   Hsla,
+    /// Warning banner text / icon color (amber, full opacity).
+    pub warning_text: Hsla,
+}
+
+/// Returns the fixed semantic colors for a theme's [`ThemeMode`].
+///
+/// These are compile-time constants chosen by light/dark mode, deliberately
+/// outside the themeable palette: a theme file cannot set them.
+pub fn semantic_colors(mode: ThemeMode) -> SemanticColors {
+    match mode {
+        ThemeMode::Light => SemanticColors {
+            error:        hex(0xB0, 0x30, 0x28),
+            warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.12),
+            warning_text: gpui::hsla(0.08, 0.85, 0.35, 1.0),
+        },
+        ThemeMode::Dark => SemanticColors {
+            error:        hex(0xE0, 0x58, 0x58),
+            warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.10),
+            warning_text: gpui::hsla(0.10, 0.90, 0.65, 1.0),
+        },
+    }
 }
 
 // ── Density

@@ -12,7 +12,7 @@ Appearance.
 
 ## Color themes
 
-Three light, three dark:
+Four light, two dark:
 
 | Theme | Mode | Character |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Three light, three dark:
 | Sage | Light | Cool forest green |
 | Ink | Dark | Warm brown-black |
 | Moss | Dark | Cool forest green-black |
-| Rosewood | Dark | Warm burgundy/wine |
+| Rosewood | Light | Warm burgundy/wine |
 
 ## Density
 
@@ -68,11 +68,18 @@ accent_soft = "#8C4A22 0.13"
 accent_on = "#FCF9F3"
 shadow = "#3A2E1A 0.18"
 scrim = "#1E160A 0.26"
-error = "#B03028"
-warning_bg = "hsla(0.11 0.9 0.5 0.12)"
-warning_text = "hsla(0.08 0.85 0.35 1.0)"
 ```
 
-Fields left out of a theme file fall back to the matching built-in theme's
-value. User-defined theme files loaded from disk use the same format via
-`theme_loader::load_from_path`.
+`mode` is `light` or `dark`; it selects the fixed semantic state colors and
+the fallback base for any palette field the file omits. Fields left out fall
+back to a built-in base of the same mode, so a partially specified theme file
+still loads. User-defined theme files loaded from disk use the same format
+via `theme_loader::load_from_path`.
+
+### Semantic state colors are not themeable
+
+The error and warning colors are deliberately **not** part of the themeable
+palette. They are fixed by `mode` at compile time so a theme file cannot make
+a failed download look healthy or an error state indistinguishable from a
+success state. Any `error`, `warning_bg`, or `warning_text` keys in a theme
+file are ignored.
