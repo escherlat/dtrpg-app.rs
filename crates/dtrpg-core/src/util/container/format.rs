@@ -15,7 +15,7 @@ pub enum ContainerFormat {
 }
 
 /// Metadata exposed for one archive entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ContainerEntry {
     pub name: String,
     pub size_bytes: u64,
