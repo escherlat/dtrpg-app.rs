@@ -87,8 +87,9 @@ Each file's stem becomes the theme's id (used for persistence), and its
 `name` field is what Settings > Appearance and the status-bar theme picker
 show. The same flat palette format applies; built-in ids are reserved, so a
 file named `parchment.toml` is ignored in favor of the built-in. The
-directory is read at startup and the pickers list whatever is there at that
-point - restart the app after adding, renaming, or removing files.
+directory is read at startup and watched while the app runs: adding,
+editing, or removing a theme file updates the pickers and, if the active
+theme's file changed, its live colors - no restart needed.
 
 A malformed file (no `name`, unparseable TOML) is skipped; a theme that loads
 but omits palette fields falls back per-key as described above.

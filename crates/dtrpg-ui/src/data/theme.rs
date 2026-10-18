@@ -5,7 +5,8 @@ use dtrpg_core::data::constants::{
     DEFAULT_BODY_FONT, DEFAULT_LABEL_FONT, DEFAULT_MONO_FONT, DEFAULT_UI_TEXT_SIZE,
     DEFAULT_VALUE_FONT,
 };
-use gpui::{Hsla, Pixels, SharedString, px}; // Pixels kept for GPUI layout fields
+use gpui::{BorrowAppContext, Hsla, Pixels, SharedString, px}; /* Pixels kept for GPUI layout
+                                                               * fields */
 
 use crate::data::theme_catalog::ThemeId;
 
@@ -271,6 +272,18 @@ impl LibriTheme {
 /// ambient system mode) regardless of which Libri theme was active.
 ///
 /// Call this whenever [`LibriTheme`] changes, updating both `colors` (read
+/// Installs `theme` as the active global and syncs its colors into the
+/// `gpui_kit::component::Theme` global. Shared by the settings/status theme
+/// pickers and the themes-directory hot reload so neither duplicates the
+/// two-global update.
+pub fn install_theme(theme: LibriTheme, cx: &mut gpui::App) {
+    let colors = theme.colors.clone();
+    cx.set_global(theme);
+    cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
+          apply_theme_colors(theme, &colors);
+      });
+}
+
 /// directly by most components) and `tokens` (read by `DataTable` and other
 /// newer widgets) so the two stay in sync. `ColorTokens` has a smaller set of
 /// semantic roles than `gpui_kit::component::Theme` — where there's no
