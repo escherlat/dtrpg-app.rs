@@ -193,8 +193,7 @@ impl LibraryController {
     }
 
     /// Starts the next queued availability check if none is currently in
-    /// flight, mirroring [`Self::drain_thumbnail_queue`]'s single-flight
-    /// pattern. No-ops if a check is already in flight or the queue is
+    /// flight. No-ops if a check is already in flight or the queue is
     /// empty; re-invoked from [`Self::start_item_check`]'s completion
     /// handler for the next queued id.
     pub(super) fn drain_check_queue(&mut self, cx: &mut Context<Self>) {

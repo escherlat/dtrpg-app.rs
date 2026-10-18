@@ -5,19 +5,18 @@ use super::*;
 impl LibraryController {
     // ── Shared thumbnail/download concurrency ────────────────────────────────
 
-    /// Returns how many more thumbnail fetches and/or file downloads can be
-    /// dispatched right now without exceeding `max_concurrent_downloads`.
+    /// Returns how many more file downloads can be dispatched right now
+    /// without exceeding `max_concurrent_downloads`.
     ///
-    /// Thumbnail and download slots draw from the same aggregate limit (see
-    /// `thumbnail-queue-concurrency`'s "shared limit" requirement).
+    /// Thumbnail fetches no longer count here: they run on the work queue,
+    /// which applies the same limit to them separately. Downloads move onto
+    /// that queue next, which makes the limit shared again.
     pub(super) fn available_slots(&self) -> usize {
-        remaining_slots(self.max_concurrent_downloads,
-                        self.active_thumbnail_fetches,
-                        self.active_downloads)
+        remaining_slots(self.max_concurrent_downloads, 0, self.active_downloads)
     }
 
-    /// Updates the shared thumbnail/download concurrency limit and drains
-    /// both queues in case the new limit freed up slots.
+    /// Updates the concurrency limit for thumbnails and downloads, and starts
+    /// waiting work in case the new limit freed up slots.
     ///
     /// Called when [`crate::controllers::settings::SettingsController`]
     /// reports a `SettingsChanged` event, so a change made on the Storage
@@ -27,7 +26,7 @@ impl LibraryController {
             return;
         }
         self.max_concurrent_downloads = n;
-        self.drain_thumbnail_queue(cx);
+        self.work.set_limit(n);
         self.drain_download_queue(cx);
     }
 

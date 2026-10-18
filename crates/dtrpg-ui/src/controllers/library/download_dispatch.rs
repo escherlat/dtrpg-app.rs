@@ -168,7 +168,6 @@ impl LibraryController {
                               cx.emit(LibraryChanged);
                           }
                           ctrl.drain_download_queue(cx);
-                          ctrl.drain_thumbnail_queue(cx);
                           activity_id
                       })
                       .ok()

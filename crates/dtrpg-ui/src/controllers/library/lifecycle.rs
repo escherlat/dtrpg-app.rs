@@ -17,12 +17,35 @@ impl LibraryController {
                collections_service: Box<dyn CollectionsService>,
                activity: Entity<ActivityController>, cx: &mut Context<Self>)
                -> Self {
+        let (mut ctrl, work_events) = Self::build(service, collections_service, activity);
+        ctrl.start_work_event_pump(work_events, cx);
+        ctrl.start_load(cx);
+        ctrl.start_periodic_check_batch_timer(cx);
+        ctrl.start_periodic_catalog_refresh_timer(cx);
+        ctrl
+    }
+
+    /// Builds the controller's initial state, along with the receiver for its
+    /// work queue's events, without starting anything.
+    ///
+    /// Reads saved preferences from disk, but loads no catalog and starts no
+    /// timers or event loop, so tests can build a controller and drive it
+    /// themselves.
+    pub(super) fn build(service: Box<dyn LibraryService>,
+                        collections_service: Box<dyn CollectionsService>,
+                        activity: Entity<ActivityController>)
+                        -> (Self, JobEvents) {
         let vm = LibraryViewModel::new(service);
         let prefs = dtrpg_core::data::ui_preferences::UiPreferences::load();
         let view_prefs = dtrpg_core::data::file_openers::CatalogViewPrefs::load();
         let storage = StorageConfig::load();
+        let network_monitor = Arc::new(NetworkMonitor::new());
+        let cover_fetcher =
+            Arc::new(CoverFetcher::new(Arc::new(HttpCoverTransport::new(Arc::clone(&network_monitor))),
+                                       covers_dir()));
+        let (work, work_events) = WorkQueue::new(storage.max_concurrent_downloads());
 
-        let mut ctrl =
+        let ctrl =
             Self { vm,
                    activity,
                    catalog: Vec::new(),
@@ -41,8 +64,9 @@ impl LibraryController {
                    collections_loaded: false,
                    collections_service: Arc::from(collections_service),
                    collection_members: HashSet::new(),
-                   thumbnail_queue: VecDeque::new(),
-                   active_thumbnail_fetches: 0,
+                   work,
+                   cover_fetcher,
+                   thumbnail_jobs: ThumbnailJobs::default(),
                    thumbnail_activity_id: None,
                    thumbnail_processed: 0,
                    thumbnail_refresh_active: false,
@@ -53,7 +77,7 @@ impl LibraryController {
                    load_generation: 0,
                    catalog_sync_in_flight: false,
                    pending_reload: false,
-                   network_monitor: Arc::new(NetworkMonitor::new()),
+                   network_monitor,
                    items_cache: None,
                    publisher_search_open: false,
                    publisher_search_query: String::new(),
@@ -85,10 +109,27 @@ impl LibraryController {
                    pending_download: None,
                    bulk_selection_mode: false,
                    bulk_selected_ids: HashSet::new() };
-        ctrl.start_load(cx);
-        ctrl.start_periodic_check_batch_timer(cx);
-        ctrl.start_periodic_catalog_refresh_timer(cx);
-        ctrl
+        (ctrl, work_events)
+    }
+
+    /// Starts a loop that applies each work-queue event to the controller, for
+    /// as long as the controller lives.
+    ///
+    /// Events arrive on the foreground executor, one at a time, so handlers
+    /// can update controller state without further synchronization. The loop
+    /// ends when the controller is dropped: the queue's sender goes with it,
+    /// which closes the channel.
+    pub(super) fn start_work_event_pump(&self, mut events: JobEvents, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, async_cx| {
+              while let Some(event) = events.recv().await {
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.handle_work_event(event, cx))
+                                  .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
     }
 
     /// Starts a background loop that calls

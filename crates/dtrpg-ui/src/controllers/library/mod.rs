@@ -14,24 +14,27 @@ use dtrpg_core::data::constants::{
     CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
     CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS,
 };
-use dtrpg_core::data::cover_cache::{load_cached_cover, save_cached_cover};
+use dtrpg_core::data::cover_cache::load_cached_cover;
 use dtrpg_core::data::enums::*;
 use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
+use dtrpg_core::services::covers::{CoverFetcher, HttpCoverTransport};
 use dtrpg_core::services::network_monitor::NetworkMonitor;
 use dtrpg_core::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};
 use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
 use dtrpg_core::util::sort::*;
+use dtrpg_core::work::{JobEvents, WorkQueue};
 use gpui::{
     AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task, Window,
 };
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
+use thumbnail_jobs::ThumbnailJobs;
 
 use crate::controllers::activity::ActivityController;
 use crate::data::events::*;
@@ -61,12 +64,15 @@ mod helpers;
 mod lifecycle;
 mod preferences;
 mod selection;
+mod thumbnail_jobs;
 mod thumbnails;
 
 #[cfg(test)]
 mod tests_catalog;
 #[cfg(test)]
 mod tests_checks;
+#[cfg(test)]
+mod tests_thumbnails;
 #[cfg(test)]
 mod tests_ui;
 
@@ -132,17 +138,6 @@ pub struct LibrarySnapshot {
     pub bulk_selection_count:      usize,
 }
 
-/// Error from a cover/avatar thumbnail fetch, carrying the `Retry-After`
-/// duration when the failure was an HTTP 429 response so the fetch's
-/// `retry_with_backoff` call can honor it instead of the default backoff.
-struct ThumbnailFetchError {
-    /// Human-readable description of the failure, logged as-is.
-    message:     String,
-    /// The server-specified wait duration from a `Retry-After` header, when
-    /// the failure was an HTTP 429 response that included one.
-    retry_after: Option<std::time::Duration>,
-}
-
 /// Owns all mutable state for the library view.
 pub struct LibraryController {
     /// View model that owns the service and pane state.
@@ -191,22 +186,21 @@ pub struct LibraryController {
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
     pub collection_members:        HashSet<u64>,
-    /// Queue of `(item_id, cover_url, force_network)` triples pending thumbnail
-    /// fetches. `force_network` skips the disk cache and always re-fetches —
-    /// set for manual "Load Thumbnail"/"Refresh Thumbnails" actions, which
-    /// exist specifically to bypass a stale cached image; left `false` for
-    /// automatic background loads.
-    thumbnail_queue:               VecDeque<(Arc<str>, Arc<str>, bool)>,
-    /// Number of thumbnail fetches currently in flight. Bounded by
-    /// [`Self::available_slots`] together with `active_downloads`.
-    active_thumbnail_fetches:      usize,
+    /// The core work queue that runs thumbnail fetches. Its limit is kept in
+    /// step with `max_concurrent_downloads`.
+    work:                          WorkQueue,
+    /// Fetches cover images, reading the disk cache before the network.
+    cover_fetcher:                 Arc<CoverFetcher>,
+    /// Every thumbnail fetch submitted to `work` that has not finished.
+    thumbnail_jobs:                ThumbnailJobs,
     /// Activity id for the aggregated thumbnail loading entry.
     thumbnail_activity_id:         Option<u64>,
     /// Number of thumbnails processed (successes and failures both count) in
     /// the current batch. Reset to `0` whenever a new aggregated activity
-    /// item starts. Together with the live queue length this gives a real,
-    /// monotonically advancing progress fraction — `processed / (processed
-    /// + queue.len())` — instead of an indeterminate placeholder.
+    /// item starts. Together with the number of fetches not yet finished this
+    /// gives a real, monotonically advancing progress fraction —
+    /// `processed / (processed + unfinished)` — instead of an indeterminate
+    /// placeholder.
     thumbnail_processed:           usize,
     /// True while a [`Self::refresh_all_thumbnails`] batch is in progress.
     /// Drives the distinct "Refreshing…" activity label; cleared once
@@ -345,14 +339,14 @@ pub struct LibraryController {
     /// check. `LibraryChanged` is emitted on insertion and removal.
     verifying_downloads:           HashSet<Arc<str>>,
     /// Queue of item ids awaiting a periodic per-item availability check
-    /// (see `catalog-item-level-reconciliation`), mirroring `thumbnail_queue`.
+    /// (see `catalog-item-level-reconciliation`).
     check_queue:                   VecDeque<Arc<str>>,
     /// Queue of `(item_id, file_index, title)` triples pending a file
     /// download. Keyed per file (not per entry) so a multi-item entry can
     /// have more than one of its files queued or active independently.
     download_queue:                VecDeque<(Arc<str>, u32, String)>,
     /// Number of file downloads currently in flight. Bounded by
-    /// [`Self::available_slots`] together with `active_thumbnail_fetches`.
+    /// [`Self::available_slots`].
     active_downloads:              usize,
     /// Per-file cancellation flag for an in-flight download, keyed by
     /// `(item_id, file_index)`, set by [`Self::cancel_download`] and polled by
