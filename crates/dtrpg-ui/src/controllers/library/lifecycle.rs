@@ -64,7 +64,7 @@ impl LibraryController {
                    selected_item_file: HashMap::new(),
                    other_details_open: HashMap::new(),
                    file_other_details_open: HashMap::new(),
-                   zip_preview: None,
+                   container_preview: None,
                    file_info_cache: HashMap::new(),
                    checking_items: HashSet::new(),
                    verifying_downloads: HashSet::new(),

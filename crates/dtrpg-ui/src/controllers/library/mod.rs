@@ -128,10 +128,10 @@ pub struct LibrarySnapshot {
     pub bulk_selection_count:      usize,
 }
 
-/// A Zip content preview popover open for one file row within a detail
-/// tab's item tier (see `zip-content-preview`).
+/// A Container content preview popover open for one file row within a detail
+/// tab's item tier (see `container-content-preview`).
 #[derive(Clone)]
-struct ZipPreviewState {
+struct ContainerPreviewState {
     /// Catalog entry id owning the previewed file row.
     entry_id:   Arc<str>,
     /// The file's position within the entry's `files` list.
@@ -323,13 +323,13 @@ pub struct LibraryController {
     /// `selected_item_file`. Ephemeral — never persisted, and defaults to
     /// collapsed.
     file_other_details_open:       HashMap<Arc<str>, bool>,
-    /// The Zip content preview popover currently open (hovered or pinned) in
-    /// a detail tab's item tier, if any (see `zip-content-preview`). At most
+    /// The Container content preview popover currently open (hovered or pinned) in
+    /// a detail tab's item tier, if any (see `container-content-preview`). At most
     /// one is shown at a time. Ephemeral — never persisted, and cleared
     /// whenever the entry's detail tab is closed or reopened, same
     /// convention as `selected_item_file`.
-    zip_preview:                   Option<ZipPreviewState>,
-    /// Per-file Info column metadata (PDF page count, Zip file count, image
+    container_preview:                   Option<ContainerPreviewState>,
+    /// Per-file Info column metadata (PDF page count, Container file count, image
     /// dimensions), keyed by `(entry_id, row_ix)` and computed once on first
     /// access — see [`Self::file_info`]. Evicted per-entry whenever a file's
     /// `downloaded` flag transitions, since re-downloading may change the

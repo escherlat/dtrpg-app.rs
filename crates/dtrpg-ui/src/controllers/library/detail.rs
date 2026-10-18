@@ -3,20 +3,20 @@
 use super::*;
 
 impl LibraryController {
-    // ── Zip content preview (item tier) ──────────────────────────────────────
+    // ── Container content preview (item tier) ──────────────────────────────────────
 
     /// Returns the active Zip preview's file row and anchor position for
     /// `entry_id`, if one is open (hovered or pinned).
     #[must_use]
-    pub fn zip_preview_for(&self, entry_id: &str) -> Option<(usize, Point<Pixels>, bool)> {
-        self.zip_preview
+    pub fn container_preview_for(&self, entry_id: &str) -> Option<(usize, Point<Pixels>, bool)> {
+        self.container_preview
             .as_ref()
             .filter(|p| p.entry_id.as_ref() == entry_id)
             .map(|p| (p.row_ix, p.anchor_pos, p.pinned))
     }
 
     /// Returns `entry_id`'s file at `row_ix`'s Info column value (PDF page
-    /// count, Zip file count, or image dimensions).
+    /// count, Container file count, or image dimensions).
     ///
     /// Returns the cached value if present. Otherwise, if the file has been
     /// downloaded to `entry_dir`, extracts and caches its Info value via
@@ -50,9 +50,9 @@ impl LibraryController {
     /// re-read the archive or re-notify every frame.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn hover_zip_preview(&mut self, entry_id: Arc<str>, row_ix: usize,
+    pub fn hover_container_preview(&mut self, entry_id: Arc<str>, row_ix: usize,
                              anchor_pos: Point<Pixels>, cx: &mut Context<Self>) {
-        if let Some(existing) = &self.zip_preview {
+        if let Some(existing) = &self.container_preview {
             if existing.pinned && (existing.entry_id != entry_id || existing.row_ix != row_ix) {
                 return;
             }
@@ -60,7 +60,7 @@ impl LibraryController {
                 return;
             }
         }
-        self.zip_preview = Some(ZipPreviewState { entry_id,
+        self.container_preview = Some(ContainerPreviewState { entry_id,
                                                   row_ix,
                                                   anchor_pos,
                                                   pinned: false });
@@ -72,15 +72,15 @@ impl LibraryController {
     /// is the active preview.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn clear_hover_zip_preview(&mut self, entry_id: &str, row_ix: usize,
+    pub fn clear_hover_container_preview(&mut self, entry_id: &str, row_ix: usize,
                                    cx: &mut Context<Self>) {
-        let should_clear = self.zip_preview.as_ref().is_some_and(|p| {
+        let should_clear = self.container_preview.as_ref().is_some_and(|p| {
                                                         !p.pinned
                                                         && p.entry_id.as_ref() == entry_id
                                                         && p.row_ix == row_ix
                                                     });
         if should_clear {
-            self.zip_preview = None;
+            self.container_preview = None;
             cx.emit(LibraryChanged);
         }
     }
@@ -90,17 +90,17 @@ impl LibraryController {
     /// click, or clears it entirely on a second click of the same row.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn toggle_zip_preview_pin(&mut self, entry_id: Arc<str>, row_ix: usize,
+    pub fn toggle_container_preview_pin(&mut self, entry_id: Arc<str>, row_ix: usize,
                                   anchor_pos: Point<Pixels>, cx: &mut Context<Self>) {
         let already_pinned =
-            self.zip_preview
+            self.container_preview
                 .as_ref()
                 .is_some_and(|p| p.pinned && p.entry_id == entry_id && p.row_ix == row_ix);
-        self.zip_preview = if already_pinned {
+        self.container_preview = if already_pinned {
             None
         }
         else {
-            Some(ZipPreviewState { entry_id,
+            Some(ContainerPreviewState { entry_id,
                                    row_ix,
                                    anchor_pos,
                                    pinned: true })
@@ -112,12 +112,12 @@ impl LibraryController {
     /// pinned — used by the popover's own close control.
     ///
     /// Emits [`LibraryChanged`].
-    pub fn close_zip_preview(&mut self, entry_id: &str, cx: &mut Context<Self>) {
-        if self.zip_preview
+    pub fn close_container_preview(&mut self, entry_id: &str, cx: &mut Context<Self>) {
+        if self.container_preview
                .as_ref()
                .is_some_and(|p| p.entry_id.as_ref() == entry_id)
         {
-            self.zip_preview = None;
+            self.container_preview = None;
             cx.emit(LibraryChanged);
         }
     }

@@ -139,9 +139,9 @@ detail:
   field_file_id: "ID du fichier"
   field_download_location: "Emplacement de téléchargement"
   copy_tooltip: "Copier"
-  zip_preview_heading: "Contenu du Zip"
-  zip_preview_empty: "Cette archive ne contient aucune entrée."
-  zip_preview_unavailable: "Aperçu indisponible"
+  container_preview_heading: "Contenu du conteneur"
+  container_preview_empty: "Ce conteneur ne contient aucune entrée."
+  container_preview_unavailable: "Aperçu indisponible"
 
 settings:
   title: "Réglages"
