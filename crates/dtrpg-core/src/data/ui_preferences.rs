@@ -12,7 +12,7 @@ use crate::util::sort::{CollectionSortMethod, SortDirection};
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct UiPreferencesFile {
-    /// Persisted key of the active color theme (`ThemeKey`'s variant name,
+    /// Persisted id of the active color theme (its stable `ThemeId` string,
     /// lowercased). `None` before this preference existed, or if never
     /// changed from the default.
     pub theme_key: Option<String>,

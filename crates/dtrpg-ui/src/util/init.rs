@@ -7,7 +7,8 @@ use dtrpg_core::data::paths::cache_dir;
 use dtrpg_core::data::ui_preferences::UiPreferences;
 use gpui::{App, SharedString, px};
 
-use crate::data::theme::{Density, FontSelections, LibriTheme, ThemeKey};
+use crate::data::theme::{Density, FontSelections, LibriTheme};
+use crate::data::theme_catalog::ThemeCatalog;
 use crate::i18n;
 use crate::ui::library::cover::CoverCache;
 
@@ -43,8 +44,8 @@ pub fn init_globals(cx: &mut App) {
 /// whichever selections aren't being changed.
 fn initial_theme(cx: &App) -> LibriTheme {
     let prefs = UiPreferences::load();
-    let key = prefs.theme_key()
-                   .and_then(ThemeKey::from_persisted_key)
+    let id = prefs.theme_key()
+                   .and_then(ThemeCatalog::resolve)
                    .unwrap_or_default();
 
     let installed = cx.text_system().all_font_names();
@@ -64,7 +65,7 @@ fn initial_theme(cx: &App) -> LibriTheme {
                                  label_font,
                                  mono_font,
                                  ui_text_size };
-    LibriTheme::new(key, Density::default(), fonts)
+    LibriTheme::new(id, Density::default(), fonts)
 }
 
 /// Resolves a persisted font family name against `installed` (the system's
