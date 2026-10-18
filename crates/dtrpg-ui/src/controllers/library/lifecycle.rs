@@ -102,6 +102,8 @@ impl LibraryController {
                           check_jobs: CheckJobs::default(),
                           download_jobs: DownloadJobs::default(),
                           cache_root: cache_dir(),
+                          reconcile_tags_after_verify: false,
+                          file_tags_reconciled: false,
                           max_concurrent_downloads: storage.max_concurrent_downloads(),
                           recently_updated_window_days: storage.recently_updated_window_days(),
                           pending_download: None,
@@ -272,6 +274,7 @@ impl LibraryController {
                       }
                       ctrl.apply_verifications(&verifications);
                       cx.emit(LibraryChanged);
+                      ctrl.reconcile_file_tags_if_requested(cx);
                   })
                   .ok();
           })

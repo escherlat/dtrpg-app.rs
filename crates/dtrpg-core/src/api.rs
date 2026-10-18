@@ -135,6 +135,82 @@ impl LibraryApi {
             .count_recently_updated(now_secs, window_days)
     }
 
+    /// Returns every tag that some item in the local index has, ordered
+    /// ignoring case.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or queried.
+    pub fn index_list_tags(&self) -> Result<Vec<String>, IndexError> {
+        self.open_index()?.list_tags()
+    }
+
+    /// Returns the tags of the item `item_id` (the stable catalog id), ordered
+    /// ignoring case.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or queried.
+    pub fn index_item_tags(&self, item_id: &str) -> Result<Vec<String>, IndexError> {
+        self.open_index()?.tags_for_item(item_id)
+    }
+
+    /// Returns the tags of every item that has any, keyed by the stable catalog
+    /// id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or queried.
+    pub fn index_all_item_tags(
+        &self)
+        -> Result<std::collections::HashMap<String, Vec<String>>, IndexError> {
+        self.open_index()?.all_item_tags()
+    }
+
+    /// Tags the item `item_id` with `tag`; returns `false` if it already had
+    /// the tag. Tags are free text, unique ignoring case: adding "Solo" when
+    /// "solo" exists uses the existing spelling.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::InvalidTag`] if `tag` is empty, longer than 64
+    /// characters, or contains a comma or control character,
+    /// [`IndexError::NoSuchItem`] if the item is not in the index, and another
+    /// [`IndexError`] if the index cannot be opened or written.
+    pub fn index_add_tag(&self, item_id: &str, tag: &str) -> Result<bool, IndexError> {
+        self.open_index()?.add_tag(item_id, tag)
+    }
+
+    /// Removes `tag` from the item `item_id`; returns `false` if it did not
+    /// have the tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or written.
+    pub fn index_remove_tag(&self, item_id: &str, tag: &str) -> Result<bool, IndexError> {
+        self.open_index()?.remove_tag(item_id, tag)
+    }
+
+    /// Renames the tag `from` to `to` on every item and returns how many items
+    /// that was. If `to` is already a tag, the two are merged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::InvalidTag`] if `to` cannot be stored, and another
+    /// [`IndexError`] if the index cannot be opened or written.
+    pub fn index_rename_tag(&self, from: &str, to: &str) -> Result<usize, IndexError> {
+        self.open_index()?.rename_tag(from, to)
+    }
+
+    /// Removes the tag `tag` from every item and returns how many items had it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or written.
+    pub fn index_delete_tag(&self, tag: &str) -> Result<usize, IndexError> {
+        self.open_index()?.delete_tag(tag)
+    }
+
     /// Lists every item in the user's library.
     ///
     /// # Errors
@@ -290,6 +366,33 @@ mod tests {
         assert_eq!(api.index_count_by_status(ItemStatus::Downloaded).unwrap(),
                    downloaded);
         assert_eq!(api.index_count_all().unwrap(), catalog.len());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn tags_are_stored_in_the_index_and_found_by_search() {
+        let dir = test_dir("tags");
+        let _ = std::fs::remove_dir_all(&dir);
+        let api = api_at(&dir);
+        let catalog = stub_catalog();
+        api.open_index()
+           .unwrap()
+           .replace_all_items(&catalog)
+           .unwrap();
+        let id = catalog[0].id.to_string();
+
+        assert!(api.index_add_tag(&id, "solo").unwrap());
+        assert!(!api.index_add_tag(&id, "Solo").unwrap());
+
+        assert_eq!(api.index_item_tags(&id).unwrap(), ["solo"]);
+        assert_eq!(api.index_list_tags().unwrap(), ["solo"]);
+        let found = api.search("solo").unwrap();
+        assert!(found.iter().any(|item| item.id == catalog[0].id));
+
+        assert_eq!(api.index_rename_tag("solo", "duet").unwrap(), 1);
+        assert_eq!(api.index_delete_tag("duet").unwrap(), 1);
+        assert!(api.index_list_tags().unwrap().is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::data::enums::ItemStatus;
-use crate::data::index::IndexError;
+use crate::data::index::{IndexError, tags};
 use crate::data::library::{LibraryItem, LibraryItemFile};
 
 fn status_to_text(status: ItemStatus) -> &'static str {
@@ -108,12 +108,13 @@ fn insert_item(conn: &Connection, item: &LibraryItem) -> rusqlite::Result<()> {
     conn.execute(
                  "INSERT INTO items_fts (item_id, title, publisher, authors, description, tags,
                                  file_names, summary_text)
-         VALUES (?1, ?2, ?3, '', ?4, '', ?5, '')",
+         VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, '')",
                  params![
         item.id.as_ref(),
         item.title.as_ref(),
         item.publisher.as_ref(),
         item.desc.as_ref(),
+        tags::joined_for_item(conn, &item.id)?,
         file_names,
     ],
     )?;

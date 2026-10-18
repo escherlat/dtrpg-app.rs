@@ -6,7 +6,7 @@ use rusqlite::Connection;
 /// Bump whenever the schema changes in a way that requires existing
 /// databases to be rebuilt, mirroring `catalog_cache.rs`'s
 /// `CACHE_SCHEMA_VERSION` convention for the JSON cache it replaces.
-pub(super) const SCHEMA_VERSION: i64 = 2;
+pub(super) const SCHEMA_VERSION: i64 = 3;
 
 /// Creates every table, index, and the FTS5 virtual table if they don't
 /// already exist, then records (or checks) the schema version via SQLite's
@@ -73,8 +73,11 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
             name TEXT NOT NULL UNIQUE
         );
 
+        -- No foreign key on item_id: the catalog is rewritten in full, and
+        -- deleting its rows must not delete the user's tags with them (the
+        -- catalog is saved in checkpoints while pages are still loading).
         CREATE TABLE IF NOT EXISTS item_tags (
-            item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            item_id TEXT NOT NULL,
             tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
             PRIMARY KEY (item_id, tag_id)
         );
@@ -120,6 +123,22 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
     if previous_version == 1 {
         conn.execute("ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0",
                      [])?;
+    }
+    if (1..3).contains(&previous_version) {
+        // Version 3 dropped the foreign key from `item_tags.item_id`. SQLite
+        // cannot drop a constraint, so the table is rebuilt.
+        conn.execute_batch(
+                           "
+            CREATE TABLE item_tags_new (
+                item_id TEXT NOT NULL,
+                tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (item_id, tag_id)
+            );
+            INSERT INTO item_tags_new (item_id, tag_id) SELECT item_id, tag_id FROM item_tags;
+            DROP TABLE item_tags;
+            ALTER TABLE item_tags_new RENAME TO item_tags;
+            ",
+        )?;
     }
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())

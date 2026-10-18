@@ -67,6 +67,7 @@ mod diagnostics;
 mod download_dispatch;
 mod download_jobs;
 mod downloads;
+mod file_tags;
 mod filtering;
 mod helpers;
 mod lifecycle;
@@ -83,6 +84,8 @@ mod tests_catalog;
 mod tests_checks;
 #[cfg(test)]
 mod tests_downloads;
+#[cfg(test)]
+mod tests_file_tags;
 #[cfg(test)]
 mod tests_support;
 #[cfg(test)]
@@ -363,6 +366,12 @@ pub struct LibraryController {
     /// Where the catalog cache is saved after a download. A field so tests
     /// can point it somewhere other than the user's real cache.
     cache_root:                    PathBuf,
+    /// Set by a full catalog load, and cleared when the verification of
+    /// downloads that follows it reconciles the files' tags with the index.
+    reconcile_tags_after_verify:   bool,
+    /// Whether the files' tags have been reconciled with the index in this
+    /// launch. They are reconciled at most once.
+    file_tags_reconciled:          bool,
     /// Shared thumbnail/download concurrency limit. Initialized from
     /// [`dtrpg_core::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].

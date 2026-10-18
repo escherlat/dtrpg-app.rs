@@ -75,3 +75,7 @@ bzip2 = "0.6.1"
 xz2 = "0.1.7"
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 tempfile = "3.27.0"
+# File-system tags: extended attributes (macOS and Linux) and the binary
+# property list macOS stores user tags in.
+xattr = "1.6"
+plist = "1"
