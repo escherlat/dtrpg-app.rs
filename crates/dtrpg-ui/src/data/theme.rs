@@ -41,12 +41,84 @@ pub struct ColorTokens {
     pub shadow:         Hsla,
     /// Overlay scrim.
     pub scrim:          Hsla,
-    /// Error / destructive state (red).
+    /// Error / destructive state (red). Fixed by mode, never read from a
+    /// theme file (see [`semantic_colors`]).
     pub error:          Hsla,
-    /// Warning banner background (amber, low opacity).
+    /// Warning banner background (amber, low opacity). Fixed by mode.
     pub warning_bg:     Hsla,
-    /// Warning banner text / icon color (amber, full opacity).
+    /// Warning banner text / icon color (amber, full opacity). Fixed by mode.
     pub warning_text:   Hsla,
+}
+
+// ── Semantic state colors
+// ────────────────────────────────────────────────────────
+
+/// Light or dark variant a theme declares. Used to select the fixed semantic
+/// state colors and the fallback base for a partially-specified theme file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeMode {
+    Light,
+    Dark,
+}
+
+impl ThemeMode {
+    /// The canonical lowercase spelling used in theme files.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ThemeMode::Light => "light",
+            ThemeMode::Dark => "dark",
+        }
+    }
+}
+
+impl std::str::FromStr for ThemeMode {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "light" => Ok(ThemeMode::Light),
+            "dark" => Ok(ThemeMode::Dark),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for ThemeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Semantic state colors (error / warning) that no theme file may override,
+/// so a theme can never make a failed download look healthy or an error
+/// indistinguishable from a success state (ADR-0005).
+#[derive(Debug, Clone, Copy)]
+pub struct SemanticColors {
+    /// Error / destructive state (red).
+    pub error:       Hsla,
+    /// Warning banner background (amber, low opacity).
+    pub warning_bg:   Hsla,
+    /// Warning banner text / icon color (amber, full opacity).
+    pub warning_text: Hsla,
+}
+
+/// Returns the fixed semantic colors for a theme's [`ThemeMode`].
+///
+/// These are compile-time constants chosen by light/dark mode, deliberately
+/// outside the themeable palette: a theme file cannot set them.
+pub fn semantic_colors(mode: ThemeMode) -> SemanticColors {
+    match mode {
+        ThemeMode::Light => SemanticColors {
+            error:        hex(0xB0, 0x30, 0x28),
+            warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.12),
+            warning_text: gpui::hsla(0.08, 0.85, 0.35, 1.0),
+        },
+        ThemeMode::Dark => SemanticColors {
+            error:        hex(0xE0, 0x58, 0x58),
+            warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.10),
+            warning_text: gpui::hsla(0.10, 0.90, 0.65, 1.0),
+        },
+    }
 }
 
 // ── Density
@@ -210,14 +282,7 @@ impl gpui::Global for LibriTheme {}
 impl LibriTheme {
     /// Constructs the theme for `key`, `density`, and `fonts`.
     pub fn new(key: ThemeKey, density: Density, fonts: FontSelections) -> Self {
-        let colors = match key {
-            ThemeKey::Parchment => parchment_colors(),
-            ThemeKey::Slate => slate_colors(),
-            ThemeKey::Sage => sage_colors(),
-            ThemeKey::Ink => ink_colors(),
-            ThemeKey::Moss => moss_colors(),
-            ThemeKey::Rosewood => rosewood_colors(),
-        };
+        let colors = crate::data::theme_loader::load_builtin(key);
         let density_constants = match density {
             Density::Comfortable => DensityConstants::comfortable(),
             Density::Compact => DensityConstants::compact(),
@@ -537,12 +602,12 @@ pub fn apply_theme_colors(theme: &mut gpui_kit::component::Theme, colors: &Color
 // ── Color constructors
 // ────────────────────────────────────────────────────────
 
-fn hex(r: u8, g: u8, b: u8) -> Hsla {
+pub(crate) fn hex(r: u8, g: u8, b: u8) -> Hsla {
     let n = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
     gpui::rgb(n).into()
 }
 
-fn hex_a(r: u8, g: u8, b: u8, a: f32) -> Hsla {
+pub(crate) fn hex_a(r: u8, g: u8, b: u8, a: f32) -> Hsla {
     let n = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
     let base: Hsla = gpui::rgb(n).into();
     Hsla { a, ..base }
@@ -556,7 +621,7 @@ fn hex_a(r: u8, g: u8, b: u8, a: f32) -> Hsla {
 // --shadow:rgba(58,46,26,0.18)  --scrim:rgba(30,22,10,0.26)
 // accent: oklch(0.47 0.105 25) ≈ #8C4A22 (warm brown-orange)
 
-fn parchment_colors() -> ColorTokens {
+pub(crate) fn parchment_colors() -> ColorTokens {
     ColorTokens { desktop_bg:     hex(0xC5, 0xB9, 0x9D),
                   surface:        hex(0xFC, 0xF9, 0xF3),
                   surface_alt:    hex(0xF2, 0xEC, 0xDF),
@@ -583,7 +648,7 @@ fn parchment_colors() -> ColorTokens {
 // --shadow:rgba(28,42,58,0.18)  --scrim:rgba(18,28,40,0.26)
 // accent: oklch(0.47 0.095 25) ≈ #7A4220 (cooler warm)
 
-fn slate_colors() -> ColorTokens {
+pub(crate) fn slate_colors() -> ColorTokens {
     ColorTokens { desktop_bg:     hex(0xAD, 0xB7, 0xBF),
                   surface:        hex(0xFC, 0xFD, 0xFE),
                   surface_alt:    hex(0xEE, 0xF1, 0xF4),
@@ -610,7 +675,7 @@ fn slate_colors() -> ColorTokens {
 // --shadow:rgba(38,48,28,0.18)  --scrim:rgba(24,32,18,0.26)
 // accent: oklch(0.47 0.095 25) ≈ #7A4220
 
-fn sage_colors() -> ColorTokens {
+pub(crate) fn sage_colors() -> ColorTokens {
     ColorTokens { desktop_bg:     hex(0xB2, 0xBC, 0xA0),
                   surface:        hex(0xFA, 0xFB, 0xF6),
                   surface_alt:    hex(0xED, 0xF0, 0xE7),
@@ -637,7 +702,7 @@ fn sage_colors() -> ColorTokens {
 // --shadow:rgba(0,0,0,0.5)  --scrim:rgba(0,0,0,0.45)
 // accent: oklch(0.76 0.115 25) ≈ #E0845A (light warm)
 
-fn ink_colors() -> ColorTokens {
+pub(crate) fn ink_colors() -> ColorTokens {
     ColorTokens { desktop_bg:     hex(0x14, 0x11, 0x0A),
                   surface:        hex(0x1B, 0x18, 0x12),
                   surface_alt:    hex(0x21, 0x1D, 0x15),
@@ -666,7 +731,7 @@ fn ink_colors() -> ColorTokens {
 // --shadow:rgba(0,0,0,0.5)  --scrim:rgba(0,0,0,0.45)
 // accent: muted gold-green ≈ #9CB06A
 
-fn moss_colors() -> ColorTokens {
+pub(crate) fn moss_colors() -> ColorTokens {
     ColorTokens { desktop_bg:     hex(0x0F, 0x17, 0x12),
                   surface:        hex(0x16, 0x20, 0x1A),
                   surface_alt:    hex(0x1C, 0x27, 0x20),
@@ -696,7 +761,7 @@ fn moss_colors() -> ColorTokens {
 // --shadow:rgba(58,26,24,0.18)  --scrim:rgba(32,14,12,0.26)
 // accent: deep wine red ≈ #7A2C2C
 
-fn rosewood_colors() -> ColorTokens {
+pub(crate) fn rosewood_colors() -> ColorTokens {
     ColorTokens { desktop_bg:     hex(0xC9, 0xA8, 0xA0),
                   surface:        hex(0xFB, 0xF3, 0xF1),
                   surface_alt:    hex(0xF0, 0xE0, 0xDC),
