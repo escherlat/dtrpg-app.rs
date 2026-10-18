@@ -1,4 +1,11 @@
 
+## 0.4.1 - 2026-10-17
+
+### Fixed
+- Enable Secret Service keyring backend
+
+
+
 ## 0.4.0 - 2026-10-16
 
 ### Added
