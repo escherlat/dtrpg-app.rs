@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use crate::util::zip_preview;
+use dtrpg_core::util::container;
 
 /// A file's Info column value. Formats without a defined extraction, and
 /// files whose content can't be parsed, are represented by [`Self::None`]
@@ -46,7 +46,7 @@ pub fn extract_pdf_page_count(path: &Path) -> Option<u32> {
 /// the same archive-reading path as the zip-content-preview hover.
 #[must_use]
 pub fn extract_zip_file_count(path: &Path) -> Option<u32> {
-    let entries = zip_preview::list_entries(path).ok()?;
+    let entries = container::list_entries(path).ok()?;
     u32::try_from(entries.len()).ok()
 }
 

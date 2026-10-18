@@ -11,4 +11,3 @@ pub mod reveal;
 pub mod size;
 pub mod symlink;
 pub mod text;
-pub mod zip_preview;
