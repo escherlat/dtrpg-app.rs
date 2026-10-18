@@ -13,5 +13,6 @@ pub mod data;
 pub mod logging;
 pub mod models;
 pub mod platform;
+pub mod runtime;
 pub mod services;
 pub mod util;

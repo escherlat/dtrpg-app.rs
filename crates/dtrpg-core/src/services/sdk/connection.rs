@@ -17,7 +17,7 @@ use dtrpg_sdk::{
     AuthTokenResponse, ClientError, Config, DriveThruRpgSdk, LibraryClient as SdkLibraryClient,
     SdkError, auth::key_exchange,
 };
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Handle;
 
 use crate::constants::{
     ACCESS_TOKEN_ENV, API_BASE_URL_ENV, APPLICATION_KEY_ENV, REFRESH_TOKEN_ENV,
@@ -30,10 +30,11 @@ use crate::{
         token_status::{TokenStatus, TokenStatusHandle},
     },
     services::LoginTokens,
+    runtime,
     util::datetime::now_secs,
 };
 
-/// An SDK session plus the runtime that drives it.
+/// An SDK session plus a handle to the shared runtime that drives it.
 ///
 /// When a request fails with HTTP 401 (expired access token), the connection
 /// renews the session and retries the request once, so callers never see an
@@ -47,7 +48,7 @@ pub(super) struct SdkConnection {
     application_key: String,
     session: Mutex<Session>,
     token_status: TokenStatusHandle,
-    runtime: Runtime,
+    runtime: Handle,
 }
 
 /// The SDK's auth state and the client built from its current access token.
@@ -227,10 +228,7 @@ fn build_connection(
     .map_err(ConnectionError::Sdk)?;
 
     let client = sdk.library_client().map_err(ConnectionError::Sdk)?;
-    let runtime = Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .map_err(ConnectionError::RuntimeInit)?;
+    let runtime = runtime::handle().map_err(ConnectionError::RuntimeInit)?;
 
     let session = Session {
         sdk,
@@ -311,7 +309,7 @@ mod tests {
             application_key: "app-key".to_string(),
             session: Mutex::new(Session { sdk, client }),
             token_status: TokenStatusHandle::default(),
-            runtime: Builder::new_multi_thread().enable_all().build().unwrap(),
+            runtime: runtime::handle().unwrap(),
         }
     }
 
