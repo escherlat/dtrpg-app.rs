@@ -38,6 +38,7 @@ dirs = "7"
 rfd = "0.17"
 keyring = { version = "3", features = ["apple-native", "sync-secret-service"] }
 thiserror = "2"
+rmcp = { version = "3.5.1", features = ["server", "macros", "transport-io", "schemars"] }
 tracing = "0.1"
 dtrpg-core = { path = "crates/dtrpg-core" }
 dtrpg-ui = { path = "crates/dtrpg-ui" }
