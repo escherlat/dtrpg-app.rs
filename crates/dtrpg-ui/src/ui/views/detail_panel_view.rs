@@ -44,7 +44,7 @@ use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
 use crate::util::reveal::reveal_in_file_manager;
 use crate::view_models::inspector::{
-    InspectorContentsState, InspectorPreviewState, InspectorTab, InspectorViewModel,
+    InspectorContentsState, InspectorPreviewState, InspectorTab, InspectorViewModel
 };
 
 /// Renders the expanded detail tab's content: a large cover, title,
@@ -1570,8 +1570,7 @@ fn render_secondary_inspector_tab(item: &LibraryItem, tab: InspectorTab,
         InspectorTab::Collections => render_collections_section(item, context.entity.clone(), context.colors, context.cx)
             .into_any_element(),
         InspectorTab::Contents => {
-            let _filter_input = context.entity.read(context.cx)
-                                               .inspector_filter_input_for(&item.id);
+            let _filter_input = context.entity.read(context.cx).inspector_filter_input_for(&item.id);
             render_inspector_contents(&contents, &item.id, context.entity.clone(), context.colors, context.cx)
         }
         InspectorTab::Summary => div().flex()
