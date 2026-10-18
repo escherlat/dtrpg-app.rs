@@ -161,7 +161,7 @@ mod tests {
                           format:     "PDF".into(),
                           size_mb:    1.0,
                           downloaded: false,
-                offloaded: false, }
+                          offloaded:  false, }
     }
 
     #[test]

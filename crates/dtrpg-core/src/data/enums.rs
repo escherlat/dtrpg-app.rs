@@ -32,9 +32,11 @@ impl ItemActivity {
     pub fn of(is_downloading: bool, is_verifying: bool) -> Self {
         if is_downloading {
             Self::Downloading
-        } else if is_verifying {
+        }
+        else if is_verifying {
             Self::Verifying
-        } else {
+        }
+        else {
             Self::Idle
         }
     }

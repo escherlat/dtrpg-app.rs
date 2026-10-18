@@ -1,7 +1,6 @@
 //! Appearance/locale preferences and small presentation accessors.
 
 use super::*;
-
 use crate::data::theme_catalog::ThemeId;
 
 impl LibraryController {

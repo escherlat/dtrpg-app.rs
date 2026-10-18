@@ -28,8 +28,6 @@ mod tests {
 
     #[test]
     fn missing_file_is_not_offloaded() {
-        assert!(!is_offloaded(std::path::Path::new(
-            "/definitely/not/a/libri-file",
-        )));
+        assert!(!is_offloaded(std::path::Path::new("/definitely/not/a/libri-file",)));
     }
 }

@@ -150,10 +150,11 @@ fn row_to_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
 }
 
 fn load_files_for(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<LibraryItemFile>> {
-    let mut stmt = conn.prepare(
-                                "SELECT file_id, file_index, name, format, size_mb, downloaded, offloaded
+    let mut stmt =
+        conn.prepare(
+                     "SELECT file_id, file_index, name, format, size_mb, downloaded, offloaded
          FROM files WHERE item_id = ?1 ORDER BY file_index",
-    )?;
+        )?;
     let files = stmt.query_map(params![item_id], |row| {
                         Ok(LibraryItemFile { id:         Arc::from(row.get::<_, String>(0)?),
                                              index:      row.get(1)?,
@@ -161,7 +162,7 @@ fn load_files_for(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<Libr
                                              format:     Arc::from(row.get::<_, String>(3)?),
                                              size_mb:    row.get(4)?,
                                              downloaded: row.get(5)?,
-                                             offloaded: row.get(6)?, })
+                                             offloaded:  row.get(6)?, })
                     })?
                     .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(files)
