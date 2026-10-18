@@ -106,6 +106,9 @@ pub struct SettingsSnapshot {
     pub storage_rules:                  Vec<PlacementRule>,
     /// Input state for a new publisher placement rule.
     pub publisher_rule_input:           Option<Entity<InputState>>,
+    pub collection_rule_input:          Option<Entity<InputState>>,
+    pub size_rule_input:                Option<Entity<InputState>>,
+    pub rule_target_root_id:            u32,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -224,6 +227,9 @@ pub struct SettingsController {
     /// the root view after creation.
     max_concurrent_downloads_input: Option<Entity<InputState>>,
     publisher_rule_input:           Option<Entity<InputState>>,
+    collection_rule_input:          Option<Entity<InputState>>,
+    size_rule_input:                Option<Entity<InputState>>,
+    rule_target_root_id:            u32,
     /// Font picker state for the Appearance page's body-font row; set by the
     /// root view after creation.
     body_font_select:               Option<FontSelectState>,
@@ -319,6 +325,9 @@ impl SettingsController {
                               recently_updated_window_input: None,
                               max_concurrent_downloads_input: None,
                               publisher_rule_input: None,
+                              collection_rule_input: None,
+                              size_rule_input: None,
+                              rule_target_root_id: 0,
                               body_font_select: None,
                               value_font_select: None,
                               label_font_select: None,
@@ -362,6 +371,9 @@ impl SettingsController {
                recently_updated_window_input: None,
                max_concurrent_downloads_input: None,
                publisher_rule_input: None,
+               collection_rule_input: None,
+               size_rule_input: None,
+               rule_target_root_id: 0,
                body_font_select: None,
                value_font_select: None,
                label_font_select: None,
@@ -398,6 +410,15 @@ impl SettingsController {
     /// Attaches the publisher rule input state created by the root view.
     pub fn set_publisher_rule_input(&mut self, input: Entity<InputState>) {
         self.publisher_rule_input = Some(input);
+    }
+
+    /// Attaches the collection and size rule inputs created by the root view.
+    pub fn set_collection_rule_input(&mut self, input: Entity<InputState>) {
+        self.collection_rule_input = Some(input);
+    }
+
+    pub fn set_size_rule_input(&mut self, input: Entity<InputState>) {
+        self.size_rule_input = Some(input);
     }
 
     /// Attaches the body-font picker state entity created by the root view.
@@ -557,10 +578,39 @@ impl SettingsController {
         if publisher.is_empty() {
             return;
         }
-        let target = self.storage.roots().last().map_or(0, |root| root.id);
         self.storage
-            .add_rule(PlacementCondition::Publisher(publisher.to_owned()), target);
+            .add_rule(PlacementCondition::Publisher(publisher.to_owned()),
+                      self.rule_target_root_id);
         cx.emit(SettingsChanged);
+    }
+
+    /// Selects the root targeted by newly created placement rules.
+    pub fn set_rule_target_root(&mut self, id: u32, cx: &mut Context<Self>) {
+        if self.storage.root(id).is_some() {
+            self.rule_target_root_id = id;
+            cx.emit(SettingsChanged);
+        }
+    }
+
+    /// Adds a collection-membership placement rule from the numeric ID input.
+    pub fn add_collection_rule(&mut self, value: String, cx: &mut Context<Self>) {
+        if let Ok(id) = value.trim().parse::<u64>() {
+            self.storage
+                .add_rule(PlacementCondition::Collection(id), self.rule_target_root_id);
+            cx.emit(SettingsChanged);
+        }
+    }
+
+    /// Adds a minimum-size placement rule from the megabytes input.
+    pub fn add_size_rule(&mut self, value: String, cx: &mut Context<Self>) {
+        if let Ok(size) = value.trim().parse::<f64>()
+           && size >= 0.0
+        {
+            self.storage
+                .add_rule(PlacementCondition::SizeAtLeastMb(size),
+                          self.rule_target_root_id);
+            cx.emit(SettingsChanged);
+        }
     }
 
     /// Validates `path` for writability and saves it as the new storage root.
@@ -962,6 +1012,9 @@ impl SettingsController {
                            storage_roots: self.storage.roots(),
                            storage_rules: self.storage.rules().to_vec(),
                            publisher_rule_input: self.publisher_rule_input.clone(),
+                           collection_rule_input: self.collection_rule_input.clone(),
+                           size_rule_input: self.size_rule_input.clone(),
+                           rule_target_root_id: self.rule_target_root_id,
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,

@@ -12,6 +12,7 @@ use gpui::{
     AnyElement, Element, Entity, IntoElement, ParentElement, SharedString, Styled, div, px,
 };
 use gpui_kit::component::IconName;
+use gpui_kit::component::Selectable;
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::input::{Input, InputState, NumberInput};
 use gpui_kit::component::switch::Switch;
@@ -43,7 +44,10 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                               max_concurrent_downloads_input: Option<Entity<InputState>>,
                               create_collections: bool, storage_roots: Vec<StorageRoot>,
                               storage_rules: Vec<PlacementRule>,
-                              publisher_rule_input: Option<Entity<InputState>>)
+                              publisher_rule_input: Option<Entity<InputState>>,
+                              collection_rule_input: Option<Entity<InputState>>,
+                              size_rule_input: Option<Entity<InputState>>,
+                              rule_target_root_id: u32, publisher_names: Vec<String>)
                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -197,21 +201,49 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
            .child(render_create_collections_toggle(create_collections, entity.clone(), colors))
            // ── Additional roots ───────────────────────────────────────────
            .child(div().h(px(1.0)).bg(border))
-           .child(render_storage_roots(storage_roots, entity.clone(), colors))
+           .child(render_storage_roots(storage_roots.clone(), entity.clone(), colors))
            .child(div().h(px(1.0)).bg(border))
-           .child(render_storage_rules(storage_rules, entity, colors, publisher_rule_input))
+           .child(render_storage_rules(storage_rules,
+                                       entity,
+                                       colors,
+                                       storage_roots,
+                                       publisher_rule_input,
+                                       collection_rule_input,
+                                       size_rule_input,
+                                       rule_target_root_id,
+                                       publisher_names))
 }
 
 /// Renders saved placement rules in evaluation order. Rule creation is kept
 /// in the core configuration API; this view makes persisted rules visible and
 /// safely supports removing or reordering them.
+#[allow(clippy::too_many_arguments)] // Render state is split into independent settings controls.
 fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsController>,
-                        colors: &ColorTokens, publisher_input: Option<Entity<InputState>>)
+                        colors: &ColorTokens, roots: Vec<StorageRoot>,
+                        publisher_input: Option<Entity<InputState>>,
+                        collection_input: Option<Entity<InputState>>,
+                        size_input: Option<Entity<InputState>>, target_root_id: u32,
+                        publisher_names: Vec<String>)
                         -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
     let add_entity = entity.clone();
+    let suggestion_row =
+        div()
+            .flex()
+            .flex_wrap()
+            .gap(px(4.0))
+            .children(publisher_names.into_iter().take(8).map(|name| {
+                let entity = entity.clone();
+                let label = name.clone();
+                Button::new(SharedString::from(format!("publisher-suggestion-{name}")))
+                    .ghost()
+                    .child(label)
+                    .on_click(move |_, _, cx| {
+                        entity.update(cx, |ctrl, cx| ctrl.add_publisher_rule(name.clone(), cx));
+                    })
+            }));
     let add_row =
         div().flex()
              .items_center()
@@ -238,6 +270,34 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                                                          });
                                                      }));
 
+    let target_row =
+        div().flex()
+             .items_center()
+             .gap(px(4.0))
+             .child(div().text_xs().text_color(text_secondary).child("Target:"))
+             .children(roots.iter().map(|root| {
+                 let id = root.id;
+                 let entity = entity.clone();
+                 Button::new(SharedString::from(format!("rule-target-{id}")))
+                .ghost()
+                .selected(id == target_root_id)
+                .child(root.name.clone())
+                .on_click(move |_, _, cx| {
+                    entity.update(cx, |ctrl, cx| ctrl.set_rule_target_root(id, cx));
+                })
+             }));
+
+    let collection_row = rule_input_row(collection_input,
+                                        "Collection ID",
+                                        "Add collection rule",
+                                        entity.clone(),
+                                        |ctrl, value, cx| ctrl.add_collection_rule(value, cx));
+    let size_row = rule_input_row(size_input,
+                                  "Minimum MB",
+                                  "Add size rule",
+                                  entity.clone(),
+                                  |ctrl, value, cx| ctrl.add_size_rule(value, cx));
+
     div().flex()
          .flex_col()
          .gap(px(8.0))
@@ -245,7 +305,11 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(text_primary)
                      .child(t!("settings.storage_rules_title")))
+         .child(suggestion_row)
+         .child(target_row)
          .child(add_row)
+         .child(collection_row)
+         .child(size_row)
          .children(rules.into_iter().enumerate().map(|(index, rule)| {
              let entity_up = entity.clone();
              let entity_down = entity.clone();
@@ -295,6 +359,34 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                         }),
                 )
          }))
+}
+
+fn rule_input_row<F>(input: Option<Entity<InputState>>, placeholder: &'static str,
+                     label: &'static str, entity: Entity<SettingsController>, action: F)
+                     -> impl IntoElement + 'static + use<F>
+    where F: Fn(&mut SettingsController, String, &mut gpui::Context<SettingsController>) + 'static {
+    let input_element =
+        input.clone()
+             .map_or_else(|| div().text_xs().child(placeholder).into_any_element(),
+                          |input| Input::new(&input).into_any_element());
+    div()
+        .flex()
+        .items_center()
+        .gap(px(6.0))
+        .child(input_element)
+        .child(
+            Button::new(SharedString::from(format!("{label}-button")))
+                .ghost()
+                .outline()
+                .child(label)
+                .on_click(move |_, _, cx| {
+                    let Some(input) = input.clone() else {
+                        return;
+                    };
+                    let value = input.read(cx).value().to_string();
+                    entity.update(cx, |ctrl, cx| action(ctrl, value, cx));
+                }),
+        )
 }
 
 fn format_rule(rule: &PlacementRule) -> String {
