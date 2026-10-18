@@ -26,6 +26,10 @@ zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 lopdf = { version = "0.45.0", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 toml = "1"
+# Already in the dependency tree via gpui/gpui-kit (notify 8.2.0, futures
+# 0.3.x); declared directly because themes hot reload uses both.
+notify = "8.2.0"
+futures = "0.3"
 
 [dev-dependencies]
 pretty_assertions = "1"

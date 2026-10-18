@@ -31,11 +31,7 @@ impl LibraryController {
     pub fn set_theme(&self, id: ThemeId, cx: &mut Context<Self>) {
         let current = cx.global::<LibriTheme>();
         let new_theme = LibriTheme::new(id.clone(), current.density, current.fonts.clone());
-        let colors = new_theme.colors.clone();
-        cx.set_global(new_theme);
-        cx.update_global::<gpui_kit::component::Theme, _>(|theme, _cx| {
-              apply_theme_colors(theme, &colors);
-          });
+        install_theme(new_theme, cx);
         dtrpg_core::data::ui_preferences::UiPreferences::load().save_theme_key(id.as_str());
         cx.notify();
     }

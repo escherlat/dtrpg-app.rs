@@ -32,6 +32,7 @@ pub fn init_globals(cx: &mut App) {
     ThemeCatalog::refresh();
     cx.set_global(initial_theme(cx));
     cx.set_global(CoverCache::new());
+    crate::util::theme_watcher::start_theme_watcher(cx);
     // `StorageConfig::load`/`UiPreferences::load`/`UiState::load` already
     // write their own defaults to disk on first call; the catalog cache
     // metadata sidecar has no such self-initializing wrapper type (it's a
