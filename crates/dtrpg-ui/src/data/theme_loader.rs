@@ -10,18 +10,19 @@ use std::path::PathBuf;
 use gpui::Hsla;
 use serde::Deserialize;
 
-use crate::data::theme::{ColorTokens, ThemeKey, hex};
+use crate::data::theme::{ColorTokens, ThemeKey, ThemeMode, hex, semantic_colors};
 
 #[derive(Debug, Deserialize)]
 struct ThemeToml {
     name: String,
-    #[expect(dead_code, reason = "reserved for future light/dark UI hints")]
+    /// Light or dark declaration; drives fixed semantic colors and the
+    /// fallback base for missing palette keys. Defaults to light.
     #[serde(default)]
     mode: Option<String>,
-    #[serde(default)]
+    /// Palette fields live flat alongside `name`/`mode` in the file; flatten
+    /// collects them so a theme file needs no nested table.
+    #[serde(flatten)]
     palette: PaletteToml,
-    #[serde(default)]
-    colors: PaletteToml, // allow either "palette" or "colors"
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -54,12 +55,6 @@ struct PaletteToml {
     shadow: Option<String>,
     #[serde(default)]
     scrim: Option<String>,
-    #[serde(default)]
-    error: Option<String>,
-    #[serde(default)]
-    warning_bg: Option<String>,
-    #[serde(default)]
-    warning_text: Option<String>,
 }
 
 /// Loads a built-in theme by key from embedded TOML files.
@@ -86,11 +81,10 @@ pub fn load_from_path(path: &PathBuf) -> Option<ColorTokens> {
 
 fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
     let theme: ThemeToml = toml::from_str(s)?;
-    let p = theme.palette;
-    let c = theme.colors;
-    // prefer palette if set, else colors
-    let palette = if has_any(&p) { p } else { c };
-    let defaults = compiled_default_for_name(&theme.name);
+    let palette = theme.palette;
+    let mode = theme.mode.as_deref().and_then(|m| m.parse().ok()).unwrap_or(ThemeMode::Light);
+    let semantic = semantic_colors(mode);
+    let defaults = fallback_base(&theme.name, mode);
     let tokens = ColorTokens {
         desktop_bg: parse_hex_opt(palette.desktop_bg.as_deref()).unwrap_or(defaults.desktop_bg),
         surface: parse_hex_opt(palette.surface.as_deref()).unwrap_or(defaults.surface),
@@ -106,19 +100,13 @@ fn parse_theme_toml(s: &str) -> Result<ColorTokens, toml::de::Error> {
         accent_on: parse_hex_opt(palette.accent_on.as_deref()).unwrap_or(defaults.accent_on),
         shadow: parse_hex_alpha_opt(palette.shadow.as_deref()).unwrap_or(defaults.shadow),
         scrim: parse_hex_alpha_opt(palette.scrim.as_deref()).unwrap_or(defaults.scrim),
-        error: parse_hex_opt(palette.error.as_deref()).unwrap_or(defaults.error),
-        warning_bg: parse_hsla_like(palette.warning_bg.as_deref()).unwrap_or(defaults.warning_bg),
-        warning_text: parse_hsla_like(palette.warning_text.as_deref()).unwrap_or(defaults.warning_text),
+        // Semantic state colors are fixed by mode and never read from the
+        // theme file, so a theme cannot make an error look healthy (ADR-0005).
+        error: semantic.error,
+        warning_bg: semantic.warning_bg,
+        warning_text: semantic.warning_text,
     };
     Ok(tokens)
-}
-
-fn has_any(p: &PaletteToml) -> bool {
-    p.desktop_bg.is_some() || p.surface.is_some() || p.surface_alt.is_some() || p.hover.is_some() ||
-    p.text_primary.is_some() || p.text_secondary.is_some() || p.text_tertiary.is_some() ||
-    p.border.is_some() || p.border_strong.is_some() || p.accent.is_some() ||
-    p.accent_soft.is_some() || p.accent_on.is_some() || p.shadow.is_some() ||
-    p.scrim.is_some() || p.error.is_some() || p.warning_bg.is_some() || p.warning_text.is_some()
 }
 
 fn parse_hex_opt(s: Option<&str>) -> Option<Hsla> {
@@ -159,18 +147,11 @@ fn parse_hex_alpha(s: &str) -> Option<Hsla> {
     }
 }
 
-fn parse_hsla_like(s: Option<&str>) -> Option<Hsla> {
-    let s = s?.trim();
-    let s = s.strip_prefix("hsla(")?.strip_suffix(")")?;
-    let parts: Vec<f32> = s.split_whitespace().filter_map(|p| p.parse().ok()).collect();
-    if parts.len() == 4 {
-        Some(gpui::hsla(parts[0], parts[1], parts[2], parts[3]))
-    } else {
-        None
-    }
-}
-
-fn compiled_default_for_name(name: &str) -> ColorTokens {
+/// Per-key fallback base for a theme file: a known built-in name resolves to
+/// that built-in's compiled palette; an unrecognized name falls back to a
+/// light or dark built-in base matching the declared mode, so a partially
+/// specified custom theme still loads with sane values (ADR-0005).
+fn fallback_base(name: &str, mode: ThemeMode) -> ColorTokens {
     match name.to_lowercase().as_str() {
         "parchment" => crate::data::theme::parchment_colors(),
         "slate" => crate::data::theme::slate_colors(),
@@ -178,7 +159,10 @@ fn compiled_default_for_name(name: &str) -> ColorTokens {
         "ink" => crate::data::theme::ink_colors(),
         "moss" => crate::data::theme::moss_colors(),
         "rosewood" => crate::data::theme::rosewood_colors(),
-        _ => crate::data::theme::parchment_colors(),
+        _ => match mode {
+            ThemeMode::Light => crate::data::theme::parchment_colors(),
+            ThemeMode::Dark => crate::data::theme::ink_colors(),
+        },
     }
 }
 
@@ -195,7 +179,59 @@ fn compiled_default(key: ThemeKey) -> ColorTokens {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)] // Test fixtures use unwrap/expect for concise assertions.
+
     use crate::data::theme::ThemeKey;
+
+    #[test]
+    fn custom_theme_reads_flat_palette_fields() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("custom.toml");
+        std::fs::write(
+            &path,
+            "name = \"Custom\"\nmode = \"dark\"\nsurface = \"#101010\"\naccent = \"#FF00FF\"\n",
+        )
+        .unwrap();
+        let colors = super::load_from_path(&path).expect("custom theme should load");
+        // The distinct surface/accent must be parsed from the root keys, not
+        // fall back to the compiled base.
+        assert_eq!(colors.surface, crate::data::theme::hex(0x10, 0x10, 0x10));
+        assert_eq!(colors.accent, crate::data::theme::hex(0xFF, 0x00, 0xFF));
+        // Missing keys fall back to the dark base (ink).
+        let ink = crate::data::theme::ink_colors();
+        assert_eq!(colors.text_primary, ink.text_primary);
+    }
+
+    #[test]
+    fn semantic_colors_cannot_be_overridden_by_theme_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("evil.toml");
+        // A theme file that tries to make an error look healthy.
+        std::fs::write(
+            &path,
+            "name = \"Parchment\"\nmode = \"light\"\nerror = \"#00FF00\"\nwarning_text = \"#00FF00\"\n",
+        )
+        .unwrap();
+        let colors = super::load_from_path(&path).expect("theme should load");
+        let light = crate::data::theme::semantic_colors(crate::data::theme::ThemeMode::Light);
+        assert_eq!(colors.error, light.error, "error color must stay semantic");
+        assert_eq!(colors.warning_text, light.warning_text);
+        assert_ne!(colors.error, crate::data::theme::hex(0x00, 0xFF, 0x00));
+    }
+
+    #[test]
+    fn partial_unknown_theme_falls_back_to_mode_base() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sparse.toml");
+        std::fs::write(&path, "name = \"Sparse\"\nmode = \"dark\"\n").unwrap();
+        let colors = super::load_from_path(&path).expect("sparse theme should load");
+        let ink = crate::data::theme::ink_colors();
+        // Every missing key falls back to the dark base, and semantic colors
+        // are the fixed dark set.
+        assert_eq!(colors.surface, ink.surface);
+        let dark = crate::data::theme::semantic_colors(crate::data::theme::ThemeMode::Dark);
+        assert_eq!(colors.error, dark.error);
+    }
 
     #[test]
     fn builtin_toml_matches_compiled_defaults() {
