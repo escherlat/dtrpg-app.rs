@@ -19,7 +19,7 @@ use dtrpg_core::data::enums::*;
 use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
-use dtrpg_core::data::storage::StorageConfig;
+use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use dtrpg_core::services::network_monitor::NetworkMonitor;
 use dtrpg_core::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry};

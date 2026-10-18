@@ -36,8 +36,14 @@ pub fn validate_writable(path: &Path) -> Result<(), StorageError> {
 /// Returns free disk space at the current storage root, in megabytes.
 #[must_use]
 pub fn available_space_mb() -> Option<f64> {
-    fs4::available_space(StorageConfig::load().root_path()).ok()
-                                                           .map(|bytes| bytes as f64 / 1_048_576.0)
+    available_space_mb_at(&StorageConfig::load().root_path())
+}
+
+/// Returns free disk space at an explicit storage path, in megabytes.
+#[must_use]
+pub fn available_space_mb_at(path: &Path) -> Option<f64> {
+    fs4::available_space(path).ok()
+                              .map(|bytes| bytes as f64 / 1_048_576.0)
 }
 
 /// Derives the directory a downloaded item's files live in under `root`.
