@@ -105,3 +105,12 @@ in the on-disk catalog cache (`catalog_cache.rs`); `offloaded` needs
 as `offloaded: false`, which is corrected on the next verification pass
 regardless. No other migration steps; no rollback concerns beyond reverting
 the change.
+
+## Addendum (2026-10-18): superseded mechanism
+
+Detection moved into `dtrpg_core::platform` (ADR 0004). It reads the `SF_DATALESS` bit of the file's `st_flags`
+on macOS, which needs no `objc2` call and, like the key it replaces, does not download the file. On Windows it
+reads the recall and offline file attributes. The earlier `mdls` query asked for a key that `mdls` does not
+expose, so it always answered "local". The decision against a marker-file heuristic stands: the hidden
+`.name.icloud` stubs of macOS before 14 are not handled. A file mid-download is not told apart from a placeholder,
+because the flag does not change until the download completes.

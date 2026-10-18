@@ -1,6 +1,6 @@
 ## Purpose
 
-Lets the app tell, on macOS, whether a file that exists on disk is fully
+Lets the app tell, on macOS and Windows, whether a file that exists on disk is fully
 present locally or is an iCloud "dataless" placeholder whose bytes have been
 evicted to save disk space and would trigger a network download on open.
 
@@ -8,7 +8,7 @@ evicted to save disk space and would trigger a network download on open.
 
 ### Requirement: The system SHALL classify an existing file's iCloud materialization state
 
-For a file path that exists on disk, on macOS, the system SHALL determine
+For a file path that exists on disk, on macOS or Windows, the system SHALL determine
 whether the file is fully materialized locally or is an iCloud offloaded
 (dataless) placeholder, without altering the file's contents or triggering
 its download.
@@ -24,18 +24,15 @@ its download.
   at the same path
 - **THEN** the system reports the file as offloaded
 
-#### Scenario: A file mid-download is not classified as offloaded
-- **WHEN** the system checks materialization state for a file that is
-  currently being fetched from iCloud (downloading but not yet complete)
-- **THEN** the system reports the file as not offloaded
+### Requirement: The system SHALL treat materialization state as unavailable on platforms that do not report it
 
-### Requirement: The system SHALL treat iCloud materialization state as unavailable on non-macOS platforms
+The platform integration layer reports cloud placeholder state on macOS and Windows. On any other
+platform, the system SHALL report every existing file as not offloaded, without error.
 
-On platforms other than macOS, the system SHALL report every existing file
-as not offloaded, without error, since offloading is a macOS/iCloud-specific
-filesystem behavior.
+#### Scenario: Windows placeholder is classified as offloaded
+- **WHEN** the system checks materialization state for a Files On-Demand placeholder on Windows
+- **THEN** the system reports the file as offloaded
 
-#### Scenario: Non-macOS platform always reports not offloaded
-- **WHEN** the system checks materialization state for an existing file on a
-  non-macOS platform
+#### Scenario: A platform without cloud placeholder state reports not offloaded
+- **WHEN** the system checks materialization state for an existing file on Linux
 - **THEN** the system reports the file as not offloaded
