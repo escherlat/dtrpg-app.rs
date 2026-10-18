@@ -26,6 +26,7 @@ open = { workspace = true }
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 lopdf = { version = "0.45.0", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
+toml = "1"
 
 [dev-dependencies]
 pretty_assertions = "1"
