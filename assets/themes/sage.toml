@@ -1,3 +1,17 @@
 name = "Sage"
 mode = "light"
-palette = {}
+
+desktop_bg = "#B2BCA0"
+surface = "#FAFBF6"
+surface_alt = "#EDF0E7"
+hover = "#E6EBDE"
+text_primary = "#23271F"
+text_secondary = "#515A4A"
+text_tertiary = "#848D78"
+border = "#E2E7DA"
+border_strong = "#D4DBC8"
+accent = "#7A4220"
+accent_soft = "#7A4220 0.130"
+accent_on = "#FAFBF6"
+shadow = "#26301C 0.180"
+scrim = "#182012 0.260"

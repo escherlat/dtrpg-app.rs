@@ -12,7 +12,7 @@ Appearance.
 
 ## Color themes
 
-Three light, three dark:
+Four light, two dark:
 
 | Theme | Mode | Character |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Three light, three dark:
 | Sage | Light | Cool forest green |
 | Ink | Dark | Warm brown-black |
 | Moss | Dark | Cool forest green-black |
-| Rosewood | Dark | Warm burgundy/wine |
+| Rosewood | Light | Warm burgundy/wine |
 
 ## Density
 
@@ -42,3 +42,44 @@ system:
 
 A separate "Text Scale" control adjusts the shared UI text size, scaling
 every size-aware element in the window together, like zooming a page.
+
+## Theme data files
+
+Each built-in theme ships as a TOML file under `assets/themes/` in the
+repository. The app loads these at startup and falls back to compiled
+defaults if a file is missing or malformed. The format is a flat palette of
+hex colors, with optional alpha appended after a space:
+
+```toml
+name = "Parchment"
+mode = "light"
+
+desktop_bg = "#C5B99D"
+surface = "#FCF9F3"
+surface_alt = "#F2ECDF"
+hover = "#EDE6D6"
+text_primary = "#26211A"
+text_secondary = "#5B5346"
+text_tertiary = "#8C8270"
+border = "#E7DFCD"
+border_strong = "#DBD1BB"
+accent = "#8C4A22"
+accent_soft = "#8C4A22 0.13"
+accent_on = "#FCF9F3"
+shadow = "#3A2E1A 0.18"
+scrim = "#1E160A 0.26"
+```
+
+`mode` is `light` or `dark`; it selects the fixed semantic state colors and
+the fallback base for any palette field the file omits. Fields left out fall
+back to a built-in base of the same mode, so a partially specified theme file
+still loads. User-defined theme files loaded from disk use the same format
+via `theme_loader::load_from_path`.
+
+### Semantic state colors are not themeable
+
+The error and warning colors are deliberately **not** part of the themeable
+palette. They are fixed by `mode` at compile time so a theme file cannot make
+a failed download look healthy or an error state indistinguishable from a
+success state. Any `error`, `warning_bg`, or `warning_text` keys in a theme
+file are ignored.

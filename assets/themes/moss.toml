@@ -1,3 +1,17 @@
 name = "Moss"
 mode = "dark"
-palette = {}
+
+desktop_bg = "#0F1712"
+surface = "#16201A"
+surface_alt = "#1C2720"
+hover = "#243028"
+text_primary = "#E4ECDD"
+text_secondary = "#A9B8A0"
+text_tertiary = "#7A8A74"
+border = "#28332B"
+border_strong = "#344036"
+accent = "#9CB06A"
+accent_soft = "#9CB06A 0.130"
+accent_on = "#16201A"
+shadow = "#000000 0.500"
+scrim = "#000000 0.450"
