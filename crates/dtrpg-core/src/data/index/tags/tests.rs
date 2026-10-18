@@ -303,6 +303,7 @@ fn upgrading_an_older_index_keeps_its_tags_when_the_catalog_is_rewritten() {
                              PRIMARY KEY (item_id, tag_id)
                          );
                          INSERT INTO item_tags (item_id, tag_id) SELECT 'a', id FROM tags;
+                         ALTER TABLE tags DROP COLUMN color;
                          PRAGMA user_version = 2;")
          .unwrap();
 

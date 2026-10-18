@@ -10,9 +10,13 @@
 //! item's `tags` column in the full-text table is refreshed in the same
 //! transaction as every change.
 
+use std::collections::HashMap;
+
 use rusqlite::{Connection, params};
 
 use crate::data::index::IndexError;
+use crate::data::tag_color::TagColor;
+use crate::util::datetime::now_secs;
 
 /// Longest tag, in characters.
 const MAX_TAG_CHARS: usize = 64;
@@ -96,6 +100,14 @@ fn delete_tag_if_unused(conn: &Connection, tag_id: i64) -> rusqlite::Result<()> 
     Ok(())
 }
 
+/// Records that `item_id`'s tags changed at `changed_at`.
+fn touch(conn: &Connection, item_id: &str, changed_at: i64) -> rusqlite::Result<()> {
+    conn.execute("INSERT INTO item_tags_changed (item_id, changed_at) VALUES (?1, ?2)
+                  ON CONFLICT(item_id) DO UPDATE SET changed_at = excluded.changed_at",
+                 params![item_id, changed_at])?;
+    Ok(())
+}
+
 /// Returns every tag that some item in the catalog has, ordered ignoring case.
 ///
 /// # Errors
@@ -126,17 +138,14 @@ pub(super) fn tags_for_item(conn: &Connection, item_id: &str) -> Result<Vec<Stri
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
-pub(super) fn all_item_tags(
-    conn: &Connection)
-    -> Result<std::collections::HashMap<String, Vec<String>>, IndexError> {
+pub(super) fn all_item_tags(conn: &Connection) -> Result<HashMap<String, Vec<String>>, IndexError> {
     let mut stmt = conn.prepare("SELECT it.item_id, t.name FROM item_tags it
                                  JOIN tags t ON t.id = it.tag_id
                                  JOIN items i ON i.id = it.item_id")?;
     let rows = stmt.query_map([], |row| {
                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
                    })?;
-    let mut by_item: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
+    let mut by_item: HashMap<String, Vec<String>> = HashMap::new();
     for row in rows {
         let (item_id, name) = row?;
         by_item.entry(item_id).or_default().push(name);
@@ -175,6 +184,7 @@ pub(super) fn add_tag(conn: &mut Connection, item_id: &str, tag: &str) -> Result
                 > 0;
     if added {
         refresh_search_text(&tx, item_id)?;
+        touch(&tx, item_id, now_secs())?;
     }
     tx.commit()?;
     Ok(added)
@@ -198,6 +208,7 @@ pub(super) fn remove_tag(conn: &mut Connection, item_id: &str, tag: &str)
                   > 0;
     if removed {
         refresh_search_text(&tx, item_id)?;
+        touch(&tx, item_id, now_secs())?;
         delete_tag_if_unused(&tx, tag_id)?;
     }
     tx.commit()?;
@@ -233,8 +244,10 @@ pub(super) fn rename_tag(conn: &mut Connection, from: &str, to: &str) -> Result<
                        params![new_name, from_id])?;
         }
     }
+    let changed_at = now_secs();
     for item_id in &items {
         refresh_search_text(&tx, item_id)?;
+        touch(&tx, item_id, changed_at)?;
     }
     tx.commit()?;
     Ok(items.len())
@@ -256,12 +269,121 @@ pub(super) fn delete_tag(conn: &mut Connection, tag: &str) -> Result<usize, Inde
     let items = items_with_tag_id(&tx, tag_id)?;
     tx.execute("DELETE FROM item_tags WHERE tag_id = ?1", params![tag_id])?;
     tx.execute("DELETE FROM tags WHERE id = ?1", params![tag_id])?;
+    let changed_at = now_secs();
     for item_id in &items {
         refresh_search_text(&tx, item_id)?;
+        touch(&tx, item_id, changed_at)?;
     }
     tx.commit()?;
     Ok(items.len())
 }
 
+/// Returns the color of every tag that has one, keyed by the tag's name lower
+/// cased.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+pub(super) fn tag_colors(conn: &Connection) -> Result<HashMap<String, TagColor>, IndexError> {
+    let mut stmt = conn.prepare("SELECT name, color FROM tags WHERE color IS NOT NULL")?;
+    let rows = stmt.query_map([], |row| {
+                       Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                   })?;
+    let mut colors = HashMap::new();
+    for row in rows {
+        let (name, color) = row?;
+        // A color this version does not know (written by a newer one) is no
+        // color.
+        if let Ok(color) = color.parse::<TagColor>() {
+            colors.insert(name.to_lowercase(), color);
+        }
+    }
+    Ok(colors)
+}
+
+/// Sets the color of the tag `tag`, or clears it with `None`. Returns `false`
+/// if there is no such tag.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if a statement fails.
+pub(super) fn set_tag_color(conn: &Connection, tag: &str, color: Option<TagColor>)
+                            -> Result<bool, IndexError> {
+    let Some(tag_id) = find_tag_id(conn, tag.trim())?
+    else {
+        return Ok(false);
+    };
+    conn.execute("UPDATE tags SET color = ?1 WHERE id = ?2",
+                 params![color.map(|c| c.name()), tag_id])?;
+    Ok(true)
+}
+
+/// Returns when `item_id`'s tags last changed in the index, in Unix seconds, or
+/// `None` if they never have.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+pub(super) fn tags_changed_at(conn: &Connection, item_id: &str) -> Result<Option<i64>, IndexError> {
+    let mut stmt = conn.prepare("SELECT changed_at FROM item_tags_changed WHERE item_id = ?1")?;
+    let mut rows = stmt.query_map(params![item_id], |row| row.get::<_, i64>(0))?;
+    Ok(rows.next().transpose()?)
+}
+
+/// Makes `tags` exactly the tags of `item_id`, as of `changed_at`.
+///
+/// A tag the index already has keeps its spelling, and keeps its color unless
+/// it has none and the new tag has one. A tag it does not have is created.
+///
+/// # Errors
+///
+/// Returns [`IndexError::InvalidTag`] if a tag cannot be stored,
+/// [`IndexError::NoSuchItem`] if `item_id` is not in the catalog, and
+/// [`IndexError::Sqlite`] if a statement fails; nothing is changed on error.
+pub(super) fn set_item_tags(conn: &mut Connection, item_id: &str,
+                            tags: &[(String, Option<TagColor>)], changed_at: i64)
+                            -> Result<(), IndexError> {
+    let wanted = tags.iter()
+                     .map(|(name, color)| Ok((normalize(name)?, *color)))
+                     .collect::<Result<Vec<_>, IndexError>>()?;
+    let tx = conn.transaction()?;
+    let item_exists: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM items WHERE id = ?1)",
+                                         params![item_id],
+                                         |row| row.get(0))?;
+    if !item_exists {
+        return Err(IndexError::NoSuchItem(item_id.to_owned()));
+    }
+    let previous = {
+        let mut stmt = tx.prepare("SELECT tag_id FROM item_tags WHERE item_id = ?1")?;
+        stmt.query_map(params![item_id], |row| row.get::<_, i64>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    tx.execute("DELETE FROM item_tags WHERE item_id = ?1", params![item_id])?;
+    for (name, color) in &wanted {
+        let tag_id = match find_tag_id(&tx, name)? {
+            Some(id) => id,
+            None => {
+                tx.execute("INSERT INTO tags (name) VALUES (?1)", params![name])?;
+                tx.last_insert_rowid()
+            }
+        };
+        if let Some(color) = color {
+            tx.execute("UPDATE tags SET color = ?1 WHERE id = ?2 AND color IS NULL",
+                       params![color.name(), tag_id])?;
+        }
+        tx.execute("INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?1, ?2)",
+                   params![item_id, tag_id])?;
+    }
+    for tag_id in previous {
+        delete_tag_if_unused(&tx, tag_id)?;
+    }
+    refresh_search_text(&tx, item_id)?;
+    touch(&tx, item_id, changed_at)?;
+    tx.commit()?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod color_tests;
 #[cfg(test)]
 mod tests;
