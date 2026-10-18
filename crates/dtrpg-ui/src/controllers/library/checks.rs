@@ -87,11 +87,7 @@ impl LibraryController {
     /// render paths. Items missing from the map are idle.
     #[must_use]
     pub fn item_activity_snapshot(&self) -> HashMap<Arc<str>, ItemActivity> {
-        let downloading = self.download_queue
-                              .iter()
-                              .map(|(id, ..)| id)
-                              .chain(self.download_activity_ids.keys().map(|(id, _)| id));
-        item_activity_map(&self.verifying_downloads, downloading)
+        item_activity_map(&self.verifying_downloads, self.download_jobs.item_ids())
     }
 
     // ── Item-level availability checks
@@ -119,12 +115,14 @@ impl LibraryController {
     /// Checks `id`'s availability against the server if it hasn't been
     /// checked within `ITEM_CHECK_COOLDOWN_SECS`, or if it has never been
     /// checked. No-ops if the item is unknown, already within its cooldown,
-    /// or already has a check in flight.
+    /// or already has a check running.
     ///
     /// Called when the user views an entry's details (the single-click
     /// popover via [`Self::select_item`], or an expanded detail tab — see
-    /// each `open_detail_tab` call site).
-    pub fn maybe_check_item(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
+    /// each `open_detail_tab` call site). The user is waiting on it, so it
+    /// goes ahead of any background checks still waiting, and replaces one
+    /// already waiting for the same item.
+    pub fn maybe_check_item(&mut self, id: Arc<str>, _cx: &mut Context<Self>) {
         let Some(item) = self.item_by_id(&id)
         else {
             return;
@@ -132,95 +130,142 @@ impl LibraryController {
         if !item_check_due(item.availability_last_checked) {
             return;
         }
-        self.start_item_check(id, cx);
+        self.submit_check(id, Priority::Interactive);
     }
 
-    /// Starts a background availability check for `id`, bypassing the
+    /// Submits an availability check for `id` to the work queue, bypassing the
     /// per-item cooldown (callers are expected to have already filtered by
-    /// staleness — see [`Self::maybe_check_item`] and
-    /// [`Self::drain_check_queue`]). No-ops if a check for this id is
-    /// already in flight or the item is unknown.
-    pub(super) fn start_item_check(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
-        if self.checking_items.contains(&id) || self.item_by_id(&id).is_none() {
-            return;
-        }
-        self.checking_items.insert(Arc::clone(&id));
-        cx.emit(LibraryChanged);
-
-        let numeric_id = self.item_by_id(&id).map(|i| i.numeric_id).unwrap_or(0);
-        let service_arc = self.vm.service_arc();
-
-        cx.spawn(async move |this, async_cx| {
-            let result = async_cx.background_executor()
-                                 .spawn(async move { service_arc.get_item(numeric_id) })
-                                 .await;
-            if let Err(e) = &result
-               && e.kind != LibraryServiceErrorKind::NotFound
-            {
-                // Transient failure: not evidence of removal, leave the item
-                // and its flag entirely unchanged.
-                tracing::warn!(id = %id, error = %e, "item availability check failed transiently");
-            }
-            this.update(async_cx, |ctrl, cx| {
-                    if let Some(existing) = ctrl.catalog.iter_mut().find(|i| i.id == id) {
-                        apply_check_result(existing, result, std::time::SystemTime::now());
-                        ctrl.section_counts = section_counts(&ctrl.catalog,
-                                                             now_secs(),
-                                                             ctrl.recently_updated_window_days);
-                        ctrl.invalidate_cache();
-                    }
-                    ctrl.checking_items.remove(&id);
-                    cx.emit(LibraryChanged);
-                    ctrl.drain_check_queue(cx);
-                })
-                .ok();
-        })
-        .detach();
-    }
-
-    /// Pushes `ids` not already queued or in flight onto `check_queue`, then
-    /// starts the drain loop.
+    /// staleness).
     ///
-    /// Used by [`Self::request_check_batch`] to enqueue a batch of items
-    /// overdue for a re-check.
-    pub fn enqueue_checks(&mut self, ids: impl Iterator<Item = Arc<str>>, cx: &mut Context<Self>) {
-        for id in ids {
-            if should_enqueue_check(&self.check_queue, &self.checking_items, &id) {
-                self.check_queue.push_back(id);
-            }
-        }
-        self.drain_check_queue(cx);
-    }
-
-    /// Starts the next queued availability check if none is currently in
-    /// flight, mirroring [`Self::drain_thumbnail_queue`]'s single-flight
-    /// pattern. No-ops if a check is already in flight or the queue is
-    /// empty; re-invoked from [`Self::start_item_check`]'s completion
-    /// handler for the next queued id.
-    pub(super) fn drain_check_queue(&mut self, cx: &mut Context<Self>) {
-        if !self.checking_items.is_empty() {
-            return;
-        }
-        let Some(id) = self.check_queue.pop_front()
+    /// No-ops if the item is unknown or its check is already running. A check
+    /// already waiting is left alone, unless this one is interactive, in which
+    /// case it is replaced so the user's request is not stuck behind a
+    /// background one.
+    fn submit_check(&mut self, id: Arc<str>, priority: Priority) {
+        let Some(numeric_id) = self.item_by_id(&id).map(|item| item.numeric_id)
         else {
             return;
         };
-        self.start_item_check(id, cx);
+        if self.check_jobs.is_running(&id) {
+            return;
+        }
+        if self.check_jobs.is_pending(&id) {
+            if priority != Priority::Interactive {
+                return;
+            }
+            if let Some(waiting) = self.check_jobs.remove_pending(&id) {
+                self.work.cancel(waiting);
+            }
+        }
+
+        let service = self.vm.service_arc();
+        let result = ResultSlot::new();
+        let job_result = result.clone();
+        let spec = JobSpec { kind: JobKind::Check,
+                             priority,
+                             label: id.to_string() };
+        let job_id =
+            self.work.submit(spec, move |_context| {
+                         // A failed check is still a result: the caller decides
+                         // from the error whether the item is gone or the
+                         // network was merely unavailable.
+                         job_result.put(service.get_item(numeric_id));
+                         Ok(())
+                     });
+        self.check_jobs.add(job_id, CheckJob::new(id, result));
     }
 
-    /// Requests a batch of per-item availability checks, gated by
-    /// `ITEM_CHECK_BATCH_COOLDOWN_SECS` and shared between the manual
+    /// Shows an item as being checked once its check starts.
+    pub(super) fn check_started(&mut self, id: JobId, cx: &mut Context<Self>) {
+        if let Some(item_id) = self.check_jobs.mark_started(id) {
+            self.checking_items.insert(item_id);
+            cx.emit(LibraryChanged);
+        }
+    }
+
+    /// Applies a finished check to the catalog.
+    ///
+    /// A not-found answer marks the item unavailable. Any other failure is
+    /// not evidence of removal, so it leaves the item and its flag unchanged.
+    pub(super) fn check_finished(&mut self, id: JobId, outcome: Outcome, cx: &mut Context<Self>) {
+        let Some(job) = self.check_jobs.finish(id)
+        else {
+            // Cancelled before it started, and already forgotten.
+            return;
+        };
+        self.checking_items.remove(&job.item_id);
+
+        let result = match outcome {
+            Outcome::Succeeded => job.result.take(),
+            Outcome::Failed(message) => {
+                tracing::warn!(id = %job.item_id, error = %message,
+                               "item availability check failed");
+                None
+            }
+            Outcome::Cancelled => None,
+        };
+        if let Some(result) = result {
+            if let Err(error) = &result
+               && error.kind != LibraryServiceErrorKind::NotFound
+            {
+                tracing::warn!(id = %job.item_id, error = %error,
+                               "item availability check failed transiently");
+            }
+            if let Some(existing) = self.catalog.iter_mut().find(|i| i.id == job.item_id) {
+                apply_check_result(existing, result, std::time::SystemTime::now());
+                self.section_counts =
+                    section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
+                self.invalidate_cache();
+            }
+        }
+        cx.emit(LibraryChanged);
+    }
+
+    /// Cancels every availability check that has not started. A check already
+    /// running is left to finish.
+    pub(super) fn cancel_pending_checks(&mut self) {
+        for id in self.check_jobs.remove_all_pending() {
+            self.work.cancel(id);
+        }
+    }
+
+    /// Submits availability checks for `ids` that have none waiting or running.
+    ///
+    /// Used by [`Self::request_check_batch`] to submit a batch of items overdue
+    /// for a re-check.
+    pub fn enqueue_checks(&mut self, ids: impl Iterator<Item = Arc<str>>, priority: Priority) {
+        for id in ids {
+            self.submit_check(id, priority);
+        }
+    }
+
+    /// Requests a batch of per-item availability checks on behalf of the
+    /// automatic timer. They run in the background, behind anything the user
+    /// asks for. See [`Self::request_manual_check_batch`] for the same batch
+    /// requested by the user.
+    ///
+    /// Gated by `ITEM_CHECK_BATCH_COOLDOWN_SECS`, shared between the manual
     /// trigger and the automatic periodic timer so neither can flood the API
     /// by stacking on top of the other.
-    ///
+    pub fn request_check_batch(&mut self, cx: &mut Context<Self>) {
+        self.request_check_batch_as(Priority::Background, cx);
+    }
+
+    /// Requests the same batch as [`Self::request_check_batch`], on behalf of
+    /// the user ("Check Item Availability"). The user is waiting on it, so it
+    /// goes ahead of background work.
+    pub fn request_manual_check_batch(&mut self, cx: &mut Context<Self>) {
+        self.request_check_batch_as(Priority::Interactive, cx);
+    }
+
     /// No-ops (silently) if a batch was already requested too recently.
     /// Otherwise selects up to `ITEM_CHECK_BATCH_SIZE` catalog items overdue
-    /// for a check (oldest-checked first), enqueues them, and immediately
-    /// persists the batch timestamp — before the queue finishes draining —
-    /// so a slow-draining batch doesn't leave the cooldown window open to a
-    /// second trigger firing mid-batch.
-    pub fn request_check_batch(&mut self, cx: &mut Context<Self>) {
-        let root = cache_dir();
+    /// for a check (oldest-checked first), submits them, and immediately
+    /// persists the batch timestamp — before the checks finish — so a
+    /// slow-running batch doesn't leave the cooldown window open to a second
+    /// trigger firing mid-batch.
+    fn request_check_batch_as(&mut self, priority: Priority, _cx: &mut Context<Self>) {
+        let root = self.cache_root.clone();
         let last_batch_secs = load_cache_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
         let now = std::time::SystemTime::now();
         let now_secs = now.duration_since(std::time::UNIX_EPOCH)
@@ -235,6 +280,6 @@ impl LibraryController {
         if let Err(e) = save_check_batch_timestamp(&root, now_secs) {
             tracing::warn!(error = %e, "failed to persist check-batch cooldown timestamp");
         }
-        self.enqueue_checks(ids.into_iter(), cx);
+        self.enqueue_checks(ids.into_iter(), priority);
     }
 }

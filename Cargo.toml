@@ -42,7 +42,7 @@ rmcp = { version = "3.5.1", features = ["server", "macros", "transport-io", "sch
 tracing = "0.1"
 dtrpg-core = { path = "crates/dtrpg-core" }
 dtrpg-ui = { path = "crates/dtrpg-ui" }
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 # gpui-kit forks zed-industries/zed's gpui under its own package family
 # (gpui-pre, gpui-pre-platform, gpui-pre-macros) — pinned to the exact
 # version gpui-kit 0.7.3 itself depends on, so our Context/Window/App/Global

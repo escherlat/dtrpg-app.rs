@@ -12,7 +12,7 @@ use self::gateway::{HttpSdkLibraryGateway, UnavailableSdkGateway};
 use self::mapping::{last_page_from_links, map_order_product, product_lookup, publisher_lookup};
 use crate::{
     data::{library::LibraryItem, token_status::TokenStatusHandle},
-    services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind},
+    services::{DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind},
 };
 
 /// Library service adapter backed by the Rust SDK.
@@ -249,15 +249,13 @@ impl LibraryService for RustSdkLibraryService {
     }
 
     fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
-                     cancel: &std::sync::atomic::AtomicBool,
-                     on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>)
+                     control: DownloadControl<'_>)
                      -> Result<(), LibraryServiceError> {
         download::download_item(self.gateway.as_ref(),
                                 order_product_id,
                                 index,
                                 dest,
-                                cancel,
-                                on_retry)
+                                control)
     }
 }
 

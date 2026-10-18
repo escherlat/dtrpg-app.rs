@@ -15,16 +15,27 @@ The app MUST load thumbnails concurrently, dispatching up to `max_concurrent_dow
 - **THEN** the next pending thumbnail in the queue is dispatched immediately without waiting for other slots
 
 ### Requirement: Thumbnail and download concurrency MUST share the same limit
-The number of concurrent thumbnail fetches plus concurrent file downloads MUST NOT exceed `max_concurrent_downloads` in aggregate, so that thumbnail loading and active downloads do not collectively saturate the connection.
+The number of concurrent thumbnail fetches plus concurrent file downloads MUST NOT exceed `max_concurrent_downloads` in aggregate, so that thumbnail loading and active downloads do not collectively saturate the connection. Availability checks do not count toward this limit.
 
 #### Scenario: Downloading while thumbnails are loading
 - **WHEN** a file download is in progress and grid thumbnails are being fetched
 - **THEN** the combined number of active fetches stays at or below `max_concurrent_downloads`
 
+#### Scenario: A check is not counted
+- **WHEN** `max_concurrent_downloads` thumbnail fetches and downloads are running and an availability check is requested
+- **THEN** the check runs without waiting for one of them to finish, subject to the rule that checks run one at a time
+
 ### Requirement: Priority thumbnails MUST preempt lower-priority ones
-When the user scrolls to a new grid region or selects an item, the app MUST promote that item's thumbnail to the front of the thumbnail queue.
+When the user asks for a thumbnail — "Load Thumbnail" on an entry, opening an entry's detail view, or refreshing a detail cover — the app MUST schedule that fetch ahead of any background thumbnail loading still waiting. It MUST NOT interrupt a fetch that is already running.
 
-#### Scenario: Promoting a thumbnail on item selection
-- **WHEN** the user selects an item whose thumbnail is pending in the queue
-- **THEN** that thumbnail moves to the front of the queue and is dispatched as soon as a slot is available
+#### Scenario: Promoting a thumbnail on user request
+- **WHEN** the user asks for an entry's thumbnail while background thumbnail fetches are waiting
+- **THEN** that fetch is dispatched as soon as a slot is available, ahead of all the waiting background fetches
 
+#### Scenario: Running fetches are not interrupted
+- **WHEN** the user asks for a thumbnail while the limit is reached
+- **THEN** the fetches already running continue, and the requested one starts when one of them finishes
+
+#### Scenario: Requests are served in the order made
+- **WHEN** the user asks for several thumbnails one after another while all slots are busy
+- **THEN** they are dispatched in the order they were requested

@@ -2,16 +2,17 @@
 
 use dtrpg_sdk::auth::{credential_login, key_exchange};
 use dtrpg_sdk::{ClientError, config::Config};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Handle;
 
 use crate::constants::API_BASE_URL_ENV;
+use crate::runtime;
 use crate::services::{LoginError, LoginService, LoginTokens};
 
 /// [`LoginService`] implementation backed by the DriveThruRPG SDK auth
 /// endpoint.
 pub struct SdkLoginService {
     config:  Config,
-    runtime: Runtime,
+    runtime: Handle,
 }
 
 impl SdkLoginService {
@@ -29,9 +30,7 @@ impl SdkLoginService {
             Ok(base_url) => Config::with_base_url("", base_url),
             Err(_) => Config::new(""),
         };
-        let runtime = Builder::new_multi_thread()
-            .enable_all()
-            .build()
+        let runtime = runtime::handle()
             .map_err(|e| LoginError(format!("Unable to start login runtime: {e}")))?;
         Ok(Self { config, runtime })
     }

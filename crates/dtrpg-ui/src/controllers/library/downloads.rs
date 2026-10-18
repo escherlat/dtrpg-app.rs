@@ -113,27 +113,20 @@ impl LibraryController {
     /// downloaded, or that specific file is already queued/in flight.
     pub fn enqueue_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
                                  cx: &mut Context<Self>) {
-        let Some(item_id) = self.catalog
-                                .iter()
-                                .find(|i| {
-                                    i.id.as_ref() == id
-                                    && i.files.get(index as usize).is_some_and(|f| !f.downloaded)
-                                })
-                                .map(|i| Arc::clone(&i.id))
+        let Some(item) = self.catalog
+                             .iter()
+                             .find(|i| {
+                                 i.id.as_ref() == id
+                                 && i.files.get(index as usize).is_some_and(|f| !f.downloaded)
+                             })
+                             .cloned()
         else {
             return;
         };
-        let key = (Arc::clone(&item_id), index);
-        let already_pending = self.download_queue
-                                  .iter()
-                                  .any(|(qid, qidx, _)| qid.as_ref() == id && *qidx == index)
-                              || self.download_activity_ids.contains_key(&key);
-        if already_pending {
+        if self.download_jobs.has_file(id, index) {
             return;
         }
-        self.download_queue
-            .push_back((item_id, index, title.into()));
-        self.drain_download_queue(cx);
+        self.submit_download(item, index, title.into());
         cx.emit(LibraryChanged);
     }
 
@@ -305,30 +298,22 @@ impl LibraryController {
 
     /// Cancels a single file's download that has not yet completed.
     ///
-    /// If `(id, index)` is still waiting in `download_queue`, removes it —
-    /// no activity entry existed yet for a queued item. If it is actively
-    /// fetching (holds a concurrency slot), signals its cancellation flag
-    /// and removes its activity panel entry immediately; the in-flight
-    /// task observes the flag at its next checkpoint, skips marking the
-    /// file `downloaded`, and frees the slot itself (see
-    /// [`Self::dispatch_download`]) — `active_downloads` is only ever
-    /// decremented there, never here, to avoid double-counting the slot.
-    /// Other files queued or in flight for the same entry are unaffected.
+    /// A download still waiting in the work queue is removed and never
+    /// starts; no activity entry existed yet for it. One that is running has
+    /// its job cancelled and its activity panel entry removed immediately; the
+    /// job observes the cancellation at its next checkpoint, so the file is
+    /// not marked `downloaded`, and the queue frees its slot. Other files
+    /// queued or in flight for the same entry are unaffected.
     ///
     /// No-op if `(id, index)` is not queued or in flight.
     pub fn cancel_download(&mut self, id: &str, index: u32, cx: &mut Context<Self>) {
-        if dequeue_file(&mut self.download_queue, id, index) {
-            cx.emit(LibraryChanged);
-            return;
-        }
-
         let key = (Arc::<str>::from(id), index);
-        let Some(flag) = self.download_cancel_flags.remove(&key)
+        let Some((job_id, activity_id)) = self.download_jobs.cancel(&key)
         else {
             return;
         };
-        flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        if let Some(activity_id) = self.download_activity_ids.remove(&key) {
+        self.work.cancel(job_id);
+        if let Some(activity_id) = activity_id {
             self.activity
                 .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
         }
@@ -339,12 +324,7 @@ impl LibraryController {
     /// actively downloading.
     #[must_use]
     pub fn is_downloading(&self, id: &str) -> bool {
-        self.download_queue
-            .iter()
-            .any(|(qid, ..)| qid.as_ref() == id)
-        || self.download_activity_ids
-               .keys()
-               .any(|(aid, _)| aid.as_ref() == id)
+        self.download_jobs.has_item(id)
     }
 
     /// Returns `true` if the file at `(id, index)` is currently queued or
@@ -354,12 +334,7 @@ impl LibraryController {
     /// indicator on a row instead of its download/downloaded affordance.
     #[must_use]
     pub fn is_file_queued_or_active(&self, id: &str, index: u32) -> bool {
-        self.download_queue
-            .iter()
-            .any(|(qid, qidx, _)| qid.as_ref() == id && *qidx == index)
-        || self.download_activity_ids
-               .keys()
-               .any(|(aid, aidx)| aid.as_ref() == id && *aidx == index)
+        self.download_jobs.has_file(id, index)
     }
 }
 

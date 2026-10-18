@@ -147,15 +147,12 @@ impl LibraryController {
         // Queued availability checks reference items that no longer exist in
         // the now-cleared catalog; an in-flight check (if any) still
         // completes normally and harmlessly finds nothing to update.
-        self.check_queue.clear();
-        for (id, _url, _force) in self.thumbnail_queue.drain(..) {
-            cx.global_mut::<CoverCache>().in_flight.remove(&id);
-        }
-        // If nothing is currently in flight, no pending fetch completion will
-        // ever run `drain_thumbnail_queue`'s empty-queue completion
-        // branch — without this, the aggregated activity item would be
+        self.cancel_pending_checks();
+        self.cancel_pending_thumbnails(cx);
+        // If nothing is currently in flight, no fetch completion will ever
+        // complete the aggregated activity item — without this, it would be
         // left showing "in progress" indefinitely.
-        if self.active_thumbnail_fetches == 0
+        if self.thumbnail_jobs.is_empty()
            && let Some(id) = self.thumbnail_activity_id.take()
         {
             self.thumbnail_processed = 0;

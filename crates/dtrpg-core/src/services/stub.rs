@@ -1,7 +1,9 @@
 //! Test stubs for the library service.
 
 use crate::data::library::LibraryItem;
-use crate::services::{LibraryService, LibraryServiceError, LibraryServiceErrorKind};
+use crate::services::{
+    DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind,
+};
 use crate::util::stubs::stub_catalog;
 
 /// Controls which canned behavior a [`StubLibraryService`] exhibits.
@@ -66,8 +68,7 @@ impl LibraryService for StubLibraryService {
     }
 
     fn download_item(&self, _order_product_id: u64, _index: u32, dest: &std::path::Path,
-                     _cancel: &std::sync::atomic::AtomicBool,
-                     _on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>)
+                     _control: DownloadControl<'_>)
                      -> Result<(), LibraryServiceError> {
         match self.mode {
             StubMode::Seeded | StubMode::Empty => {
