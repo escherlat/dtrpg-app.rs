@@ -32,6 +32,14 @@ use crate::data::token_status_global::TokenStatusGlobal;
 /// `cx.text_system().all_font_names()`), not a curated list.
 pub type FontSelectState = Entity<SelectState<Vec<String>>>;
 
+/// Placement rule condition currently being edited in Downloads settings.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum RuleEditorType {
+    Publisher,
+    Collection,
+    Size,
+}
+
 /// Per-type counts of regenerable app cache data, computed from disk and
 /// cached on the controller — see [`SettingsController::refresh_cache_counts`].
 #[derive(Clone, Copy, Default)]
@@ -109,6 +117,7 @@ pub struct SettingsSnapshot {
     pub collection_rule_input:          Option<Entity<InputState>>,
     pub size_rule_input:                Option<Entity<InputState>>,
     pub rule_target_root_id:            u32,
+    pub rule_editor_type:               RuleEditorType,
     /// `true` when the configured storage root is unreachable (e.g. unmounted
     /// volume).
     pub storage_unavailable:            bool,
@@ -230,6 +239,7 @@ pub struct SettingsController {
     collection_rule_input:          Option<Entity<InputState>>,
     size_rule_input:                Option<Entity<InputState>>,
     rule_target_root_id:            u32,
+    rule_editor_type:               RuleEditorType,
     /// Font picker state for the Appearance page's body-font row; set by the
     /// root view after creation.
     body_font_select:               Option<FontSelectState>,
@@ -328,6 +338,7 @@ impl SettingsController {
                               collection_rule_input: None,
                               size_rule_input: None,
                               rule_target_root_id: 0,
+                              rule_editor_type: RuleEditorType::Publisher,
                               body_font_select: None,
                               value_font_select: None,
                               label_font_select: None,
@@ -374,6 +385,7 @@ impl SettingsController {
                collection_rule_input: None,
                size_rule_input: None,
                rule_target_root_id: 0,
+               rule_editor_type: RuleEditorType::Publisher,
                body_font_select: None,
                value_font_select: None,
                label_font_select: None,
@@ -590,6 +602,12 @@ impl SettingsController {
             self.rule_target_root_id = id;
             cx.emit(SettingsChanged);
         }
+    }
+
+    /// Selects the placement condition type shown in the rule editor.
+    pub fn set_rule_editor_type(&mut self, kind: RuleEditorType, cx: &mut Context<Self>) {
+        self.rule_editor_type = kind;
+        cx.emit(SettingsChanged);
     }
 
     /// Adds a collection-membership placement rule from the numeric ID input.
@@ -1015,6 +1033,7 @@ impl SettingsController {
                            collection_rule_input: self.collection_rule_input.clone(),
                            size_rule_input: self.size_rule_input.clone(),
                            rule_target_root_id: self.rule_target_root_id,
+                           rule_editor_type: self.rule_editor_type,
                            storage_unavailable: self.storage_unavailable,
                            storage_path_exists: self.storage_path_exists,
                            auth,

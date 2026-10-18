@@ -96,6 +96,7 @@ impl Render for SettingsWindowView {
                                           snap.size_rule_input,
                                           snap.rule_target_root_id,
                                           self.library.read(cx).publisher_names(),
+                                          snap.rule_editor_type,
                                           self.settings.clone(),
                                           self.library.clone(),
                                           &self.focus_handle,

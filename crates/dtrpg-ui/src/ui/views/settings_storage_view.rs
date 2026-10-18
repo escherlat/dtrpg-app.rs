@@ -18,7 +18,7 @@ use gpui_kit::component::input::{Input, InputState, NumberInput};
 use gpui_kit::component::switch::Switch;
 use rust_i18n::t;
 
-use crate::controllers::settings::SettingsController;
+use crate::controllers::settings::{RuleEditorType, SettingsController};
 use crate::data::theme::ColorTokens;
 use crate::ui::widgets::selectable_text;
 
@@ -47,7 +47,8 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                               publisher_rule_input: Option<Entity<InputState>>,
                               collection_rule_input: Option<Entity<InputState>>,
                               size_rule_input: Option<Entity<InputState>>,
-                              rule_target_root_id: u32, publisher_names: Vec<String>)
+                              rule_target_root_id: u32, publisher_names: Vec<String>,
+                              rule_editor_type: RuleEditorType)
                               -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
@@ -211,7 +212,8 @@ pub fn render_storage_section(storage_root_path: PathBuf, storage_path_exists: b
                                        collection_rule_input,
                                        size_rule_input,
                                        rule_target_root_id,
-                                       publisher_names))
+                                       publisher_names,
+                                       rule_editor_type))
 }
 
 /// Renders saved placement rules in evaluation order. Rule creation is kept
@@ -223,52 +225,95 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                         publisher_input: Option<Entity<InputState>>,
                         collection_input: Option<Entity<InputState>>,
                         size_input: Option<Entity<InputState>>, target_root_id: u32,
-                        publisher_names: Vec<String>)
+                        publisher_names: Vec<String>, rule_editor_type: RuleEditorType)
                         -> impl IntoElement + 'static + use<> {
     let text_primary = colors.text_primary;
     let text_secondary = colors.text_secondary;
     let border = colors.border;
+    let selector = [(RuleEditorType::Publisher, "Publisher"),
+                    (RuleEditorType::Collection, "Collection"),
+                    (RuleEditorType::Size, "Size")];
+    let type_selector = div()
+        .flex()
+        .flex_col()
+        .gap(px(2.0))
+        .children(selector.into_iter().map(|(kind, label)| {
+            let entity = entity.clone();
+            Button::new(SharedString::from(format!("rule-type-{label}")))
+                .ghost()
+                .selected(kind == rule_editor_type)
+                .child(label)
+                .on_click(move |_, _, cx| {
+                    entity.update(cx, |ctrl, cx| ctrl.set_rule_editor_type(kind, cx));
+                })
+        }));
+    let active_input = match rule_editor_type {
+        RuleEditorType::Publisher => publisher_input.clone(),
+        RuleEditorType::Collection => collection_input.clone(),
+        RuleEditorType::Size => size_input.clone(),
+    };
+    let input = active_input.clone();
     let add_entity = entity.clone();
-    let suggestion_row =
+    let add_button = Button::new("add-placement-rule").ghost()
+                                                      .outline()
+                                                      .child(t!("settings.storage_add_rule"))
+                                                      .on_click(move |_, _, cx| {
+                                                          let Some(input) = input.clone()
+                                                          else {
+                                                              return;
+                                                          };
+                                                          let value =
+                                                              input.read(cx).value().to_string();
+                                                          add_entity.update(cx, |ctrl, cx| {
+                                                                        match rule_editor_type {
+                RuleEditorType::Publisher => ctrl.add_publisher_rule(value, cx),
+                RuleEditorType::Collection => ctrl.add_collection_rule(value, cx),
+                RuleEditorType::Size => ctrl.add_size_rule(value, cx),
+            }
+                                                                    });
+                                                      });
+    let suggestion_list = if rule_editor_type == RuleEditorType::Publisher {
         div()
             .flex()
-            .flex_wrap()
-            .gap(px(4.0))
+            .flex_col()
+            .gap(px(2.0))
             .children(publisher_names.into_iter().take(8).map(|name| {
-                let entity = entity.clone();
-                let label = name.clone();
+                let input = publisher_input.clone();
                 Button::new(SharedString::from(format!("publisher-suggestion-{name}")))
                     .ghost()
-                    .child(label)
-                    .on_click(move |_, _, cx| {
-                        entity.update(cx, |ctrl, cx| ctrl.add_publisher_rule(name.clone(), cx));
+                    .child(name.clone())
+                    .on_click(move |_, window, cx| {
+                        if let Some(input) = input.clone() {
+                            input.update(cx, |state, cx| {
+                                state.set_value(name.clone(), window, cx);
+                            });
+                        }
                     })
-            }));
-    let add_row =
-        div().flex()
-             .items_center()
-             .gap(px(6.0))
-             .child(match publisher_input.clone() {
-                        Some(input) => Input::new(&input).into_any_element(),
-                        None => div().text_xs()
-                                     .text_color(text_secondary)
-                                     .child("Publisher")
-                                     .into_any_element(),
-                    })
-             .child(Button::new("add-publisher-rule").ghost()
-                                                     .outline()
-                                                     .child(t!("settings.storage_add_rule"))
-                                                     .on_click(move |_, _, cx| {
-                                                         let Some(input) = publisher_input.clone()
-                                                         else {
-                                                             return;
-                                                         };
-                                                         let publisher =
-                                                             input.read(cx).value().to_string();
-                                                         add_entity.update(cx, |ctrl, cx| {
-                                                             ctrl.add_publisher_rule(publisher, cx)
-                                                         });
-                                                     }));
+            }))
+            .into_any_element()
+    }
+    else {
+        div().into_any_element()
+    };
+    let add_row = div().flex()
+                       .items_start()
+                       .gap(px(6.0))
+                       .child(type_selector)
+                       .child(div().flex_1()
+                                   .flex_col()
+                                   .gap(px(3.0))
+                                   .child(active_input.map_or_else(|| {
+                                                           div().text_xs()
+                                                                .text_color(text_secondary)
+                                                                .child("Value")
+                                                                .into_any_element()
+                                                       },
+                                                       |input| {
+                                                           Input::new(&input).appearance(true)
+                                                                             .into_any_element()
+                                                       }))
+                                   .child(suggestion_list))
+                       .child(add_button);
 
     let target_row =
         div().flex()
@@ -287,17 +332,6 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                 })
              }));
 
-    let collection_row = rule_input_row(collection_input,
-                                        "Collection ID",
-                                        "Add collection rule",
-                                        entity.clone(),
-                                        |ctrl, value, cx| ctrl.add_collection_rule(value, cx));
-    let size_row = rule_input_row(size_input,
-                                  "Minimum MB",
-                                  "Add size rule",
-                                  entity.clone(),
-                                  |ctrl, value, cx| ctrl.add_size_rule(value, cx));
-
     div().flex()
          .flex_col()
          .gap(px(8.0))
@@ -305,11 +339,8 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                      .font_weight(gpui::FontWeight::SEMIBOLD)
                      .text_color(text_primary)
                      .child(t!("settings.storage_rules_title")))
-         .child(suggestion_row)
          .child(target_row)
          .child(add_row)
-         .child(collection_row)
-         .child(size_row)
          .children(rules.into_iter().enumerate().map(|(index, rule)| {
              let entity_up = entity.clone();
              let entity_down = entity.clone();
@@ -359,34 +390,6 @@ fn render_storage_rules(rules: Vec<PlacementRule>, entity: Entity<SettingsContro
                         }),
                 )
          }))
-}
-
-fn rule_input_row<F>(input: Option<Entity<InputState>>, placeholder: &'static str,
-                     label: &'static str, entity: Entity<SettingsController>, action: F)
-                     -> impl IntoElement + 'static + use<F>
-    where F: Fn(&mut SettingsController, String, &mut gpui::Context<SettingsController>) + 'static {
-    let input_element =
-        input.clone()
-             .map_or_else(|| div().text_xs().child(placeholder).into_any_element(),
-                          |input| Input::new(&input).into_any_element());
-    div()
-        .flex()
-        .items_center()
-        .gap(px(6.0))
-        .child(input_element)
-        .child(
-            Button::new(SharedString::from(format!("{label}-button")))
-                .ghost()
-                .outline()
-                .child(label)
-                .on_click(move |_, _, cx| {
-                    let Some(input) = input.clone() else {
-                        return;
-                    };
-                    let value = input.read(cx).value().to_string();
-                    entity.update(cx, |ctrl, cx| action(ctrl, value, cx));
-                }),
-        )
 }
 
 fn format_rule(rule: &PlacementRule) -> String {
