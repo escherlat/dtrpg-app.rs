@@ -1,7 +1,7 @@
 //! Library UI state and interaction controller.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dtrpg_core::data::catalog_cache::{
@@ -28,12 +28,13 @@ use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
 use dtrpg_core::util::sort::*;
-use dtrpg_core::work::{JobEvents, WorkQueue};
+use dtrpg_core::work::{JobEvent, JobEvents, WorkQueue};
 use gpui::{
     AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task, Window,
 };
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
+use download_jobs::DownloadJobs;
 use thumbnail_jobs::ThumbnailJobs;
 
 use crate::controllers::activity::ActivityController;
@@ -58,6 +59,7 @@ mod concurrency;
 mod detail;
 mod diagnostics;
 mod download_dispatch;
+mod download_jobs;
 mod downloads;
 mod filtering;
 mod helpers;
@@ -71,6 +73,10 @@ mod thumbnails;
 mod tests_catalog;
 #[cfg(test)]
 mod tests_checks;
+#[cfg(test)]
+mod tests_downloads;
+#[cfg(test)]
+mod tests_support;
 #[cfg(test)]
 mod tests_thumbnails;
 #[cfg(test)]
@@ -341,23 +347,13 @@ pub struct LibraryController {
     /// Queue of item ids awaiting a periodic per-item availability check
     /// (see `catalog-item-level-reconciliation`).
     check_queue:                   VecDeque<Arc<str>>,
-    /// Queue of `(item_id, file_index, title)` triples pending a file
-    /// download. Keyed per file (not per entry) so a multi-item entry can
-    /// have more than one of its files queued or active independently.
-    download_queue:                VecDeque<(Arc<str>, u32, String)>,
-    /// Number of file downloads currently in flight. Bounded by
-    /// [`Self::available_slots`].
-    active_downloads:              usize,
-    /// Per-file cancellation flag for an in-flight download, keyed by
-    /// `(item_id, file_index)`, set by [`Self::cancel_download`] and polled by
-    /// the download task at its next checkpoint. Removed once the task
-    /// observes it (success, error, or cancellation) or by `cancel_download`
-    /// itself for a still-queued item.
-    download_cancel_flags:         HashMap<(Arc<str>, u32), Arc<std::sync::atomic::AtomicBool>>,
-    /// Activity panel id for each in-flight (slot-holding) download, keyed by
-    /// `(item_id, file_index)`. Not populated for files still waiting in
-    /// `download_queue`.
-    download_activity_ids:         HashMap<(Arc<str>, u32), u64>,
+    /// Every file download submitted to `work` that has not finished. Keyed
+    /// per file (not per entry) so a multi-item entry can have more than one
+    /// of its files queued or active independently.
+    download_jobs:                 DownloadJobs,
+    /// Where the catalog cache is saved after a download. A field so tests
+    /// can point it somewhere other than the user's real cache.
+    cache_root:                    PathBuf,
     /// Shared thumbnail/download concurrency limit. Initialized from
     /// [`dtrpg_core::data::storage::StorageConfig`] and kept in sync with the
     /// Storage settings page via [`Self::set_max_concurrent_downloads`].

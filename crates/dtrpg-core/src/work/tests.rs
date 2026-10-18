@@ -377,3 +377,40 @@ fn a_job_can_pass_its_cancel_flag_to_other_code() {
     assert_eq!(outcome_of(&mut events, id), Outcome::Succeeded);
     assert!(!seen.load(Ordering::SeqCst));
 }
+
+#[test]
+fn a_retry_is_reported_between_started_and_finished() {
+    let (queue, mut events) = new_queue(1);
+    let id = queue.submit(background(JobKind::Download), |context| {
+                      context.report_retry(2, Duration::from_secs(3));
+                      Ok(())
+                  });
+
+    assert_eq!(next_event(&mut events), JobEvent::Started { id });
+    assert_eq!(next_event(&mut events),
+               JobEvent::Retrying { id,
+                                    attempt: 2,
+                                    delay: Duration::from_secs(3) });
+    assert_eq!(next_event(&mut events),
+               JobEvent::Finished { id,
+                                    outcome: Outcome::Succeeded });
+}
+
+#[test]
+fn every_kind_of_job_counts_against_the_same_limit() {
+    let (queue, mut events) = new_queue(2);
+    let gate = Arc::new(Gate::default());
+    let entered = Arc::new(AtomicUsize::new(0));
+    for kind in [JobKind::Thumbnail, JobKind::Download, JobKind::Thumbnail, JobKind::Download] {
+        submit_gated(&queue, background(kind), &gate, &entered);
+    }
+
+    wait_until(|| entered.load(Ordering::SeqCst) == 2);
+    // Give a wrongly started third job time to show itself.
+    thread::sleep(Duration::from_millis(50));
+    assert_eq!(entered.load(Ordering::SeqCst), 2);
+
+    gate.open();
+    let finished = finished_outcomes(&mut events, 4);
+    assert!(finished.iter().all(|(_, outcome)| *outcome == Outcome::Succeeded));
+}

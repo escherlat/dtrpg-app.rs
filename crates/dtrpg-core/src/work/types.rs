@@ -1,6 +1,6 @@
 //! The vocabulary shared by the queue and its callers.
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
 /// Identifies one submitted job. Ids are unique for the life of a queue.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -77,8 +77,8 @@ pub type JobEvents = tokio::sync::mpsc::UnboundedReceiver<JobEvent>;
 
 /// A change in a job's lifecycle.
 ///
-/// Events for one job arrive in order: `Started`, any number of `Progress`,
-/// then `Finished`. A job cancelled while pending only ever produces
+/// Events for one job arrive in order: `Started`, any number of `Progress` and
+/// `Retrying`, then `Finished`. A job cancelled while pending only ever produces
 /// `Finished`. Events from different jobs may interleave, and an event can
 /// arrive before the call that submitted its job has returned.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -96,6 +96,15 @@ pub enum JobEvent {
         done: u64,
         /// Total units, when known.
         total: Option<u64>,
+    },
+    /// The job's latest attempt failed and it will try again after `delay`.
+    Retrying {
+        /// The job retrying.
+        id: JobId,
+        /// The attempt about to be made, counting the first as 1.
+        attempt: u32,
+        /// How long the job waits before that attempt.
+        delay: Duration,
     },
     /// The job is over and its slot is free.
     Finished {

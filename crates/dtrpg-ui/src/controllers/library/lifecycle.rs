@@ -100,16 +100,33 @@ impl LibraryController {
                    checking_items: HashSet::new(),
                    verifying_downloads: HashSet::new(),
                    check_queue: VecDeque::new(),
-                   download_queue: VecDeque::new(),
-                   active_downloads: 0,
-                   download_cancel_flags: HashMap::new(),
-                   download_activity_ids: HashMap::new(),
+                   download_jobs: DownloadJobs::default(),
+                   cache_root: cache_dir(),
                    max_concurrent_downloads: storage.max_concurrent_downloads(),
                    recently_updated_window_days: storage.recently_updated_window_days(),
                    pending_download: None,
                    bulk_selection_mode: false,
                    bulk_selected_ids: HashSet::new() };
         (ctrl, work_events)
+    }
+
+    /// Applies a work-queue event. Each handler ignores jobs that are not its
+    /// own, so an event goes to both.
+    pub(super) fn handle_work_event(&mut self, event: JobEvent, cx: &mut Context<Self>) {
+        match event {
+            JobEvent::Started { id } => {
+                self.thumbnail_started(id, cx);
+                self.download_started(id, cx);
+            }
+            JobEvent::Retrying { id, attempt, delay } => {
+                self.download_retrying(id, attempt, delay, cx);
+            }
+            JobEvent::Progress { .. } => {}
+            JobEvent::Finished { id, outcome } => {
+                self.thumbnail_finished(id, outcome.clone(), cx);
+                self.download_finished(id, outcome, cx);
+            }
+        }
     }
 
     /// Starts a loop that applies each work-queue event to the controller, for

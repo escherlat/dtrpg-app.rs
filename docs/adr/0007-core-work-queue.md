@@ -241,10 +241,40 @@ say.
   `Background`. "Load Thumbnail", opening a detail tab, and refreshing a detail
   cover are `Interactive`. The old queue put these at the front in reverse
   order of request; they are now first in, first out among themselves.
-- **Interim limit.** Until downloads move onto the queue, thumbnails and
-  downloads each apply `max_concurrent_downloads` separately, so up to twice
-  the limit can run at once. The downloads slice restores the shared limit.
+- **Interim limit.** Until downloads moved onto the queue, thumbnails and
+  downloads each applied `max_concurrent_downloads` separately, so up to twice
+  the limit could run at once. The downloads slice below restored the shared
+  limit.
 - **A stranded marker is fixed.** Cancelling waiting fetches now clears their
   in-flight markers. Previously "Refresh Thumbnails" left the marker set on
   any detail cover it dropped from the queue, and `ensure_detail_cover` then
   never fetched that cover.
+
+### Downloads (slice 3)
+
+- **One limit again.** Thumbnails and downloads are on the same queue, so
+  `max_concurrent_downloads` bounds them together, as it did before. The
+  `remaining_slots` helper and the controller's slot counters are gone.
+- **Downloads are `Interactive`.** A download the user asks for no longer waits
+  behind a backlog of thumbnails. This is the deliberate behavior change the
+  Consequences section promised, and a test pins it.
+- **The job works out its own destination.** It reads the storage settings and
+  resolves the path when it starts, on its worker thread, as the old code did
+  when a slot freed up, but without the disk read on the UI thread. It leaves
+  the path in a `ResultSlot` so the controller can link the file into
+  collections and log failures.
+- **Retries are an event.** `JobEvent::Retrying` carries the attempt and the
+  delay, and the controller turns it into the activity label. Cover fetches
+  could report the same event later.
+- **Cancel is the queue's.** The activity panel's cancel action and the
+  controller's `cancel_download` both cancel the job. A waiting download is
+  removed and never starts; a running one sees the cancel flag, is not marked
+  downloaded, and frees its slot. A cancelled job finishing changes nothing.
+- **The catalog cache directory is a field.** The controller used to call
+  `cache_dir()` where it saved the catalog after a download, which made a
+  test of that path overwrite the real cache. Tests now point it at a
+  temporary directory.
+- **One detail changed.** If an entry's file is no longer in the catalog when
+  a download would start, the old code showed an activity error. A download
+  is now submitted only for a file that is in the catalog at that moment, so
+  that path is gone.

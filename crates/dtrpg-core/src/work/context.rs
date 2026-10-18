@@ -1,8 +1,11 @@
 //! The handle a running job uses to talk back to the queue.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
 };
 
 use tokio::sync::mpsc::UnboundedSender;
@@ -41,6 +44,15 @@ impl JobContext {
     #[must_use]
     pub fn cancel_flag(&self) -> &AtomicBool {
         &self.cancel
+    }
+
+    /// Reports that the job's latest attempt failed and it will make attempt
+    /// number `attempt` after waiting `delay`.
+    pub fn report_retry(&self, attempt: u32, delay: Duration) {
+        // A closed channel means nobody is watching; the job carries on.
+        let _ = self.events.send(JobEvent::Retrying { id: self.id,
+                                                      attempt,
+                                                      delay });
     }
 
     /// Reports `done` of `total` units complete, if the total is known.

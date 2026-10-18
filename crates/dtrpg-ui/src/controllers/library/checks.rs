@@ -87,11 +87,7 @@ impl LibraryController {
     /// render paths. Items missing from the map are idle.
     #[must_use]
     pub fn item_activity_snapshot(&self) -> HashMap<Arc<str>, ItemActivity> {
-        let downloading = self.download_queue
-                              .iter()
-                              .map(|(id, ..)| id)
-                              .chain(self.download_activity_ids.keys().map(|(id, _)| id));
-        item_activity_map(&self.verifying_downloads, downloading)
+        item_activity_map(&self.verifying_downloads, self.download_jobs.item_ids())
     }
 
     // ── Item-level availability checks

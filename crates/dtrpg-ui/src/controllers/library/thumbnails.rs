@@ -3,7 +3,7 @@
 //! Fetches run as jobs on the core work queue. This module submits them and
 //! turns the queue's events back into cache, catalog, and activity updates.
 
-use dtrpg_core::work::{JobEvent, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot};
+use dtrpg_core::work::{JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot};
 
 use super::{thumbnail_jobs::ThumbnailJob, *};
 
@@ -96,18 +96,9 @@ impl LibraryController {
         }
     }
 
-    /// Handles an event from the work queue.
-    pub(super) fn handle_work_event(&mut self, event: JobEvent, cx: &mut Context<Self>) {
-        match event {
-            JobEvent::Started { id } => self.thumbnail_started(id, cx),
-            JobEvent::Progress { .. } => {}
-            JobEvent::Finished { id, outcome } => self.thumbnail_finished(id, outcome, cx),
-        }
-    }
-
     /// Starts the aggregated "loading thumbnails" activity entry when the
     /// first fetch of a batch begins.
-    fn thumbnail_started(&mut self, id: JobId, cx: &mut Context<Self>) {
+    pub(super) fn thumbnail_started(&mut self, id: JobId, cx: &mut Context<Self>) {
         if !self.thumbnail_jobs.mark_started(id) || self.thumbnail_activity_id.is_some() {
             return;
         }
@@ -124,7 +115,7 @@ impl LibraryController {
 
     /// Applies a finished fetch: caches the image (or records the failure),
     /// then advances the batch's progress.
-    fn thumbnail_finished(&mut self, id: JobId, outcome: Outcome, cx: &mut Context<Self>) {
+    pub(super) fn thumbnail_finished(&mut self, id: JobId, outcome: Outcome, cx: &mut Context<Self>) {
         let Some(job) = self.thumbnail_jobs.finish(id)
         else {
             // Cancelled before it started, and already forgotten.
