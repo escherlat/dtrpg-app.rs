@@ -9,6 +9,7 @@
 
 mod context;
 mod queue;
+mod slot;
 mod state;
 mod types;
 
@@ -17,4 +18,5 @@ mod tests;
 
 pub use context::JobContext;
 pub use queue::WorkQueue;
-pub use types::{JobEvent, JobId, JobKind, JobResult, JobSpec, Outcome, Priority};
+pub use slot::ResultSlot;
+pub use types::{JobEvent, JobEvents, JobId, JobKind, JobResult, JobSpec, Outcome, Priority};

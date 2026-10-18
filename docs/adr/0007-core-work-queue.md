@@ -208,3 +208,43 @@ branch, with the full suite run at each step:
    submits its batch as `Interactive`. The `Check` cap of 1 applies to both,
    so a manual batch jumps ahead of pending background work but still runs
    one check at a time.
+
+## Implementation notes
+
+Recorded as slices land, where the work taught something the design did not
+say.
+
+### Thumbnails (slice 2)
+
+- **The queue gets its runtime itself.** `WorkQueue::new(limit)` takes no
+  runtime handle. A job obtains the shared runtime when it starts, and if the
+  runtime cannot start, that one job fails and frees its slot. This keeps
+  construction infallible for callers, such as `LibraryController::new`, that
+  have no error path.
+- **Jobs hand back values through a `ResultSlot`.** The closure returns only
+  success or failure, as rule 2 says. A job that produces a value, such as
+  fetched image bytes, puts it in a slot its submitter also holds; it is there
+  by the time `Finished` arrives. The `JobContext` also exposes its cancel
+  flag, for passing to code that takes an `&AtomicBool`, such as
+  `retry_with_backoff`.
+- **Network access sits behind `CoverTransport`.** `dtrpg_core::services::covers`
+  holds the cache-first fetch and its retries, with a transport trait for the
+  one HTTP request. This is the test seam the original code lacked. The
+  controller keeps only bookkeeping (`ThumbnailJobs`) and applies results.
+- **Progress counts unfinished fetches.** The old code drained its queue
+  before reporting progress, so "remaining" meant "waiting" and ignored
+  fetches already running. The queue reports a finish before the next start, so
+  that count would now depend on event timing. Progress and the "remaining"
+  label now count every fetch that has not finished, and the activity entry
+  completes when the last one finishes, not when the queue first empties.
+- **Priorities.** Automatic loading and "Refresh Thumbnails" are
+  `Background`. "Load Thumbnail", opening a detail tab, and refreshing a detail
+  cover are `Interactive`. The old queue put these at the front in reverse
+  order of request; they are now first in, first out among themselves.
+- **Interim limit.** Until downloads move onto the queue, thumbnails and
+  downloads each apply `max_concurrent_downloads` separately, so up to twice
+  the limit can run at once. The downloads slice restores the shared limit.
+- **A stranded marker is fixed.** Cancelling waiting fetches now clears their
+  in-flight markers. Previously "Refresh Thumbnails" left the marker set on
+  any detail cover it dropped from the queue, and `ensure_detail_cover` then
+  never fetched that cover.

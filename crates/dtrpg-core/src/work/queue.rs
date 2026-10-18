@@ -6,16 +6,14 @@ use std::{
     thread,
 };
 
-use tokio::{
-    runtime::Handle,
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
-};
+use tokio::sync::mpsc::{self, UnboundedSender};
 
 use super::{
     context::JobContext,
     state::{Pending, State},
-    types::{JobEvent, JobId, JobResult, JobSpec, Outcome},
+    types::{JobEvent, JobEvents, JobId, JobResult, JobSpec, Outcome},
 };
+use crate::runtime;
 
 /// Runs submitted jobs on the shared runtime, within a concurrency limit.
 ///
@@ -27,13 +25,13 @@ pub struct WorkQueue {
 
 struct Shared {
     state: Mutex<State>,
-    runtime: Handle,
     events: UnboundedSender<JobEvent>,
 }
 
 impl WorkQueue {
-    /// Creates a queue that runs at most `limit` jobs at once on `runtime`,
-    /// and the receiver for its [`JobEvent`]s.
+    /// Creates a queue that runs at most `limit` jobs at once on the shared
+    /// runtime (see [`crate::runtime`]), and the receiver for its
+    /// [`JobEvent`]s.
     ///
     /// A `limit` below 1 is treated as 1. The receiver is unbounded, so the
     /// caller must keep reading it, or drop it if it does not want events; the
@@ -42,17 +40,15 @@ impl WorkQueue {
     /// # Examples
     ///
     /// ```
-    /// use dtrpg_core::{runtime, work::WorkQueue};
+    /// use dtrpg_core::work::WorkQueue;
     ///
-    /// let (queue, _events) = WorkQueue::new(runtime::handle()?, 3);
+    /// let (queue, _events) = WorkQueue::new(3);
     /// # drop(queue);
-    /// # Ok::<(), std::io::Error>(())
     /// ```
     #[must_use]
-    pub fn new(runtime: Handle, limit: usize) -> (Self, UnboundedReceiver<JobEvent>) {
+    pub fn new(limit: usize) -> (Self, JobEvents) {
         let (events, receiver) = mpsc::unbounded_channel();
         let shared = Shared { state: Mutex::new(State::new(limit)),
-                              runtime,
                               events };
         (Self { shared: Arc::new(shared) }, receiver)
     }
@@ -66,12 +62,9 @@ impl WorkQueue {
     /// # Examples
     ///
     /// ```
-    /// use dtrpg_core::{
-    ///     runtime,
-    ///     work::{JobEvent, JobKind, JobSpec, Outcome, Priority, WorkQueue},
-    /// };
+    /// use dtrpg_core::work::{JobEvent, JobKind, JobSpec, Outcome, Priority, WorkQueue};
     ///
-    /// let (queue, mut events) = WorkQueue::new(runtime::handle()?, 3);
+    /// let (queue, mut events) = WorkQueue::new(3);
     /// let spec = JobSpec { kind: JobKind::Download,
     ///                      priority: Priority::Interactive,
     ///                      label: "Example".to_owned() };
@@ -80,7 +73,6 @@ impl WorkQueue {
     /// assert_eq!(events.blocking_recv(), Some(JobEvent::Started { id }));
     /// assert_eq!(events.blocking_recv(),
     ///            Some(JobEvent::Finished { id, outcome: Outcome::Succeeded }));
-    /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn submit<F>(&self, spec: JobSpec, job: F) -> JobId
         where F: FnOnce(&JobContext) -> JobResult + Send + 'static {
@@ -155,15 +147,26 @@ impl Shared {
         let context = JobContext::new(id, Arc::clone(&cancel), self.events.clone());
         self.emit(JobEvent::Started { id });
 
+        let handle = match runtime::handle() {
+            Ok(handle) => handle,
+            Err(error) => {
+                // Without a runtime the job cannot run. Fail it, so its slot
+                // is freed and whoever is waiting on it hears about it.
+                tracing::error!(%id, %error, "work queue cannot start a job");
+                self.finish(id, &cancel, Ok(Err(format!("unable to start the runtime: {error}"))));
+                return;
+            }
+        };
+
         let shared = Arc::clone(self);
         // The join handle is dropped on purpose: a blocking task cannot be
         // aborted, and the queue tracks every job to its `Finished` event.
-        drop(self.runtime.spawn_blocking(move || {
-                             // The closure is consumed by the call, so nothing
-                             // it touched is observed in a broken state afterwards.
-                             let result = panic::catch_unwind(AssertUnwindSafe(|| job(&context)));
-                             shared.finish(id, &cancel, result);
-                         }));
+        drop(handle.spawn_blocking(move || {
+                        // The closure is consumed by the call, so nothing it
+                        // touched is observed in a broken state afterwards.
+                        let result = panic::catch_unwind(AssertUnwindSafe(|| job(&context)));
+                        shared.finish(id, &cancel, result);
+                    }));
     }
 
     /// Frees the job's slot, reports how it ended, and starts the next job.

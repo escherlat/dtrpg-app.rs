@@ -11,15 +11,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tokio::sync::mpsc::UnboundedReceiver;
-
 use super::*;
-use crate::runtime;
 
 const WAIT: Duration = Duration::from_secs(5);
 
-fn new_queue(limit: usize) -> (WorkQueue, UnboundedReceiver<JobEvent>) {
-    WorkQueue::new(runtime::handle().unwrap(), limit)
+fn new_queue(limit: usize) -> (WorkQueue, JobEvents) {
+    WorkQueue::new(limit)
 }
 
 fn spec(kind: JobKind, priority: Priority) -> JobSpec {
@@ -33,7 +30,7 @@ fn background(kind: JobKind) -> JobSpec {
 }
 
 /// Waits for the next event, failing the test if none arrives in time.
-fn next_event(events: &mut UnboundedReceiver<JobEvent>) -> JobEvent {
+fn next_event(events: &mut JobEvents) -> JobEvent {
     let deadline = Instant::now() + WAIT;
     loop {
         match events.try_recv() {
@@ -45,7 +42,7 @@ fn next_event(events: &mut UnboundedReceiver<JobEvent>) -> JobEvent {
 }
 
 /// Reads events until `id` finishes, returning its outcome.
-fn outcome_of(events: &mut UnboundedReceiver<JobEvent>, id: JobId) -> Outcome {
+fn outcome_of(events: &mut JobEvents, id: JobId) -> Outcome {
     loop {
         if let JobEvent::Finished { id: finished, outcome } = next_event(events)
            && finished == id
@@ -56,7 +53,7 @@ fn outcome_of(events: &mut UnboundedReceiver<JobEvent>, id: JobId) -> Outcome {
 }
 
 /// Reads events until `count` jobs have finished, whatever order they end in.
-fn finished_outcomes(events: &mut UnboundedReceiver<JobEvent>, count: usize)
+fn finished_outcomes(events: &mut JobEvents, count: usize)
                      -> Vec<(JobId, Outcome)> {
     let mut finished = Vec::new();
     while finished.len() < count {
@@ -348,4 +345,35 @@ fn jobs_still_run_when_nobody_reads_events() {
          });
 
     wait_until(|| ran.load(Ordering::SeqCst));
+}
+
+#[test]
+fn a_job_can_hand_back_a_value_through_a_slot() {
+    let (queue, mut events) = new_queue(1);
+    let slot = ResultSlot::new();
+    let slot_in_job = slot.clone();
+
+    let id = queue.submit(background(JobKind::Thumbnail), move |_context| {
+                      slot_in_job.put(vec![1_u8, 2, 3]);
+                      Ok(())
+                  });
+
+    assert_eq!(outcome_of(&mut events, id), Outcome::Succeeded);
+    assert_eq!(slot.take(), Some(vec![1, 2, 3]));
+    assert_eq!(slot.take(), None);
+}
+
+#[test]
+fn a_job_can_pass_its_cancel_flag_to_other_code() {
+    let (queue, mut events) = new_queue(1);
+    let seen = Arc::new(AtomicBool::new(true));
+    let seen_in_job = Arc::clone(&seen);
+
+    let id = queue.submit(background(JobKind::Download), move |context| {
+                      seen_in_job.store(context.cancel_flag().load(Ordering::SeqCst), Ordering::SeqCst);
+                      Ok(())
+                  });
+
+    assert_eq!(outcome_of(&mut events, id), Outcome::Succeeded);
+    assert!(!seen.load(Ordering::SeqCst));
 }

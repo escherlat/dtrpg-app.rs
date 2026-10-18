@@ -71,6 +71,10 @@ pub enum Outcome {
     Cancelled,
 }
 
+/// The receiving end of a queue's [`JobEvent`] stream. Read it with
+/// `recv().await` from async code, or `blocking_recv()` from a plain thread.
+pub type JobEvents = tokio::sync::mpsc::UnboundedReceiver<JobEvent>;
+
 /// A change in a job's lifecycle.
 ///
 /// Events for one job arrive in order: `Started`, any number of `Progress`,

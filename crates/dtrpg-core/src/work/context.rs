@@ -36,6 +36,13 @@ impl JobContext {
         self.cancel.load(Ordering::SeqCst)
     }
 
+    /// The cancellation flag itself, for passing to code that takes one, such
+    /// as [`retry_with_backoff`](crate::services::retry::retry_with_backoff).
+    #[must_use]
+    pub fn cancel_flag(&self) -> &AtomicBool {
+        &self.cancel
+    }
+
     /// Reports `done` of `total` units complete, if the total is known.
     pub fn report_progress(&self, done: u64, total: Option<u64>) {
         // A closed channel means nobody is watching; the job carries on.

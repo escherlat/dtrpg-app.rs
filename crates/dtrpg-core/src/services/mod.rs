@@ -2,6 +2,7 @@
 //! and collections data access.
 
 pub mod collections;
+pub mod covers;
 pub mod login;
 pub mod network_monitor;
 pub mod retry;
