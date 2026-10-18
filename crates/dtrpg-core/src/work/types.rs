@@ -35,6 +35,18 @@ impl JobKind {
             Self::Thumbnail | Self::Download => None,
         }
     }
+
+    /// Whether jobs of this kind use up the queue's overall limit.
+    ///
+    /// Availability checks do not: each is a short request, so a user waiting
+    /// on one should not be held up behind a full set of long downloads. They
+    /// are kept in check by their own cap instead.
+    pub(super) const fn counts_toward_limit(self) -> bool {
+        match self {
+            Self::Check => false,
+            Self::Thumbnail | Self::Download => true,
+        }
+    }
 }
 
 /// Which pending jobs are dispatched first.

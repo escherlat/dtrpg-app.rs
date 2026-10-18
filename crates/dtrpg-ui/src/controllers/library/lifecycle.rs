@@ -99,7 +99,7 @@ impl LibraryController {
                    file_info_cache: HashMap::new(),
                    checking_items: HashSet::new(),
                    verifying_downloads: HashSet::new(),
-                   check_queue: VecDeque::new(),
+                   check_jobs: CheckJobs::default(),
                    download_jobs: DownloadJobs::default(),
                    cache_root: cache_dir(),
                    max_concurrent_downloads: storage.max_concurrent_downloads(),
@@ -117,6 +117,7 @@ impl LibraryController {
             JobEvent::Started { id } => {
                 self.thumbnail_started(id, cx);
                 self.download_started(id, cx);
+                self.check_started(id, cx);
             }
             JobEvent::Retrying { id, attempt, delay } => {
                 self.download_retrying(id, attempt, delay, cx);
@@ -124,7 +125,8 @@ impl LibraryController {
             JobEvent::Progress { .. } => {}
             JobEvent::Finished { id, outcome } => {
                 self.thumbnail_finished(id, outcome.clone(), cx);
-                self.download_finished(id, outcome, cx);
+                self.download_finished(id, outcome.clone(), cx);
+                self.check_finished(id, outcome, cx);
             }
         }
     }

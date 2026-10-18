@@ -379,14 +379,6 @@ pub(crate) fn apply_check_result(item: &mut LibraryItem,
     }
 }
 
-/// Returns `true` if `id` should be pushed onto the check queue: not already
-/// queued and not already in flight.
-pub(crate) fn should_enqueue_check(check_queue: &VecDeque<Arc<str>>,
-                                   checking_items: &HashSet<Arc<str>>, id: &Arc<str>)
-                                   -> bool {
-    !checking_items.contains(id) && !check_queue.contains(id)
-}
-
 /// Returns `true` if a check-batch request (manual or automatic) should be
 /// suppressed because a batch was already enqueued too recently, per
 /// `ITEM_CHECK_BATCH_COOLDOWN_SECS`. `None` (no prior batch recorded) never

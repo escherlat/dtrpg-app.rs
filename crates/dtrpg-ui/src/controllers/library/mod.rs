@@ -1,6 +1,6 @@
 //! Library UI state and interaction controller.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -28,12 +28,15 @@ use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
 use dtrpg_core::util::sort::*;
-use dtrpg_core::work::{JobEvent, JobEvents, WorkQueue};
+use dtrpg_core::work::{
+    JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot, WorkQueue,
+};
 use gpui::{
     AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task, Window,
 };
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
+use check_jobs::{CheckJob, CheckJobs};
 use download_jobs::DownloadJobs;
 use thumbnail_jobs::ThumbnailJobs;
 
@@ -53,6 +56,7 @@ use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 mod bulk_selection;
 mod catalog;
 mod catalog_sync;
+mod check_jobs;
 mod checks;
 mod collections;
 mod concurrency;
@@ -69,6 +73,8 @@ mod selection;
 mod thumbnail_jobs;
 mod thumbnails;
 
+#[cfg(test)]
+mod tests_availability;
 #[cfg(test)]
 mod tests_catalog;
 #[cfg(test)]
@@ -344,9 +350,10 @@ pub struct LibraryController {
     /// [`Self::is_verifying_downloads`] without conflating the two kinds of
     /// check. `LibraryChanged` is emitted on insertion and removal.
     verifying_downloads:           HashSet<Arc<str>>,
-    /// Queue of item ids awaiting a periodic per-item availability check
-    /// (see `catalog-item-level-reconciliation`).
-    check_queue:                   VecDeque<Arc<str>>,
+    /// Every availability check submitted to `work` that has not finished
+    /// (see `catalog-item-level-reconciliation`). Distinct from
+    /// `checking_items`, which holds only those running.
+    check_jobs:                    CheckJobs,
     /// Every file download submitted to `work` that has not finished. Keyed
     /// per file (not per entry) so a multi-item entry can have more than one
     /// of its files queued or active independently.

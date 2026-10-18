@@ -25,6 +25,9 @@ use super::*;
 
 pub(super) const WAIT: Duration = Duration::from_secs(5);
 
+/// The title a successful availability check brings back.
+pub(super) const REFRESHED_TITLE: &str = "Refreshed";
+
 /// Bytes that sniff as a PNG.
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n-cover";
 
@@ -120,11 +123,15 @@ impl CoverTransport for ScriptedTransport {
 /// a retry for chosen order products, and notice cancellation. It writes
 /// nothing to disk.
 pub(super) struct ScriptedLibrary {
-    permits:   Permits,
-    failing:   HashSet<u64>,
-    retrying:  HashSet<u64>,
-    started:   Mutex<Vec<u64>>,
-    cancelled: Mutex<Vec<u64>>,
+    permits:        Permits,
+    failing:        HashSet<u64>,
+    retrying:       HashSet<u64>,
+    started:        Mutex<Vec<u64>>,
+    cancelled:      Mutex<Vec<u64>>,
+    check_permits:  Permits,
+    missing:        HashSet<u64>,
+    erroring:       HashSet<u64>,
+    checked:        Mutex<Vec<u64>>,
 }
 
 impl ScriptedLibrary {
@@ -141,11 +148,40 @@ impl ScriptedLibrary {
     /// A service with `permits` to start, whose downloads fail for the
     /// `failing` order products and report a retry for the `retrying` ones.
     pub(super) fn with(permits: usize, failing: &[u64], retrying: &[u64]) -> Arc<Self> {
-        Arc::new(Self { permits:   Permits::new(permits),
-                        failing:   failing.iter().copied().collect(),
-                        retrying:  retrying.iter().copied().collect(),
-                        started:   Mutex::new(Vec::new()),
-                        cancelled: Mutex::new(Vec::new()), })
+        Arc::new(Self { permits:       Permits::new(permits),
+                        failing:       failing.iter().copied().collect(),
+                        retrying:      retrying.iter().copied().collect(),
+                        started:       Mutex::new(Vec::new()),
+                        cancelled:     Mutex::new(Vec::new()),
+                        check_permits: Permits::new(usize::MAX / 2),
+                        missing:       HashSet::new(),
+                        erroring:      HashSet::new(),
+                        checked:       Mutex::new(Vec::new()), })
+    }
+
+    /// A service whose availability checks hold for a permit each. The
+    /// `missing` items are reported gone, and the `erroring` ones fail as if
+    /// the network were down. Downloads finish immediately.
+    pub(super) fn checking(check_permits: usize, missing: &[u64], erroring: &[u64]) -> Arc<Self> {
+        Arc::new(Self { permits:       Permits::new(usize::MAX / 2),
+                        failing:       HashSet::new(),
+                        retrying:      HashSet::new(),
+                        started:       Mutex::new(Vec::new()),
+                        cancelled:     Mutex::new(Vec::new()),
+                        check_permits: Permits::new(check_permits),
+                        missing:       missing.iter().copied().collect(),
+                        erroring:      erroring.iter().copied().collect(),
+                        checked:       Mutex::new(Vec::new()), })
+    }
+
+    /// Lets one more availability check finish.
+    pub(super) fn release_checks(&self, count: usize) {
+        self.check_permits.release(count);
+    }
+
+    /// The item number of each availability check that has begun, in order.
+    pub(super) fn checked(&self) -> Vec<u64> {
+        self.checked.lock().unwrap().clone()
     }
 
     pub(super) fn release(&self, count: usize) {
@@ -171,8 +207,19 @@ impl LibraryService for SharedLibrary {
         Ok(Vec::new())
     }
 
-    fn get_item(&self, _id: u64) -> Result<LibraryItem, LibraryServiceError> {
-        Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "no items"))
+    fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {
+        let library = &self.0;
+        library.checked.lock().unwrap().push(id);
+        library.check_permits.take("a check", || false);
+        if library.missing.contains(&id) {
+            return Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "gone"));
+        }
+        if library.erroring.contains(&id) {
+            return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network, "offline"));
+        }
+        let mut fresh = bare_item("fresh");
+        fresh.title = Arc::from(REFRESHED_TITLE);
+        Ok(fresh)
     }
 
     fn download_item(&self, order_product_id: u64, _index: u32, _dest: &Path,
@@ -242,6 +289,13 @@ fn bare_item(id: &str) -> LibraryItem {
 pub(super) fn item_with_cover(id: &str) -> LibraryItem {
     let mut item = bare_item(id);
     item.cover_url = Some(url_for(id));
+    item
+}
+
+/// An entry the server knows as item number `numeric_id`, with no files.
+pub(super) fn item_numbered(id: &str, numeric_id: u64) -> LibraryItem {
+    let mut item = bare_item(id);
+    item.numeric_id = numeric_id;
     item
 }
 

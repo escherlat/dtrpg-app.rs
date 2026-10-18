@@ -147,7 +147,7 @@ impl LibraryController {
         // Queued availability checks reference items that no longer exist in
         // the now-cleared catalog; an in-flight check (if any) still
         // completes normally and harmlessly finds nothing to update.
-        self.check_queue.clear();
+        self.cancel_pending_checks();
         self.cancel_pending_thumbnails(cx);
         // If nothing is currently in flight, no fetch completion will ever
         // complete the aggregated activity item — without this, it would be

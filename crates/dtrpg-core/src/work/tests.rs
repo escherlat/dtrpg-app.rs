@@ -414,3 +414,48 @@ fn every_kind_of_job_counts_against_the_same_limit() {
     let finished = finished_outcomes(&mut events, 4);
     assert!(finished.iter().all(|(_, outcome)| *outcome == Outcome::Succeeded));
 }
+
+#[test]
+fn a_check_runs_even_when_the_limit_is_full() {
+    let (queue, mut events) = new_queue(1);
+    let gate = Arc::new(Gate::default());
+    let entered = Arc::new(AtomicUsize::new(0));
+    submit_gated(&queue, background(JobKind::Download), &gate, &entered);
+    wait_until(|| entered.load(Ordering::SeqCst) == 1);
+
+    let check = queue.submit(background(JobKind::Check), |_context| Ok(()));
+
+    assert_eq!(outcome_of(&mut events, check), Outcome::Succeeded);
+    gate.open();
+}
+
+#[test]
+fn a_running_check_does_not_use_up_the_limit() {
+    let (queue, mut events) = new_queue(1);
+    let gate = Arc::new(Gate::default());
+    let entered = Arc::new(AtomicUsize::new(0));
+    submit_gated(&queue, background(JobKind::Check), &gate, &entered);
+    wait_until(|| entered.load(Ordering::SeqCst) == 1);
+
+    let download = queue.submit(background(JobKind::Download), |_context| Ok(()));
+
+    assert_eq!(outcome_of(&mut events, download), Outcome::Succeeded);
+    gate.open();
+}
+
+#[test]
+fn a_waiting_check_does_not_hold_up_a_download() {
+    let (queue, mut events) = new_queue(1);
+    let gate = Arc::new(Gate::default());
+    let entered = Arc::new(AtomicUsize::new(0));
+    // The first check is running, so the second must wait for it, but the
+    // download queued behind the second check can still go.
+    submit_gated(&queue, background(JobKind::Check), &gate, &entered);
+    wait_until(|| entered.load(Ordering::SeqCst) == 1);
+    queue.submit(background(JobKind::Check), |_context| Ok(()));
+
+    let download = queue.submit(background(JobKind::Download), |_context| Ok(()));
+
+    assert_eq!(outcome_of(&mut events, download), Outcome::Succeeded);
+    gate.open();
+}

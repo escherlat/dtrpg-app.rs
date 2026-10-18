@@ -68,12 +68,10 @@ impl State {
     /// Removes the next job that may start now and records it as running.
     ///
     /// Interactive jobs come before background ones, and order is first in,
-    /// first out within each. A job whose kind is at its cap is skipped, not
-    /// waited for, so it cannot block jobs of other kinds behind it.
+    /// first out within each. A job that cannot start yet, because its kind is
+    /// at its cap or the overall limit is reached, is skipped, not waited for,
+    /// so it cannot block jobs that can start behind it.
     pub(super) fn take_runnable(&mut self) -> Option<Pending> {
-        if self.running.len() >= self.limit {
-            return None;
-        }
         let pending = match self.first_runnable(&self.interactive) {
             Some(position) => self.interactive.remove(position),
             None => self.first_runnable(&self.background)
@@ -112,9 +110,22 @@ impl State {
             .position(|pending| self.kind_has_room(pending.spec.kind))
     }
 
+    /// Whether a job of `kind` may start now: its own cap, if it has one, and
+    /// the overall limit, if it counts toward it.
     fn kind_has_room(&self, kind: JobKind) -> bool {
-        kind.max_concurrent().is_none_or(|cap| {
-                                 self.running.values().filter(|r| r.kind == kind).count() < cap
-                             })
+        let under_cap = kind.max_concurrent().is_none_or(|cap| self.running_of(kind) < cap);
+        let under_limit = !kind.counts_toward_limit() || self.running_toward_limit() < self.limit;
+        under_cap && under_limit
+    }
+
+    fn running_of(&self, kind: JobKind) -> usize {
+        self.running.values().filter(|running| running.kind == kind).count()
+    }
+
+    fn running_toward_limit(&self) -> usize {
+        self.running
+            .values()
+            .filter(|running| running.kind.counts_toward_limit())
+            .count()
     }
 }

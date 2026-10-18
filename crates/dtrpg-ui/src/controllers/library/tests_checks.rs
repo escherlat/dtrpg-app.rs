@@ -177,38 +177,6 @@ mod item_check_tests {
 }
 
 #[cfg(test)]
-mod check_queue_tests {
-    use std::collections::{HashSet, VecDeque};
-    use std::sync::Arc;
-
-    use super::super::should_enqueue_check;
-
-    #[test]
-    fn id_not_queued_or_in_flight_should_be_enqueued() {
-        let queue: VecDeque<Arc<str>> = VecDeque::new();
-        let checking: HashSet<Arc<str>> = HashSet::new();
-
-        assert!(should_enqueue_check(&queue, &checking, &Arc::from("b1")));
-    }
-
-    #[test]
-    fn id_already_queued_is_not_re_enqueued() {
-        let queue: VecDeque<Arc<str>> = VecDeque::from([Arc::from("b1")]);
-        let checking: HashSet<Arc<str>> = HashSet::new();
-
-        assert!(!should_enqueue_check(&queue, &checking, &Arc::from("b1")));
-    }
-
-    #[test]
-    fn id_already_in_flight_is_not_re_enqueued() {
-        let queue: VecDeque<Arc<str>> = VecDeque::new();
-        let checking: HashSet<Arc<str>> = HashSet::from([Arc::from("b1")]);
-
-        assert!(!should_enqueue_check(&queue, &checking, &Arc::from("b1")));
-    }
-}
-
-#[cfg(test)]
 mod check_batch_tests {
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};

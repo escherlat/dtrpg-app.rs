@@ -100,12 +100,16 @@ This is a sketch of the contract, not final signatures.
    started, progressed, or finished, and the consumer keeps its own map from
    `JobId` to meaning. This keeps the queue free of generics over result
    types and free of any UI type.
-3. **One shared limit, plus an optional cap per kind.** All kinds count
-   against `limit`, which carries the existing
-   `max_concurrent_downloads` setting. `Check` additionally has a cap of 1,
-   which preserves today's one-at-a-time behavior for availability checks
-   (a batch of up to 50 would otherwise hit the API in parallel). One set of
-   accounting still serves every kind, as the requirement states.
+3. **One shared limit, plus a cap and an exemption per kind.** Thumbnails
+   and downloads count against `limit`, which carries the existing
+   `max_concurrent_downloads` setting. `Check` has a cap of 1, which preserves
+   today's one-at-a-time behavior for availability checks (a batch of up to 50
+   would otherwise hit the API in parallel), and does not count against
+   `limit`. (This revises the first draft, in which checks counted too: that
+   would have let a full set of long downloads hold up a check the user is
+   waiting on, which today runs regardless of downloads.) One set of
+   accounting still serves every kind: a kind's rules say which counts apply
+   to it.
 4. **Priority orders the pending list; it does not preempt.** `Interactive`
    work is dispatched before `Background` work; order is FIFO within a
    priority. A running job is never interrupted to make room. User-initiated
@@ -191,9 +195,10 @@ branch, with the full suite run at each step:
 - Blocking jobs run on Tokio's blocking pool, which is sized far above any
   realistic `limit`. The queue's own limit is what bounds them, so the limit
   must be enforced in the queue and never assumed from the pool.
-- The `Check` cap is a special case in the scheduler. It is the smallest way
-  to keep single-flight checks inside one accounting scheme; if more kinds
-  need caps, a per-kind limit table replaces it.
+- The `Check` rules are a special case in the scheduler. They are the
+  smallest way to keep single-flight, limit-exempt checks inside one
+  accounting scheme; if more kinds need their own rules, a per-kind table
+  replaces them.
 
 ## Resolved (2026-10-18)
 
@@ -278,3 +283,28 @@ say.
   a download would start, the old code showed an activity error. A download
   is now submitted only for a file that is in the catalog at that moment, so
   that path is gone.
+
+### Availability checks (slice 4)
+
+- **Checks are their own lane.** One runs at a time and none counts against
+  the shared limit, as before. A user waiting on a check is never held up by
+  downloads.
+- **Priorities.** Opening an item's details, and the "Check Item
+  Availability" menu action, are `Interactive`; the periodic timer is
+  `Background`, as decided. The controller has two entry points for the batch,
+  `request_check_batch` (the timer) and `request_manual_check_batch` (the
+  menu), which share the existing cooldown.
+- **Asking again upgrades.** An interactive request for an item whose check is
+  waiting in the background replaces that check, so the user's request is not
+  stuck behind it. A background request never displaces a waiting check, and
+  nothing is queued for an item whose check is running.
+- **The spinner still means "running".** An item shows as being checked when
+  its check starts, not while it waits, as before.
+- **A viewed item can wait for a batch.** Because checks run one at a time, a
+  check the user triggers waits for a running batch check to finish, where
+  before it started at once alongside the batch. Each check is one short
+  request, and the user's check goes ahead of every other waiting one.
+- **The batch cooldown is saved under the controller's cache directory**, not
+  the user's real one, so tests cannot disturb it.
+- **All three hand-rolled queues are gone.** `LibraryController` no longer
+  holds a `VecDeque` queue or slot counters of its own.
