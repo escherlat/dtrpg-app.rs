@@ -295,6 +295,7 @@ activity:
   downloading_file: "Downloading %{title}…"
   downloading_file_entry: "Downloading %{title} — %{file_name}…"
   tags_restored: "Tags restored from your library (files: %{count})"
+  tags_imported: "Tags read from files into your library (files: %{count})"
   tags_restore_failed: "Tags could not be written (files: %{count})"
   session_setup_failed: "Session setup failed after sign-in"
 

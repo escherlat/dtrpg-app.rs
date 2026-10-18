@@ -1,18 +1,26 @@
-//! Makes the tags on downloaded files match the library index.
+//! Keeps the tags on downloaded files in step with the library index.
 //!
-//! The index owns tags (ADR 0004). Once per launch, after the catalog is
-//! loaded and its files checked against disk, the files of every tagged item
-//! are made to match it, in case a tag was edited outside Libri while it was
-//! closed. Files that were changed are counted in the activity panel and
-//! logged one by one.
+//! Once per launch, after the catalog is loaded and its files checked against
+//! disk, each downloaded file's tags are compared with the library's, in case
+//! a tag was edited outside Libri while it was closed (ADR 0008). Files that
+//! were changed, in either direction, are counted in the activity panel and
+//! logged one by one. The Tags switches in Native Integration settings turn
+//! the launch check, and each direction, on and off.
 
 use dtrpg_core::data::index::IndexError;
+use dtrpg_core::data::native_preferences::NativePreferences;
 use dtrpg_core::platform::{Platform, PlatformIntegration};
 use dtrpg_core::services::tag_projection::{
-    ReconcileReport, TaggedFile, project_indexed_tags, reconcile_with_index,
+    ReconcileReport, SyncSettings, TaggedFile, project_indexed_tags, reconcile_with_index,
 };
 
 use super::*;
+
+/// Which way tags may move, as the Native Integration settings say.
+fn sync_settings(preferences: &NativePreferences) -> SyncSettings {
+    SyncSettings { write_to_files:  preferences.write_tags_to_files(),
+                   read_from_files: preferences.read_tags_from_files(), }
+}
 
 /// Returns every downloaded file in `catalog` with the item it belongs to.
 pub(super) fn downloaded_files(catalog: &[LibraryItem], collections: &[CollectionEntry],
@@ -59,10 +67,17 @@ impl LibraryController {
         cx.spawn(async move |this, async_cx| {
               let outcome = async_cx.background_executor()
                                     .spawn(async move {
+                                        let preferences = NativePreferences::load();
+                                        if !preferences.reconcile_on_launch() {
+                                            return Ok(ReconcileReport::default());
+                                        }
                                         let files = downloaded_files(&catalog,
                                                                      &collections,
                                                                      &StorageConfig::load());
-                                        reconcile_with_index(&Platform, &cache_root, &files)
+                                        reconcile_with_index(&Platform,
+                                                             &cache_root,
+                                                             &files,
+                                                             sync_settings(&preferences))
                                     })
                                     .await;
               this.update(async_cx, |ctrl, cx| ctrl.report_file_tags(outcome, cx))
@@ -83,7 +98,12 @@ impl LibraryController {
         let cache_root = self.cache_root.clone();
         cx.background_executor()
           .spawn(async move {
-              match project_indexed_tags(&Platform, &cache_root, &item_id, &[path]) {
+              match project_indexed_tags(&Platform,
+                                         &cache_root,
+                                         &item_id,
+                                         &[path],
+                                         sync_settings(&NativePreferences::load()))
+              {
                   Ok(failures) => {
                       for failure in failures {
                           tracing::warn!(path = %failure.path.display(),
@@ -99,6 +119,14 @@ impl LibraryController {
           .detach();
     }
 
+    /// Adds a finished entry with `label` to the activity panel.
+    fn finish_note(&self, label: &str, cx: &mut Context<Self>) {
+        self.activity.update(cx, |activity, cx| {
+                         let id = activity.start(label, None, cx);
+                         activity.complete(id, cx);
+                     });
+    }
+
     /// Logs what a reconcile did and tells the user how many files it changed
     /// or could not change. Says nothing if every file already matched.
     pub(super) fn report_file_tags(&mut self, outcome: Result<ReconcileReport, IndexError>,
@@ -110,20 +138,24 @@ impl LibraryController {
                 return;
             }
         };
-        for path in &report.restored {
+        for path in &report.written {
             tracing::info!(path = %path.display(), "restored a file's tags from the library");
+        }
+        for path in &report.imported {
+            tracing::info!(path = %path.display(), "read a file's tags into the library");
         }
         for failure in &report.failed {
             tracing::warn!(path = %failure.path.display(),
                            error = %failure.error,
                            "could not reconcile a file's tags");
         }
-        if !report.restored.is_empty() {
-            let label = t!("activity.tags_restored", count = report.restored.len()).to_string();
-            self.activity.update(cx, |activity, cx| {
-                             let id = activity.start(&label, None, cx);
-                             activity.complete(id, cx);
-                         });
+        if !report.written.is_empty() {
+            let label = t!("activity.tags_restored", count = report.written.len()).to_string();
+            self.finish_note(&label, cx);
+        }
+        if !report.imported.is_empty() {
+            let label = t!("activity.tags_imported", count = report.imported.len()).to_string();
+            self.finish_note(&label, cx);
         }
         if !report.failed.is_empty() {
             let label = t!("activity.tags_restore_failed", count = report.failed.len()).to_string();

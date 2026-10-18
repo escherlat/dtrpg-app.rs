@@ -19,9 +19,12 @@ file-system extended attributes.
 - Project an item's tags onto each of its downloaded files, where the platform supports it:
   macOS `com.apple.metadata:_kMDItemUserTags`, Linux `user.xdg.tags`. Windows has nothing to project onto, so
   its tags live only in the index.
-- Reconcile on launch: for each downloaded file on a platform that supports projection, compare the file's tags
-  with the index and make the file match the index. The index wins. A tag edited outside Libri is overwritten,
-  and this is shown to the user, not done silently (ADR 0004, Consequences).
+- Reconcile on launch: for each downloaded file on a platform that supports projection, compare the file's tags,
+  the index's, and the tags the two last agreed on, and bring them in step by which side changed. A tag edited in
+  Finder is read back; if both sides changed, the later change wins, and the index wins when that cannot be told
+  (ADR 0008, which supersedes the "index wins" rule of ADR 0004). What it did is shown to the user, not done
+  silently.
+- Give tags a color, one of the seven Finder uses, and keep it through the file's tags on macOS.
 - Report tag projection through `Capabilities::filesystem_tags`, which already exists. The UI offers tag
   editing on every platform, because the index holds the tags; it only describes the file-system projection
   where `filesystem_tags` is true.
@@ -45,8 +48,10 @@ Settled with the project owner on 2026-10-18.
   what Finder shows.
 - **What does reconciliation show the user?** A count in the activity panel ("2 files' tags restored from your
   library") and a line in the log naming each file. No dialog, and never silent.
-- **Tag colors.** Libri writes the name only. When it rewrites a file's tags, a color an existing tag of the same
-  name already has is kept. Libri does not manage colors.
+- **Tag colors.** (Revised 2026-10-18, after the Libri v2 design was accepted.) Tags have a color, one of
+  Finder's seven, which Libri manages and writes on macOS.
+- **Reading Finder's tags back.** (2026-10-18.) Yes. If both sides changed, the later change wins, and the index
+  wins when that cannot be told. Each direction and the launch check have a switch in settings.
 - **Dependency.** The `xattr` crate, for macOS and Linux builds only, so Windows builds do not pull it in.
 
 ## Impact

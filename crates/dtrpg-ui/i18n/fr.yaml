@@ -272,6 +272,7 @@ activity:
   downloading_file: "Téléchargement de %{title}…"
   downloading_file_entry: "Téléchargement de %{title} — %{file_name}…"
   tags_restored: "Étiquettes restaurées depuis la bibliothèque (fichiers : %{count})"
+  tags_imported: "Étiquettes lues depuis les fichiers vers la bibliothèque (fichiers : %{count})"
   tags_restore_failed: "Les étiquettes n'ont pas pu être écrites (fichiers : %{count})"
   session_setup_failed: "Échec de la configuration de la session après la connexion"
 

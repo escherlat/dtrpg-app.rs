@@ -1,54 +1,69 @@
-//! Tests for projecting tags onto files, against a platform kept in memory.
+//! Tests for keeping files' tags in step with the index, against a platform
+//! kept in memory and a real in-memory index. Conflicts are in
+//! `tests_conflicts.rs`.
 
 #![allow(clippy::unwrap_used)]
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::io;
 use std::path::Path;
 use std::sync::Mutex;
 
 use super::*;
-use crate::platform::{Capabilities, PlatformKind};
+use crate::data::enums::ItemStatus;
+use crate::data::library::LibraryItem;
+use crate::platform::{Capabilities, FileState, PlatformKind};
+
+/// What a fake file holds.
+#[derive(Clone, Default)]
+struct FakeFile {
+    tags:       Vec<FileTag>,
+    changed_at: Option<i64>,
+}
 
 /// A platform whose files hold their tags in a map.
-struct InMemory {
+pub(super) struct InMemory {
     can_tag: bool,
-    files:   Mutex<HashMap<PathBuf, Vec<String>>>,
+    files:   Mutex<HashMap<PathBuf, FakeFile>>,
     broken:  HashSet<PathBuf>,
     writes:  Mutex<Vec<PathBuf>>,
 }
 
 impl InMemory {
-    fn new(can_tag: bool) -> Self {
-        Self { can_tag,
-               files: Mutex::new(HashMap::new()),
-               broken: HashSet::new(),
-               writes: Mutex::new(Vec::new()) }
+    pub(super) fn new() -> Self {
+        Self { can_tag: true,
+               files:   Mutex::new(HashMap::new()),
+               broken:  HashSet::new(),
+               writes:  Mutex::new(Vec::new()), }
     }
 
-    fn with_file(self, path: &str, tags: &[&str]) -> Self {
-        self.files
-            .lock()
-            .unwrap()
-            .insert(PathBuf::from(path), strings(tags));
-        self
+    pub(super) fn without_tags_on_files() -> Self {
+        Self { can_tag: false,
+               ..Self::new() }
     }
 
-    fn with_broken(mut self, path: &str) -> Self {
+    pub(super) fn with_broken(mut self, path: &str) -> Self {
         self.broken.insert(PathBuf::from(path));
         self
     }
 
-    fn tags_of(&self, path: &str) -> Vec<String> {
+    /// Edits a file's tags as if outside Libri, at `changed_at`.
+    pub(super) fn edit(&self, path: &str, tags: &[FileTag], changed_at: Option<i64>) {
+        self.files.lock().unwrap().insert(PathBuf::from(path),
+                                          FakeFile { tags: tags.to_vec(),
+                                                     changed_at });
+    }
+
+    pub(super) fn tags_of(&self, path: &str) -> Vec<FileTag> {
         self.files
             .lock()
             .unwrap()
             .get(Path::new(path))
-            .cloned()
+            .map(|file| file.tags.clone())
             .unwrap_or_default()
     }
 
-    fn write_count(&self) -> usize {
+    pub(super) fn write_count(&self) -> usize {
         self.writes.lock().unwrap().len()
     }
 }
@@ -63,350 +78,294 @@ impl PlatformIntegration for InMemory {
                        ..Capabilities::default() }
     }
 
-    fn file_state(&self, _path: &Path) -> io::Result<crate::platform::FileState> {
-        Ok(crate::platform::FileState::Local)
+    fn file_state(&self, _path: &Path) -> io::Result<FileState> {
+        Ok(FileState::Local)
     }
 
     fn reveal(&self, _path: &Path) -> io::Result<()> {
         Ok(())
     }
 
-    fn read_tags(&self, path: &Path) -> io::Result<Vec<String>> {
+    fn read_tags(&self, path: &Path) -> io::Result<Vec<FileTag>> {
         if self.broken.contains(path) {
             return Err(io::Error::other("read-only volume"));
         }
-        Ok(self.files
-               .lock()
-               .unwrap()
-               .get(path)
-               .cloned()
-               .unwrap_or_default())
+        Ok(self.tags_of(&path.to_string_lossy()))
     }
 
-    fn write_tags(&self, path: &Path, tags: &[String]) -> io::Result<()> {
+    fn write_tags(&self, path: &Path, tags: &[FileTag]) -> io::Result<()> {
         if self.broken.contains(path) {
             return Err(io::Error::other("read-only volume"));
         }
         self.writes.lock().unwrap().push(path.to_path_buf());
-        self.files
-            .lock()
-            .unwrap()
-            .insert(path.to_path_buf(), tags.to_vec());
+        self.files.lock().unwrap().insert(path.to_path_buf(),
+                                          FakeFile { tags:       tags.to_vec(),
+                                                     changed_at: Some(now_secs()), });
         Ok(())
+    }
+
+    fn tags_changed_at(&self, path: &Path) -> io::Result<Option<i64>> {
+        Ok(self.files
+               .lock()
+               .unwrap()
+               .get(path)
+               .and_then(|file| file.changed_at))
     }
 }
 
-fn strings(tags: &[&str]) -> Vec<String> {
-    tags.iter().map(|tag| (*tag).to_owned()).collect()
+pub(super) fn plain(names: &[&str]) -> Vec<FileTag> {
+    names.iter().map(|name| FileTag::plain(*name)).collect()
 }
 
-fn file(item_id: &str, path: &str) -> TaggedFile {
+pub(super) fn file(item_id: &str, path: &str) -> TaggedFile {
     TaggedFile { item_id: item_id.to_owned(),
                  path:    PathBuf::from(path), }
 }
 
-fn index(entries: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
-    entries.iter()
-           .map(|(id, tags)| ((*id).to_owned(), strings(tags)))
-           .collect()
+fn item(id: &str) -> LibraryItem {
+    LibraryItem::new(id,
+                     &format!("Title {id}"),
+                     "Free League",
+                     "",
+                     "Core",
+                     "PDF",
+                     100,
+                     10.0,
+                     2024,
+                     0,
+                     ItemStatus::Downloaded,
+                     "#1C2A44",
+                     "A game.",
+                     Some(1_700_000_000))
+}
+
+/// An in-memory index holding the items `ids`.
+pub(super) fn index_with(ids: &[&str]) -> LibraryIndex {
+    let mut index = LibraryIndex::open_in_memory().unwrap();
+    let items: Vec<_> = ids.iter().map(|id| item(id)).collect();
+    index.replace_all_items(&items).unwrap();
+    index
+}
+
+pub(super) fn reconcile(platform: &InMemory, index: &mut LibraryIndex, files: &[TaggedFile])
+                        -> ReconcileReport {
+    reconcile_files(platform, index, files, SyncSettings::default()).unwrap()
+}
+
+fn paths(list: &[&str]) -> Vec<PathBuf> {
+    list.iter().map(PathBuf::from).collect()
+}
+
+// ── The first time a file is seen ────────────────────────────────────────────
+
+#[test]
+fn a_file_with_no_tags_is_given_its_items_tags_and_colors() {
+    let mut index = index_with(&["a"]);
+    index.add_tag("a", "solo").unwrap();
+    index.add_tag("a", "to run").unwrap();
+    index.set_tag_color("solo", Some(TagColor::Red)).unwrap();
+    let platform = InMemory::new();
+
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
+
+    assert_eq!(report.written, paths(&["/a/one.pdf"]));
+    assert_eq!(platform.tags_of("/a/one.pdf"),
+               [FileTag::colored("solo", TagColor::Red),
+                FileTag::plain("to run")]);
 }
 
 #[test]
-fn a_tag_removed_outside_libri_is_restored() {
-    let platform = InMemory::new(true).with_file("/a/one.pdf", &["solo"]);
+fn tags_a_file_already_had_are_read_into_an_index_that_has_none() {
+    // The user may have tagged it in Finder before using Libri's tags.
+    let mut index = index_with(&["a"]);
+    let platform = InMemory::new();
+    platform.edit("/a/one.pdf",
+                  &[FileTag::colored("from finder", TagColor::Green)],
+                  Some(100));
 
-    let report = reconcile_file_tags(&platform,
-                                     &index(&[("a", &["solo", "to run"])]),
-                                     &[file("a", "/a/one.pdf")]);
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert_eq!(report.restored, [PathBuf::from("/a/one.pdf")]);
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo", "to run"]);
+    assert_eq!(report.imported, paths(&["/a/one.pdf"]));
+    assert_eq!(index.tags_for_item("a").unwrap(), ["from finder"]);
+    assert_eq!(index.tag_colors().unwrap()["from finder"], TagColor::Green);
+    assert_eq!(platform.write_count(), 0);
 }
 
 #[test]
-fn a_tag_added_outside_libri_is_removed() {
-    let platform = InMemory::new(true).with_file("/a/one.pdf", &["solo", "stray"]);
+fn a_file_and_an_item_with_no_tags_are_left_alone_and_leave_no_record() {
+    let mut index = index_with(&["a"]);
+    let platform = InMemory::new();
 
-    let report = reconcile_file_tags(&platform,
-                                     &index(&[("a", &["solo"])]),
-                                     &[file("a", "/a/one.pdf")]);
-
-    assert_eq!(report.restored.len(), 1);
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo"]);
-}
-
-#[test]
-fn a_file_with_no_tags_gets_its_items_tags() {
-    let platform = InMemory::new(true);
-
-    let report = reconcile_file_tags(&platform,
-                                     &index(&[("a", &["solo"])]),
-                                     &[file("a", "/a/one.pdf")]);
-
-    assert_eq!(report.restored.len(), 1);
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo"]);
-}
-
-#[test]
-fn a_file_that_already_matches_is_not_rewritten() {
-    let platform = InMemory::new(true).with_file("/a/one.pdf", &["To Run", "solo"]);
-
-    // Same tags, different order and case.
-    let report = reconcile_file_tags(&platform,
-                                     &index(&[("a", &["solo", "to run"])]),
-                                     &[file("a", "/a/one.pdf")]);
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
     assert_eq!(report.checked, 1);
-    assert!(report.restored.is_empty());
+    assert!(report.written.is_empty() && report.imported.is_empty());
+    assert_eq!(index.file_tag_snapshot("/a/one.pdf").unwrap(), None);
+}
+
+#[test]
+fn a_file_that_already_matches_is_recorded_not_rewritten() {
+    let mut index = index_with(&["a"]);
+    index.add_tag("a", "Solo").unwrap();
+    let platform = InMemory::new();
+    platform.edit("/a/one.pdf", &plain(&["solo"]), Some(100));
+
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
+
+    assert!(report.written.is_empty() && report.imported.is_empty());
     assert_eq!(platform.write_count(), 0);
+    assert_eq!(index.file_tag_snapshot("/a/one.pdf").unwrap(),
+               Some(vec!["solo".to_owned()]));
+}
+
+// ── After they have agreed ───────────────────────────────────────────────────
+
+/// An index with item `a` tagged "solo" and "to run", and one file of it, in
+/// step.
+fn synced() -> (LibraryIndex, InMemory) {
+    let mut index = index_with(&["a"]);
+    index.add_tag("a", "solo").unwrap();
+    index.add_tag("a", "to run").unwrap();
+    let platform = InMemory::new();
+    reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
+    (index, platform)
 }
 
 #[test]
-fn a_file_of_an_item_with_no_tags_in_the_index_is_left_alone() {
-    // The user may have tagged it in Finder before using Libri's tags.
-    let platform = InMemory::new(true).with_file("/a/one.pdf", &["from finder"]);
+fn nothing_changes_when_nothing_changed() {
+    let (mut index, platform) = synced();
+    let writes = platform.write_count();
 
-    let report = reconcile_file_tags(&platform, &index(&[]), &[file("a", "/a/one.pdf")]);
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert_eq!(report.checked, 0);
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["from finder"]);
+    assert_eq!(report.checked, 1);
+    assert!(report.written.is_empty() && report.imported.is_empty() && report.failed.is_empty());
+    assert_eq!(platform.write_count(), writes);
 }
 
 #[test]
-fn an_item_with_an_empty_tag_list_is_treated_as_having_no_tags() {
-    let platform = InMemory::new(true).with_file("/a/one.pdf", &["from finder"]);
+fn a_tag_removed_from_a_file_outside_libri_is_removed_from_the_index() {
+    let (mut index, platform) = synced();
+    platform.edit("/a/one.pdf", &plain(&["solo"]), Some(now_secs() + 100));
 
-    let report = reconcile_file_tags(&platform, &index(&[("a", &[])]), &[file("a", "/a/one.pdf")]);
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert_eq!(report.checked, 0);
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["from finder"]);
+    assert_eq!(report.imported, paths(&["/a/one.pdf"]));
+    assert_eq!(index.tags_for_item("a").unwrap(), ["solo"]);
+    assert_eq!(index.list_tags().unwrap(), ["solo"]);
 }
 
 #[test]
-fn every_file_of_an_item_is_reconciled() {
-    let platform = InMemory::new(true);
+fn a_tag_added_to_a_file_outside_libri_is_added_to_the_index() {
+    let (mut index, platform) = synced();
+    platform.edit("/a/one.pdf",
+                  &plain(&["solo", "to run", "stray"]),
+                  Some(now_secs() + 100));
 
-    let report = reconcile_file_tags(&platform,
-                                     &index(&[("a", &["solo"])]),
-                                     &[file("a", "/a/one.pdf"), file("a", "/a/two.pdf")]);
+    reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert_eq!(report.restored.len(), 2);
-    assert_eq!(platform.tags_of("/a/two.pdf"), ["solo"]);
+    assert_eq!(index.tags_for_item("a").unwrap(),
+               ["solo", "stray", "to run"]);
 }
 
 #[test]
-fn a_file_that_cannot_be_written_is_reported_and_the_others_still_are() {
-    let platform = InMemory::new(true).with_broken("/a/locked.pdf");
+fn every_tag_removed_from_a_file_outside_libri_clears_the_item() {
+    let (mut index, platform) = synced();
+    platform.edit("/a/one.pdf", &[], Some(now_secs() + 100));
 
-    let report = reconcile_file_tags(&platform,
-                                     &index(&[("a", &["solo"])]),
-                                     &[file("a", "/a/locked.pdf"), file("a", "/a/two.pdf")]);
+    reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert_eq!(report.failed,
-               [ProjectionFailure { path:  PathBuf::from("/a/locked.pdf"),
-                                    error: "read-only volume".to_owned(), }]);
-    assert_eq!(report.restored, [PathBuf::from("/a/two.pdf")]);
+    assert!(index.tags_for_item("a").unwrap().is_empty());
 }
 
 #[test]
-fn nothing_is_attempted_where_the_platform_keeps_no_tags_on_files() {
-    let platform = InMemory::new(false);
+fn a_tag_added_in_libri_is_written_to_the_file() {
+    let (mut index, platform) = synced();
+    index.add_tag("a", "co-op").unwrap();
+    index.set_tag_color("co-op", Some(TagColor::Blue)).unwrap();
 
-    let report = reconcile_file_tags(&platform,
-                                     &index(&[("a", &["solo"])]),
-                                     &[file("a", "/a/one.pdf")]);
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert_eq!(report, ReconcileReport::default());
-    assert_eq!(platform.write_count(), 0);
+    assert_eq!(report.written, paths(&["/a/one.pdf"]));
+    assert_eq!(platform.tags_of("/a/one.pdf"),
+               [FileTag::colored("co-op", TagColor::Blue),
+                FileTag::plain("solo"),
+                FileTag::plain("to run")]);
 }
 
 #[test]
-fn projecting_an_items_tags_writes_every_file() {
-    let platform = InMemory::new(true).with_file("/a/one.pdf", &["old"]);
+fn the_last_tag_removed_in_libri_clears_the_file() {
+    let (mut index, platform) = synced();
+    index.remove_tag("a", "solo").unwrap();
+    index.remove_tag("a", "to run").unwrap();
 
-    let failures = project_item_tags(&platform,
-                                     &strings(&["solo"]),
-                                     &[PathBuf::from("/a/one.pdf"), PathBuf::from("/a/two.pdf")]);
+    reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert!(failures.is_empty());
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo"]);
-    assert_eq!(platform.tags_of("/a/two.pdf"), ["solo"]);
-}
-
-#[test]
-fn projecting_no_tags_clears_the_files() {
-    let platform = InMemory::new(true).with_file("/a/one.pdf", &["solo"]);
-
-    let failures = project_item_tags(&platform, &[], &[PathBuf::from("/a/one.pdf")]);
-
-    assert!(failures.is_empty());
     assert!(platform.tags_of("/a/one.pdf").is_empty());
 }
 
 #[test]
-fn projecting_reports_the_files_it_could_not_write() {
-    let platform = InMemory::new(true).with_broken("/a/locked.pdf");
+fn a_file_is_in_step_after_each_pass_so_a_second_pass_does_nothing() {
+    let (mut index, platform) = synced();
+    platform.edit("/a/one.pdf", &plain(&["solo"]), Some(now_secs() + 100));
+    reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
+    let writes = platform.write_count();
 
-    let failures = project_item_tags(&platform,
-                                     &strings(&["solo"]),
-                                     &[PathBuf::from("/a/locked.pdf"),
-                                       PathBuf::from("/a/two.pdf")]);
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert_eq!(failures.len(), 1);
-    assert_eq!(failures[0].path, PathBuf::from("/a/locked.pdf"));
-    assert_eq!(platform.tags_of("/a/two.pdf"), ["solo"]);
+    assert!(report.written.is_empty() && report.imported.is_empty());
+    assert_eq!(platform.write_count(), writes);
 }
 
 #[test]
-fn projecting_does_nothing_where_the_platform_keeps_no_tags_on_files() {
-    let platform = InMemory::new(false);
+fn a_tag_read_from_a_file_takes_the_time_the_file_changed() {
+    let (mut index, platform) = synced();
+    platform.edit("/a/one.pdf", &plain(&["solo"]), Some(1_234));
 
-    let failures = project_item_tags(&platform,
-                                     &strings(&["solo"]),
-                                     &[PathBuf::from("/a/one.pdf")]);
+    reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
-    assert!(failures.is_empty());
-    assert_eq!(platform.write_count(), 0);
+    assert_eq!(index.tags_changed_at("a").unwrap(), Some(1_234));
+}
+
+// ── Failures and platforms ───────────────────────────────────────────────────
+
+#[test]
+fn a_file_that_cannot_be_read_is_reported_and_the_others_still_are() {
+    let mut index = index_with(&["a"]);
+    index.add_tag("a", "solo").unwrap();
+    let platform = InMemory::new().with_broken("/a/locked.pdf");
+
+    let report = reconcile(&platform,
+                           &mut index,
+                           &[file("a", "/a/locked.pdf"), file("a", "/a/two.pdf")]);
+
+    assert_eq!(report.failed,
+               [ProjectionFailure { path:  PathBuf::from("/a/locked.pdf"),
+                                    error: "read-only volume".to_owned(), }]);
+    assert_eq!(report.written, paths(&["/a/two.pdf"]));
 }
 
 #[test]
-fn reconciling_with_the_index_reads_the_tags_from_it() {
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
+fn a_file_whose_item_is_not_in_the_index_is_reported() {
+    let mut index = index_with(&["a"]);
+    let platform = InMemory::new();
+    platform.edit("/m/one.pdf", &plain(&["solo"]), Some(100));
 
-    let dir = tempfile::tempdir().unwrap();
-    {
-        let mut index = LibraryIndex::open_and_migrate(dir.path()).unwrap();
-        index.replace_all_items(&[LibraryItem::new("a",
-                                                   "Title",
-                                                   "Publisher",
-                                                   "",
-                                                   "Core",
-                                                   "PDF",
-                                                   100,
-                                                   10.0,
-                                                   2024,
-                                                   0,
-                                                   ItemStatus::Downloaded,
-                                                   "#1C2A44",
-                                                   "A game.",
-                                                   None)])
-             .unwrap();
-        index.add_tag("a", "solo").unwrap();
-    }
-    let platform = InMemory::new(true);
+    let report = reconcile(&platform, &mut index, &[file("missing", "/m/one.pdf")]);
 
-    let report = reconcile_with_index(&platform, dir.path(), &[file("a", "/a/one.pdf")]).unwrap();
-
-    assert_eq!(report.restored.len(), 1);
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo"]);
+    assert_eq!(report.failed.len(), 1);
+    assert_eq!(report.failed[0].path, PathBuf::from("/m/one.pdf"));
 }
 
 #[test]
-fn reconciling_with_the_index_does_not_open_it_where_tags_are_not_kept_on_files() {
-    let dir = tempfile::tempdir().unwrap();
-    let platform = InMemory::new(false);
+fn nothing_is_attempted_where_the_platform_keeps_no_tags_on_files() {
+    let mut index = index_with(&["a"]);
+    index.add_tag("a", "solo").unwrap();
+    let platform = InMemory::without_tags_on_files();
 
-    let report = reconcile_with_index(&platform, dir.path(), &[file("a", "/a/one.pdf")]).unwrap();
+    let report = reconcile(&platform, &mut index, &[file("a", "/a/one.pdf")]);
 
     assert_eq!(report, ReconcileReport::default());
-    assert!(!dir.path().join("library_index.sqlite3").exists());
-}
-
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[test]
-fn a_real_file_gets_the_tags_the_index_holds() {
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
-    use crate::platform::Platform;
-
-    let dir = tempfile::tempdir().unwrap();
-    let mut index = LibraryIndex::open_and_migrate(dir.path()).unwrap();
-    index.replace_all_items(&[LibraryItem::new("a",
-                                               "Title",
-                                               "Publisher",
-                                               "",
-                                               "Core",
-                                               "PDF",
-                                               100,
-                                               10.0,
-                                               2024,
-                                               0,
-                                               ItemStatus::Downloaded,
-                                               "#1C2A44",
-                                               "A game.",
-                                               None)])
-         .unwrap();
-    index.add_tag("a", "solo").unwrap();
-    index.add_tag("a", "to run").unwrap();
-    let path = dir.path().join("book.pdf");
-    std::fs::write(&path, b"data").unwrap();
-    Platform.write_tags(&path, &strings(&["stray"])).unwrap();
-    let files = [TaggedFile { item_id: "a".to_owned(),
-                              path:    path.clone(), }];
-
-    let report = reconcile_with_index(&Platform, dir.path(), &files).unwrap();
-
-    assert_eq!(report.restored, std::slice::from_ref(&path));
-    assert_eq!(Platform.read_tags(&path).unwrap(), ["solo", "to run"]);
-}
-
-fn index_with_one_item(dir: &Path) -> LibraryIndex {
-    use crate::data::enums::ItemStatus;
-    use crate::data::library::LibraryItem;
-
-    let mut index = LibraryIndex::open_and_migrate(dir).unwrap();
-    index.replace_all_items(&[LibraryItem::new("a",
-                                               "Title",
-                                               "Publisher",
-                                               "",
-                                               "Core",
-                                               "PDF",
-                                               100,
-                                               10.0,
-                                               2024,
-                                               0,
-                                               ItemStatus::Downloaded,
-                                               "#1C2A44",
-                                               "A game.",
-                                               None)])
-         .unwrap();
-    index
-}
-
-#[test]
-fn a_downloaded_file_gets_the_tags_its_item_has() {
-    let dir = tempfile::tempdir().unwrap();
-    index_with_one_item(dir.path()).add_tag("a", "solo")
-                                   .unwrap();
-    let platform = InMemory::new(true);
-
-    let failures =
-        project_indexed_tags(&platform, dir.path(), "a", &[PathBuf::from("/a/one.pdf")]).unwrap();
-
-    assert!(failures.is_empty());
-    assert_eq!(platform.tags_of("/a/one.pdf"), ["solo"]);
-}
-
-#[test]
-fn a_downloaded_file_of_an_untagged_item_is_not_written() {
-    let dir = tempfile::tempdir().unwrap();
-    index_with_one_item(dir.path());
-    let platform = InMemory::new(true);
-
-    project_indexed_tags(&platform, dir.path(), "a", &[PathBuf::from("/a/one.pdf")]).unwrap();
-
     assert_eq!(platform.write_count(), 0);
-}
-
-#[test]
-fn a_downloaded_file_is_not_written_where_the_platform_keeps_no_tags_on_files() {
-    let dir = tempfile::tempdir().unwrap();
-    index_with_one_item(dir.path()).add_tag("a", "solo")
-                                   .unwrap();
-    let platform = InMemory::new(false);
-
-    project_indexed_tags(&platform, dir.path(), "a", &[PathBuf::from("/a/one.pdf")]).unwrap();
-
-    assert_eq!(platform.write_count(), 0);
+    assert_eq!(index.file_tag_snapshot("/a/one.pdf").unwrap(), None);
 }

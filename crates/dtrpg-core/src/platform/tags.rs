@@ -14,6 +14,9 @@ use std::path::Path;
 
 use plist::Value;
 
+use super::FileTag;
+use crate::data::tag_color::TagColor;
+
 /// The attribute macOS keeps a file's tags in.
 #[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
 pub(super) const MACOS_ATTRIBUTE: &str = "com.apple.metadata:_kMDItemUserTags";
@@ -64,31 +67,46 @@ pub(super) fn decode_macos(bytes: &[u8]) -> io::Result<Vec<MacosTag>> {
 
 /// Writes `tags` as the bytes of a macOS tag attribute.
 ///
-/// A tag that `existing` already has, ignoring case, keeps the color suffix it
-/// had, so rewriting a file's tags does not lose the colors Finder gave them.
+/// A tag with a color is written with that color. A tag with none keeps the
+/// suffix `existing` has for it, ignoring case, so rewriting a file's tags does
+/// not lose a color Finder gave a tag the library knows no color for.
 ///
 /// # Errors
 ///
 /// Returns [`io::ErrorKind::InvalidData`] if the property list cannot be
 /// written.
 #[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
-pub(super) fn encode_macos(tags: &[String], existing: &[MacosTag]) -> io::Result<Vec<u8>> {
-    let entries = tags.iter()
-                      .map(|name| {
-                          let suffix =
-                              existing.iter()
-                                      .find(|old| old.name.to_lowercase() == name.to_lowercase())
-                                      .and_then(|old| old.suffix.as_deref());
-                          Value::String(match suffix {
-                                            Some(suffix) => format!("{name}\n{suffix}"),
-                                            None => name.clone(),
-                                        })
-                      })
-                      .collect();
+pub(super) fn encode_macos(tags: &[FileTag], existing: &[MacosTag]) -> io::Result<Vec<u8>> {
+    let entries =
+        tags.iter()
+            .map(|tag| {
+                let kept = existing.iter()
+                                   .find(|old| old.name.to_lowercase() == tag.name.to_lowercase())
+                                   .and_then(|old| old.suffix.clone());
+                let suffix = tag.color
+                                .map(|color| color.finder_number().to_string())
+                                .or(kept);
+                Value::String(match suffix {
+                                  Some(suffix) => format!("{}\n{suffix}", tag.name),
+                                  None => tag.name.clone(),
+                              })
+            })
+            .collect();
     let mut bytes = Vec::new();
     Value::Array(entries).to_writer_binary(&mut bytes)
                          .map_err(invalid_data)?;
     Ok(bytes)
+}
+
+/// The color a macOS tag's suffix names, if it names one.
+#[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
+fn macos_color(tag: &MacosTag) -> Option<TagColor> {
+    tag.suffix
+       .as_deref()?
+       .trim()
+       .parse::<u8>()
+       .ok()
+       .and_then(TagColor::from_finder_number)
 }
 
 /// Reads the tags out of the bytes of a Linux tag attribute.
@@ -97,30 +115,35 @@ pub(super) fn encode_macos(tags: &[String], existing: &[MacosTag]) -> io::Result
 ///
 /// Returns [`io::ErrorKind::InvalidData`] if the bytes are not UTF-8.
 #[cfg_attr(target_os = "macos", allow(dead_code))] // Compiled on macOS so its tests run there.
-pub(super) fn decode_linux(bytes: &[u8]) -> io::Result<Vec<String>> {
+pub(super) fn decode_linux(bytes: &[u8]) -> io::Result<Vec<FileTag>> {
     let text = std::str::from_utf8(bytes).map_err(invalid_data)?;
     Ok(text.split(',')
            .map(str::trim)
            .filter(|name| !name.is_empty())
-           .map(str::to_owned)
+           .map(FileTag::plain)
            .collect())
 }
 
 /// Writes `tags` as the bytes of a Linux tag attribute.
 #[cfg_attr(target_os = "macos", allow(dead_code))] // Compiled on macOS so its tests run there.
-pub(super) fn encode_linux(tags: &[String]) -> Vec<u8> {
-    tags.join(",").into_bytes()
+pub(super) fn encode_linux(tags: &[FileTag]) -> Vec<u8> {
+    tags.iter()
+        .map(|tag| tag.name.as_str())
+        .collect::<Vec<_>>()
+        .join(",")
+        .into_bytes()
 }
 
 /// Reads the tags of the file at `path` from the platform's attribute.
 ///
 /// A file with no tag attribute has no tags.
-pub(super) fn read(path: &Path) -> io::Result<Vec<String>> {
+pub(super) fn read(path: &Path) -> io::Result<Vec<FileTag>> {
     #[cfg(target_os = "macos")]
     {
         match xattr::get(path, MACOS_ATTRIBUTE)? {
             Some(bytes) => Ok(decode_macos(&bytes)?.into_iter()
-                                                   .map(|tag| tag.name)
+                                                   .map(|tag| FileTag { color: macos_color(&tag),
+                                                                        name:  tag.name, })
                                                    .collect()),
             None => Ok(Vec::new()),
         }
@@ -136,7 +159,7 @@ pub(super) fn read(path: &Path) -> io::Result<Vec<String>> {
 
 /// Makes the tags of the file at `path` exactly `tags`, in the platform's
 /// attribute. An empty list removes the attribute.
-pub(super) fn write(path: &Path, tags: &[String]) -> io::Result<()> {
+pub(super) fn write(path: &Path, tags: &[FileTag]) -> io::Result<()> {
     #[cfg(target_os = "macos")]
     let (attribute, bytes) = {
         let existing = match xattr::get(path, MACOS_ATTRIBUTE)? {
@@ -164,6 +187,14 @@ pub(super) fn write(path: &Path, tags: &[String]) -> io::Result<()> {
     else {
         xattr::set(path, attribute, &bytes)
     }
+}
+
+/// When the file's metadata, which an attribute write changes, last changed,
+/// in Unix seconds.
+pub(super) fn changed_at(path: &Path) -> io::Result<i64> {
+    use std::os::unix::fs::MetadataExt;
+
+    Ok(std::fs::metadata(path)?.ctime())
 }
 
 #[cfg(test)]
