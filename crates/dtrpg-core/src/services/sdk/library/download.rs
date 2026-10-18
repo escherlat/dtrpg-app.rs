@@ -8,16 +8,23 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::gateway::SdkLibraryGateway;
 use crate::constants::{
     DOWNLOAD_RETRY_BASE_DELAY_SECS, DOWNLOAD_RETRY_MAX_DELAY_SECS, MAX_DOWNLOAD_ATTEMPTS,
 };
 use crate::services::retry::{RetryConfig, retry_with_backoff};
-use crate::services::{LibraryServiceError, LibraryServiceErrorKind};
+use crate::services::{DownloadControl, LibraryServiceError, LibraryServiceErrorKind};
 
 const CHUNK_SIZE: usize = 64 * 1024;
+
+/// How often a transfer reports progress. Reporting after every chunk would
+/// send thousands of updates for a large file, with nobody able to see them.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
+
+/// Reports bytes received so far, and the total size if known.
+type ProgressFn<'a> = &'a mut dyn FnMut(u64, Option<u64>);
 
 /// Downloads the file identified by `(order_product_id, index)` to `dest`,
 /// via `gateway.prepare_download`, retrying a retryable transfer failure with
@@ -26,22 +33,14 @@ const CHUNK_SIZE: usize = 64 * 1024;
 /// for the cancellation, temp-file, and retry-progress contract.
 pub(super) fn download_item(
     gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32, dest: &Path,
-    cancel: &AtomicBool, on_retry: Option<&mut dyn FnMut(u32, Duration)>,
+    control: DownloadControl<'_>,
 ) -> Result<(), LibraryServiceError> {
     let config = RetryConfig {
         max_attempts: MAX_DOWNLOAD_ATTEMPTS,
         base_secs: DOWNLOAD_RETRY_BASE_DELAY_SECS,
         max_secs: DOWNLOAD_RETRY_MAX_DELAY_SECS,
     };
-    download_item_with_config(
-        gateway,
-        order_product_id,
-        index,
-        dest,
-        cancel,
-        config,
-        on_retry,
-    )
+    download_item_with_config(gateway, order_product_id, index, dest, control, config)
 }
 
 /// Same as [`download_item`] with an injectable retry policy, so tests can
@@ -49,18 +48,37 @@ pub(super) fn download_item(
 /// schedule.
 fn download_item_with_config(
     gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32, dest: &Path,
-    cancel: &AtomicBool, config: RetryConfig, mut on_retry: Option<&mut dyn FnMut(u32, Duration)>,
+    control: DownloadControl<'_>, config: RetryConfig,
 ) -> Result<(), LibraryServiceError> {
+    let DownloadControl {
+        cancel,
+        mut on_retry,
+        mut on_progress,
+    } = control;
     let mut adapted_on_retry = |attempt: u32, delay: Duration, _error: &LibraryServiceError| {
         if let Some(f) = on_retry.as_deref_mut() {
             f(attempt, delay);
+        }
+    };
+    let mut report_progress = |received: u64, total: Option<u64>| {
+        if let Some(f) = on_progress.as_deref_mut() {
+            f(received, total);
         }
     };
 
     retry_with_backoff(
         config,
         cancel,
-        || attempt_download(gateway, order_product_id, index, dest, cancel),
+        || {
+            attempt_download(
+                gateway,
+                order_product_id,
+                index,
+                dest,
+                cancel,
+                &mut report_progress,
+            )
+        },
         |e: &LibraryServiceError| {
             e.kind == LibraryServiceErrorKind::Network
                 || e.kind == LibraryServiceErrorKind::RateLimited
@@ -75,7 +93,7 @@ fn download_item_with_config(
 /// `.part` file, then renames it to `dest` on success.
 fn attempt_download(
     gateway: &dyn SdkLibraryGateway, order_product_id: u64, index: u32, dest: &Path,
-    cancel: &AtomicBool,
+    cancel: &AtomicBool, on_progress: ProgressFn<'_>,
 ) -> Result<(), LibraryServiceError> {
     // Check cancellation before `prepare_download`: a queued download that was
     // cancelled before it started must not issue the authenticated prepare
@@ -100,7 +118,7 @@ fn attempt_download(
         })?;
 
     let part_path = part_path_for(dest);
-    match stream_to_file(url, &part_path, cancel) {
+    match stream_to_file(url, &part_path, cancel, on_progress) {
         Ok(()) => std::fs::rename(&part_path, dest).map_err(|e| {
             LibraryServiceError::new(
                 LibraryServiceErrorKind::Network,
@@ -126,7 +144,7 @@ fn part_path_for(dest: &Path) -> PathBuf {
 }
 
 fn stream_to_file(
-    url: &str, part_path: &Path, cancel: &AtomicBool,
+    url: &str, part_path: &Path, cancel: &AtomicBool, on_progress: ProgressFn<'_>,
 ) -> Result<(), LibraryServiceError> {
     if let Some(parent) = part_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
@@ -173,6 +191,9 @@ fn stream_to_file(
         )
     })?;
 
+    let total = response.content_length();
+    let mut received: u64 = 0;
+    let mut last_report = Instant::now();
     let mut buf = [0u8; CHUNK_SIZE];
     loop {
         if cancel.load(Ordering::SeqCst) {
@@ -196,7 +217,15 @@ fn stream_to_file(
                 format!("download write failed: {e}"),
             )
         })?;
+        received += n as u64;
+        if last_report.elapsed() >= PROGRESS_INTERVAL {
+            on_progress(received, total);
+            last_report = Instant::now();
+        }
     }
+    // Always end with the full count, so even a file that arrived within one
+    // interval reports once.
+    on_progress(received, total);
     Ok(())
 }
 
@@ -256,6 +285,9 @@ mod tests {
         RateLimited(u64),
         /// Writes a 200 with the given body.
         Success(&'static [u8]),
+        /// Writes a 200 with the given body and no `Content-Length`, so the
+        /// total size is unknown until the connection closes.
+        SuccessWithoutLength(&'static [u8]),
     }
 
     /// Serves one response per script entry, in order, on a background
@@ -288,6 +320,11 @@ mod tests {
                             body.len()
                         );
                         let _ = stream.write_all(header.as_bytes());
+                        let _ = stream.write_all(body);
+                    }
+                    MockResponse::SuccessWithoutLength(body) => {
+                        let _ = stream
+                            .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n");
                         let _ = stream.write_all(body);
                     }
                 }
@@ -369,7 +406,14 @@ mod tests {
         let cancel = AtomicBool::new(false);
 
         let result =
-            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+            download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel),
+            fast_config(3),
+        );
 
         server.join().unwrap();
         assert!(result.is_ok(), "expected success, got {result:?}");
@@ -394,7 +438,14 @@ mod tests {
         let cancel = AtomicBool::new(false);
 
         let result =
-            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+            download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel),
+            fast_config(3),
+        );
 
         server.join().unwrap();
         assert!(result.is_err());
@@ -412,7 +463,14 @@ mod tests {
         let cancel = AtomicBool::new(false);
 
         let result =
-            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+            download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel),
+            fast_config(3),
+        );
 
         assert!(matches!(result, Err(e) if e.kind == LibraryServiceErrorKind::Session));
         assert_eq!(gateway.calls.load(Ordering::SeqCst), 1);
@@ -431,7 +489,14 @@ mod tests {
         let cancel = AtomicBool::new(true);
 
         let result =
-            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+            download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel),
+            fast_config(3),
+        );
 
         assert!(result.is_err());
         assert_eq!(gateway.calls.load(Ordering::SeqCst), 0);
@@ -465,9 +530,8 @@ mod tests {
             1,
             0,
             &dest,
-            &cancel,
+            DownloadControl::new(&cancel).on_retry(&mut on_retry),
             fast_config(3),
-            Some(&mut on_retry),
         );
 
         assert!(result.is_err());
@@ -491,7 +555,14 @@ mod tests {
         let cancel = AtomicBool::new(false);
 
         let result =
-            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(1), None);
+            download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel),
+            fast_config(1),
+        );
 
         server.join().unwrap();
         match result {
@@ -517,11 +588,86 @@ mod tests {
         let cancel = AtomicBool::new(false);
 
         let result =
-            download_item_with_config(&gateway, 1, 0, &dest, &cancel, fast_config(3), None);
+            download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel),
+            fast_config(3),
+        );
 
         server.join().unwrap();
         assert!(result.is_ok(), "expected success, got {result:?}");
         assert_eq!(gateway.calls.load(Ordering::SeqCst), 2);
         let _ = std::fs::remove_file(&dest);
+    }
+
+    // ── Progress tests ───────────────────────────────────────────────────
+
+    /// Runs a download of `response` and returns every progress report.
+    fn progress_of(response: MockResponse) -> Vec<(u64, Option<u64>)> {
+        let (url, server) = spawn_mock_server(vec![response]);
+        let gateway = CountingGateway {
+            url,
+            calls: AtomicU32::new(0),
+        };
+        let dest = temp_dest("progress");
+        let cancel = AtomicBool::new(false);
+        let mut reports = Vec::new();
+        let mut on_progress = |received: u64, total: Option<u64>| reports.push((received, total));
+
+        let result = download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel).on_progress(&mut on_progress),
+            fast_config(1),
+        );
+
+        server.join().unwrap();
+        assert!(result.is_ok(), "expected success, got {result:?}");
+        let _ = std::fs::remove_file(&dest);
+        reports
+    }
+
+    #[test]
+    fn download_item_reports_progress_ending_at_the_full_size() {
+        let reports = progress_of(MockResponse::Success(b"file contents"));
+
+        assert_eq!(reports.last(), Some(&(13, Some(13))));
+        assert!(reports.windows(2).all(|pair| pair[0].0 <= pair[1].0));
+    }
+
+    #[test]
+    fn download_item_reports_an_unknown_total_when_the_server_gives_no_length() {
+        let reports = progress_of(MockResponse::SuccessWithoutLength(b"file contents"));
+
+        assert_eq!(reports.last(), Some(&(13, None)));
+    }
+
+    #[test]
+    fn download_item_reports_no_progress_when_cancelled_before_start() {
+        let gateway = CountingGateway {
+            url: "http://127.0.0.1:1/unused".to_string(),
+            calls: AtomicU32::new(0),
+        };
+        let dest = temp_dest("progress-cancelled");
+        let cancel = AtomicBool::new(true);
+        let mut reports = Vec::new();
+        let mut on_progress = |received: u64, total: Option<u64>| reports.push((received, total));
+
+        let result = download_item_with_config(
+            &gateway,
+            1,
+            0,
+            &dest,
+            DownloadControl::new(&cancel).on_progress(&mut on_progress),
+            fast_config(3),
+        );
+
+        assert!(result.is_err());
+        assert!(reports.is_empty());
     }
 }

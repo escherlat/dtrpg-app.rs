@@ -182,18 +182,19 @@ pub trait LibraryService: Send + Sync + 'static {
     /// preparation API (`index` is the file's position within its entry's
     /// file list, i.e. [`crate::data::library::LibraryItemFile::index`]).
     ///
-    /// `cancel` is polled during the transfer; once set, the transfer stops
-    /// promptly, `{dest}.part` is deleted, and an error is returned. Callers
-    /// that already track cancellation via the same flag (see
-    /// `download-queue`) can treat any error alongside an already-set `cancel`
-    /// as an expected cancellation rather than a real failure.
+    /// `control` carries what the caller can do to the download and hear from
+    /// it; see [`DownloadControl`]. Its cancel flag is polled during the
+    /// transfer; once set, the transfer stops promptly, `{dest}.part` is
+    /// deleted, and an error is returned. Callers that already track
+    /// cancellation via the same flag (see `download-queue`) can treat any
+    /// error alongside an already-set flag as an expected cancellation rather
+    /// than a real failure.
     ///
     /// On a retryable transfer failure, an implementation may retry the
-    /// download with exponential backoff before returning an error. `on_retry`,
-    /// if present, is called once per retry with the attempt number about to
-    /// be retried and the delay before it, so callers can surface
-    /// retry-in-progress state (e.g. an activity label). Implementations that
-    /// never fail transiently (e.g. test stubs) may ignore this parameter.
+    /// download with exponential backoff before returning an error, reporting
+    /// each retry to the control's retry callback. Implementations that never
+    /// fail transiently or have no progress to report (e.g. test stubs) may
+    /// ignore the callbacks.
     ///
     /// # Errors
     ///
@@ -202,9 +203,78 @@ pub trait LibraryService: Send + Sync + 'static {
     /// (never partially written) on any error path.
     fn download_item(
         &self, order_product_id: u64, index: u32, dest: &std::path::Path,
-        cancel: &std::sync::atomic::AtomicBool,
-        on_retry: Option<&mut dyn FnMut(u32, std::time::Duration)>,
+        control: DownloadControl<'_>,
     ) -> Result<(), LibraryServiceError>;
+}
+
+/// What a caller can do to a running download, and what it hears back.
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::atomic::AtomicBool;
+///
+/// use dtrpg_core::services::DownloadControl;
+///
+/// let cancel = AtomicBool::new(false);
+/// let mut progress = Vec::new();
+/// let mut on_progress = |done: u64, total: Option<u64>| progress.push((done, total));
+/// let control = DownloadControl::new(&cancel).on_progress(&mut on_progress);
+/// # drop(control);
+/// ```
+pub struct DownloadControl<'a> {
+    cancel: &'a std::sync::atomic::AtomicBool,
+    on_retry: Option<&'a mut dyn FnMut(u32, std::time::Duration)>,
+    on_progress: Option<&'a mut dyn FnMut(u64, Option<u64>)>,
+}
+
+impl<'a> DownloadControl<'a> {
+    /// A control with a cancel flag and no callbacks.
+    #[must_use]
+    pub const fn new(cancel: &'a std::sync::atomic::AtomicBool) -> Self {
+        Self { cancel, on_retry: None, on_progress: None }
+    }
+
+    /// Calls `on_retry` for each retry, with the attempt number about to be
+    /// made and the delay before it, so a caller can show that a download is
+    /// retrying.
+    #[must_use]
+    pub fn on_retry(mut self, on_retry: &'a mut dyn FnMut(u32, std::time::Duration)) -> Self {
+        self.on_retry = Some(on_retry);
+        self
+    }
+
+    /// Calls `on_progress` as bytes arrive, with the bytes received so far in
+    /// the current attempt and the total size, if the server said what it is.
+    /// A retry starts counting again from zero.
+    #[must_use]
+    pub fn on_progress(mut self, on_progress: &'a mut dyn FnMut(u64, Option<u64>)) -> Self {
+        self.on_progress = Some(on_progress);
+        self
+    }
+
+    /// The flag a caller sets to cancel the download. An implementation polls
+    /// it during the transfer.
+    #[must_use]
+    pub const fn cancel_flag(&self) -> &std::sync::atomic::AtomicBool {
+        self.cancel
+    }
+
+    /// Reports that attempt number `attempt` is about to start after `delay`.
+    /// Does nothing if the caller did not ask to hear about retries.
+    pub fn report_retry(&mut self, attempt: u32, delay: std::time::Duration) {
+        if let Some(on_retry) = self.on_retry.as_deref_mut() {
+            on_retry(attempt, delay);
+        }
+    }
+
+    /// Reports `received` bytes so far, of `total` if known. Does nothing if
+    /// the caller did not ask to hear about progress.
+    pub fn report_progress(&mut self, received: u64, total: Option<u64>) {
+        if let Some(on_progress) = self.on_progress.as_deref_mut() {
+            on_progress(received, total);
+        }
+    }
 }
 
 // ── LoginService
