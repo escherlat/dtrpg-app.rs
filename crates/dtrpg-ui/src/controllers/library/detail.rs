@@ -27,6 +27,77 @@ impl LibraryController {
             .unwrap_or(InspectorContentsState::Unavailable)
     }
 
+    /// Returns whether an archive entry is selected for extraction.
+    #[must_use]
+    pub fn is_inspector_entry_selected(&self, entry_id: &str, name: &str) -> bool {
+        self.inspector_selected_entries
+            .get(entry_id)
+            .is_some_and(|entries| entries.contains(name))
+    }
+
+    /// Returns the number of selected archive entries for extraction.
+    #[must_use]
+    pub fn selected_inspector_entry_count(&self, entry_id: &str) -> usize {
+        self.inspector_selected_entries.get(entry_id).map_or(0, HashSet::len)
+    }
+
+    /// Toggles one archive entry's extraction selection.
+    pub fn toggle_inspector_entry(&mut self, entry_id: Arc<str>, name: String,
+                                  cx: &mut Context<Self>) {
+        let selected = self.inspector_selected_entries.entry(entry_id).or_default();
+        if !selected.insert(name.clone()) {
+            selected.remove(&name);
+        }
+        cx.emit(LibraryChanged);
+    }
+
+    /// Returns whether an extraction task is active for an inspector entry.
+    #[must_use]
+    pub fn is_inspector_extracting(&self, entry_id: &str) -> bool {
+        self.inspector_extractions.get(entry_id).copied().unwrap_or(false)
+    }
+
+    /// Opens a destination picker and extracts the selected archive entries off the render path.
+    pub fn extract_inspector_entries(&mut self, entry_id: Arc<str>, cx: &mut Context<Self>) {
+        if self.is_inspector_extracting(&entry_id) {
+            return;
+        }
+        let names: Vec<String> = self.inspector_selected_entries
+            .get(&entry_id)
+            .into_iter()
+            .flat_map(|entries| entries.iter().cloned())
+            .collect();
+        if names.is_empty() {
+            return;
+        }
+        let Some(item) = self.item_by_id(&entry_id).cloned() else { return; };
+        let Some(file) = item.files.iter().find(|file| {
+            matches!(file.format.to_ascii_uppercase().as_str(),
+                     "ZIP" | "TAR" | "TAR.GZ" | "TGZ" | "TAR.BZ2" | "TBZ2" | "TAR.XZ" | "TXZ")
+        }) else { return; };
+        let archive_path = resolved_item_dir(&StorageConfig::load(), &item).join(file.name.as_ref());
+        self.inspector_extractions.insert(Arc::clone(&entry_id), true);
+        cx.emit(LibraryChanged);
+        cx.spawn(async move |this, async_cx| {
+              let destination = rfd::AsyncFileDialog::new().pick_folder().await;
+              if let Some(destination) = destination {
+                  let destination_path = destination.path().to_path_buf();
+                  let result = async_cx.background_executor().spawn(async move {
+                      let reader = dtrpg_core::util::container::open(&archive_path)?;
+                      let names_ref: Vec<&str> = names.iter().map(String::as_str).collect();
+                      reader.extract_entries(&names_ref, &destination_path)
+                  }).await;
+                  if let Err(error) = result {
+                      tracing::warn!(%error, "inspector archive extraction failed");
+                  }
+              }
+              this.update(async_cx, |controller, cx| {
+                     controller.inspector_extractions.remove(&entry_id);
+                     cx.emit(LibraryChanged);
+                 }).ok();
+          }).detach();
+    }
+
     /// Loads the first container file for an entry off the render path.
     pub fn load_inspector_contents(&mut self, entry_id: Arc<str>, cx: &mut Context<Self>) {
         if matches!(self.inspector_contents.get(&entry_id), Some(InspectorContentsState::Loading)) {
