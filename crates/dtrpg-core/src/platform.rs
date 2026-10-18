@@ -270,6 +270,9 @@ fn materialize(_path: &Path) -> io::Result<()> {
                        "this platform cannot materialize cloud-backed files"))
 }
 
+/// Runs `program` and fails if it exits unsuccessfully. Windows does not use
+/// it: `explorer` reports failure on success, and materializing is a file open.
+#[cfg(not(target_os = "windows"))]
 fn run_command<I, S>(program: &str, args: I) -> io::Result<()>
     where I: IntoIterator<Item = S>,
           S: AsRef<std::ffi::OsStr> {
