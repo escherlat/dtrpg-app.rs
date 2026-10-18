@@ -17,6 +17,7 @@ use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;
 use crate::services::collections::{CollectionsService, CollectionsServiceError};
 use crate::services::{LibraryService, LibraryServiceError};
+use crate::util::container::{ContainerEntry, ContainerError};
 
 /// Command/query facade over the library and collections services, and over
 /// the local library index (search, counts, and reads that don't need a
@@ -56,6 +57,18 @@ impl LibraryApi {
     #[must_use]
     pub fn index_root(&self) -> &Path {
         &self.index_root
+    }
+
+    /// Lists entries in a local archive without requiring callers to know its
+    /// concrete format.
+    pub fn list_archive_entries(&self, path: &Path) -> Result<Vec<ContainerEntry>, ContainerError> {
+        crate::util::container::list_entries(path)
+    }
+
+    /// Extracts selected archive entries below `destination`.
+    pub fn extract_archive_entries(&self, path: &Path, names: &[&str], destination: &Path)
+                                   -> Result<(), ContainerError> {
+        crate::util::container::open(path)?.extract_entries(names, destination)
     }
 
     /// Returns every item in the local library index.
@@ -202,6 +215,28 @@ mod tests {
         LibraryApi::new(Box::new(StubLibraryService::new(StubMode::Seeded)),
                         Box::new(CollectionsStubService::new(CollectionsStubMode::Empty)),
                         dir)
+    }
+
+    #[test]
+    fn archive_queries_use_the_shared_container_api() {
+        let dir = test_dir("archive");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let archive_path = dir.join("fixture.tar");
+        let file = std::fs::File::create(&archive_path).unwrap();
+        let mut builder = tar::Builder::new(file);
+        let mut header = tar::Header::new_gnu();
+        header.set_path("manual.txt").unwrap();
+        header.set_size(5);
+        header.set_cksum();
+        builder.append(&header, &b"hello"[..]).unwrap();
+        builder.finish().unwrap();
+
+        let api = api_at(&dir);
+        let entries = api.list_archive_entries(&archive_path).unwrap();
+
+        assert_eq!(entries[0].name, "manual.txt");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
