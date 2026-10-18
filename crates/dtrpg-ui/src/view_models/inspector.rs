@@ -25,6 +25,15 @@ pub enum InspectorContentsState {
     Loaded(Vec<ContainerEntry>),
 }
 
+/// State of an individual archive entry preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InspectorPreviewState {
+    None,
+    Loading(String),
+    Text { name: String, contents: String },
+    Unavailable(String),
+}
+
 /// Presentation data for one file in the inspector.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InspectorFile {

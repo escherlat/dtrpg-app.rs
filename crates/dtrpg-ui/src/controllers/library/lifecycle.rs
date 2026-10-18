@@ -66,6 +66,7 @@ impl LibraryController {
                    inspector_contents: HashMap::new(),
                    inspector_selected_entries: HashMap::new(),
                    inspector_extractions: HashMap::new(),
+                   inspector_preview: HashMap::new(),
                    other_details_open: HashMap::new(),
                    file_other_details_open: HashMap::new(),
                    file_info_cache: HashMap::new(),
