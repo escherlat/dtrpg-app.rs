@@ -11,5 +11,7 @@ pub mod roots;
 
 pub use config::{DEFAULT_MAX_CONCURRENT_DOWNLOADS, DEFAULT_ROOT_ID, StorageConfig, StorageError};
 pub use paths::{
-    available_space_mb, collection_dir, publisher_dir, sanitize_path_component, validate_writable,
+    available_space_mb, available_space_mb_at, collection_dir, publisher_dir,
+    sanitize_path_component, validate_writable,
 };
+pub use roots::RootHealth;

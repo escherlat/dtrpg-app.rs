@@ -146,14 +146,12 @@ impl LibraryController {
     /// queuing anything.
     pub fn request_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(needed_mb) = self.catalog
-                                  .iter()
-                                  .find(|i| i.id.as_ref() == id)
-                                  .map(|item| missing_files_size_mb(&item.files))
+        let Some(item) = self.catalog.iter().find(|i| i.id.as_ref() == id).cloned()
         else {
             return;
         };
-        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+        let needed_mb = missing_files_size_mb(&item.files);
+        if let Some(free_mb) = self.warn_if_insufficient_space_for_item(&item, needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::Item { id: Arc::from(id),
                                                                         title });
             cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
@@ -168,16 +166,19 @@ impl LibraryController {
     pub fn request_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
                                  cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(needed_mb) = self.catalog
-                                  .iter()
-                                  .find(|i| i.id.as_ref() == id)
-                                  .and_then(|item| item.files.get(index as usize))
-                                  .filter(|f| !f.downloaded)
-                                  .map(|f| f.size_mb)
+        let Some((item, needed_mb)) = self.catalog
+                                          .iter()
+                                          .find(|i| i.id.as_ref() == id)
+                                          .and_then(|item| {
+                                              item.files
+                                                  .get(index as usize)
+                                                  .filter(|f| !f.downloaded)
+                                                  .map(|f| (item.clone(), f.size_mb))
+                                          })
         else {
             return;
         };
-        if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
+        if let Some(free_mb) = self.warn_if_insufficient_space_for_item(&item, needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::ItemFile { id: Arc::from(id),
                                                                             index,
                                                                             title });
@@ -255,6 +256,18 @@ impl LibraryController {
     /// (fail open — see `download-disk-space-check`).
     pub(super) fn warn_if_insufficient_space(needed_mb: f64) -> Option<f64> {
         let free_mb = dtrpg_core::data::storage::available_space_mb()?;
+        (needed_mb > free_mb).then_some(free_mb)
+    }
+
+    /// Applies the same free-space check to the root selected by placement
+    /// rules for `item`. Bulk requests retain their aggregate default-root
+    /// check; single-item requests can safely use the exact destination root.
+    pub(super) fn warn_if_insufficient_space_for_item(&self, item: &LibraryItem, needed_mb: f64)
+                                                      -> Option<f64> {
+        let storage = StorageConfig::load();
+        let collection_ids = collection_ids_for_item(item, &self.collections);
+        let root = storage.resolve_root_for(&item.publisher, &collection_ids, item.size_mb);
+        let free_mb = available_space_mb_at(&root.path)?;
         (needed_mb > free_mb).then_some(free_mb)
     }
 

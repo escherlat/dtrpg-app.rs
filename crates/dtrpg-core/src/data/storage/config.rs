@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::paths::{collection_dir, publisher_dir, validate_writable};
 use super::placement::{self, PlacementCondition, PlacementRule};
-use super::roots::StorageRoot;
+use super::roots::{RootHealth, StorageRoot, root_health};
 use crate::data::constants::{
     RECENTLY_UPDATED_WINDOW_DEFAULT_DAYS, RECENTLY_UPDATED_WINDOW_MAX_DAYS,
     RECENTLY_UPDATED_WINDOW_MIN_DAYS,
@@ -272,6 +272,12 @@ impl StorageConfig {
     #[must_use]
     pub fn root(&self, id: u32) -> Option<StorageRoot> {
         self.roots().into_iter().find(|r| r.id == id)
+    }
+
+    /// Returns the current health of a configured root.
+    #[must_use]
+    pub fn root_health(&self, id: u32) -> Option<RootHealth> {
+        self.root(id).as_ref().map(root_health)
     }
 
     /// Adds a new named storage root at `path` and returns its assigned id.
