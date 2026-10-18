@@ -94,6 +94,7 @@ impl LibraryController {
         let had_inspector_selection = self.inspector_selected_entries.remove(entry_id).is_some();
         let had_inspector_extraction = self.inspector_extractions.remove(entry_id).is_some();
         let had_inspector_preview = self.inspector_preview.remove(entry_id).is_some();
+        let _had_inspector_archive = self.inspector_selected_archive.remove(entry_id).is_some();
         let had_inspector_dirs = self.inspector_collapsed_dirs.remove(entry_id).is_some();
         let had_inspector_filter = self.inspector_filter_inputs.remove(entry_id).is_some();
         if had_selection
