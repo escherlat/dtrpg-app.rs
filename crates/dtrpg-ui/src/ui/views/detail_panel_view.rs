@@ -11,8 +11,8 @@ use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::util::matching::{collection_member_id, member_ids_contain};
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, Entity, Image, InteractiveElement, IntoElement,
-    MouseMoveEvent, ObjectFit, ParentElement, Pixels, SharedString, StatefulInteractiveElement,
+    AnyElement, App, Context, Entity, Image, InteractiveElement, IntoElement,
+    ObjectFit, ParentElement, Pixels, SharedString, StatefulInteractiveElement,
     Styled, StyledImage, Window, div, img, px,
 };
 use gpui_kit::component::Disableable;
@@ -452,72 +452,19 @@ impl TableDelegate for ItemListDelegate {
         let value_font_family = cx.global::<LibriTheme>().fonts.value_font.clone();
 
         match col_ix {
-            // Name column. Zip-typed files (see `zip-content-preview`) additionally get a
-            // folder-glyph affordance and hover/click wiring for the content preview
-            // popover — moving the mouse over the row opens it, leaving without clicking
-            // closes it, and a click pins it open (a second click unpins).
-            0 => {
-                let is_zip = file.format.eq_ignore_ascii_case("zip");
-                let name_cell = div().h_full()
-                                     .flex()
-                                     .items_center()
-                                     .gap(px(4.0))
-                                     .text_sm()
-                                     .font_family(value_font_family.to_string())
-                                     .text_color(colors.text_primary)
-                                     .child(div().flex_1()
-                                                 .min_w_0()
-                                                 .truncate()
-                                                 .child(file.name.to_string()));
-
-                if !is_zip {
-                    return name_cell.into_any_element();
-                }
-
-                let controller_move = self.controller.clone();
-                let entry_id_move = Arc::clone(&self.entry_id);
-                let controller_hover_end = self.controller.clone();
-                let entry_id_hover_end = Arc::clone(&self.entry_id);
-                let controller_click = self.controller.clone();
-                let entry_id_click = Arc::clone(&self.entry_id);
-
-                name_cell
-                    .id(SharedString::from(format!("item-row-{row_ix}-zip-name")))
-                    .cursor_pointer()
-                    .child(
-                        div().flex_none().child(
-                            Icon::new(IconName::FolderOpen).text_color(colors.text_tertiary),
-                        ),
-                    )
-                    .on_mouse_move(move |event: &MouseMoveEvent, _window, cx| {
-                        controller_move.update(cx, |ctrl, cx| {
-                            ctrl.hover_zip_preview(
-                                Arc::clone(&entry_id_move),
-                                row_ix,
-                                event.position,
-                                cx,
-                            );
-                        });
-                    })
-                    .on_hover(move |hovered: &bool, _window, cx| {
-                        if !hovered {
-                            controller_hover_end.update(cx, |ctrl, cx| {
-                                ctrl.clear_hover_zip_preview(&entry_id_hover_end, row_ix, cx);
-                            });
-                        }
-                    })
-                    .on_click(move |event: &ClickEvent, _window, cx| {
-                        controller_click.update(cx, |ctrl, cx| {
-                            ctrl.toggle_zip_preview_pin(
-                                Arc::clone(&entry_id_click),
-                                row_ix,
-                                event.position(),
-                                cx,
-                            );
-                        });
-                    })
-                    .into_any_element()
-            }
+            // Name column.
+            0 => div().h_full()
+                      .flex()
+                      .items_center()
+                      .gap(px(4.0))
+                      .text_sm()
+                      .font_family(value_font_family.to_string())
+                      .text_color(colors.text_primary)
+                      .child(div().flex_1()
+                                  .min_w_0()
+                                  .truncate()
+                                  .child(file.name.to_string()))
+                      .into_any_element(),
             1 => div().h_full()
                       .flex()
                       .items_center()
@@ -716,29 +663,6 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
 
     let selected_file = selected_ix.and_then(|ix| item.files.get(ix).map(|file| (ix, file)));
 
-    // Only ever `Some` while this entry's detail tab is active — inactive
-    // detail tabs never call `render_item_tier` at all (see `root_view`'s
-    // match on the active `TabTarget`), so the popover can't leak into
-    // another tab without extra gating here.
-    let zip_popover: AnyElement = match entity.read(cx).zip_preview_for(&entry_id) {
-        Some((row_ix, anchor_pos, _pinned)) => match item.files.get(row_ix) {
-            Some(file) => {
-                let file_path =
-                    dtrpg_core::data::storage::publisher_dir(storage_root_path, &item.publisher)
-                        .join(file.name.as_ref());
-                crate::ui::views::zip_preview_popover::render_zip_preview_popover(
-                    Arc::clone(&entry_id),
-                    &file_path,
-                    anchor_pos,
-                    entity.clone(),
-                    colors,
-                )
-            }
-            None => div().into_any_element(),
-        },
-        None => div().into_any_element(),
-    };
-
     div().flex()
          .flex_col()
          .gap(px(12.0))
@@ -761,7 +685,6 @@ fn render_item_tier(item: &LibraryItem, storage_root_path: &Path,
                                                              cx).into_any_element(),
                     None => div().into_any_element(),
                 })
-         .child(zip_popover)
 }
 
 /// Renders the metadata area for a single selected item within a multi-item

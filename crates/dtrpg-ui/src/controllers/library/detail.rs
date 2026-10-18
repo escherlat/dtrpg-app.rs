@@ -65,18 +65,6 @@ impl LibraryController {
           .detach();
     }
 
-    // ── Zip content preview (item tier) ──────────────────────────────────────
-
-    /// Returns the active Zip preview's file row and anchor position for
-    /// `entry_id`, if one is open (hovered or pinned).
-    #[must_use]
-    pub fn zip_preview_for(&self, entry_id: &str) -> Option<(usize, Point<Pixels>, bool)> {
-        self.zip_preview
-            .as_ref()
-            .filter(|p| p.entry_id.as_ref() == entry_id)
-            .map(|p| (p.row_ix, p.anchor_pos, p.pinned))
-    }
-
     /// Returns `entry_id`'s file at `row_ix`'s Info column value (PDF page
     /// count, Zip file count, or image dimensions).
     ///
@@ -102,86 +90,6 @@ impl LibraryController {
                          downloaded,
                          &path,
                          &format)
-    }
-
-    /// Opens (or moves) the hover preview to `entry_id`'s file row `row_ix`,
-    /// anchored at `anchor_pos`. No-op while a *different* row is pinned —
-    /// pinning takes priority over hover until explicitly dismissed. Also a
-    /// no-op if this row is already the active unpinned hover target, so
-    /// continuous `on_mouse_move` ticks over the same row don't repeatedly
-    /// re-read the archive or re-notify every frame.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn hover_zip_preview(&mut self, entry_id: Arc<str>, row_ix: usize,
-                             anchor_pos: Point<Pixels>, cx: &mut Context<Self>) {
-        if let Some(existing) = &self.zip_preview {
-            if existing.pinned && (existing.entry_id != entry_id || existing.row_ix != row_ix) {
-                return;
-            }
-            if !existing.pinned && existing.entry_id == entry_id && existing.row_ix == row_ix {
-                return;
-            }
-        }
-        self.zip_preview = Some(ZipPreviewState { entry_id,
-                                                  row_ix,
-                                                  anchor_pos,
-                                                  pinned: false });
-        cx.emit(LibraryChanged);
-    }
-
-    /// Ends the hover preview for `entry_id`'s file row `row_ix` — a no-op if
-    /// that row is pinned (pinning survives mouse-out) or if a different row
-    /// is the active preview.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn clear_hover_zip_preview(&mut self, entry_id: &str, row_ix: usize,
-                                   cx: &mut Context<Self>) {
-        let should_clear = self.zip_preview.as_ref().is_some_and(|p| {
-                                                        !p.pinned
-                                                        && p.entry_id.as_ref() == entry_id
-                                                        && p.row_ix == row_ix
-                                                    });
-        if should_clear {
-            self.zip_preview = None;
-            cx.emit(LibraryChanged);
-        }
-    }
-
-    /// Toggles the pinned state of `entry_id`'s file row `row_ix`: pins it
-    /// open (opening the preview if it wasn't already active) on the first
-    /// click, or clears it entirely on a second click of the same row.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn toggle_zip_preview_pin(&mut self, entry_id: Arc<str>, row_ix: usize,
-                                  anchor_pos: Point<Pixels>, cx: &mut Context<Self>) {
-        let already_pinned =
-            self.zip_preview
-                .as_ref()
-                .is_some_and(|p| p.pinned && p.entry_id == entry_id && p.row_ix == row_ix);
-        self.zip_preview = if already_pinned {
-            None
-        }
-        else {
-            Some(ZipPreviewState { entry_id,
-                                   row_ix,
-                                   anchor_pos,
-                                   pinned: true })
-        };
-        cx.emit(LibraryChanged);
-    }
-
-    /// Closes the Zip preview popover for `entry_id`, whether hovered or
-    /// pinned — used by the popover's own close control.
-    ///
-    /// Emits [`LibraryChanged`].
-    pub fn close_zip_preview(&mut self, entry_id: &str, cx: &mut Context<Self>) {
-        if self.zip_preview
-               .as_ref()
-               .is_some_and(|p| p.entry_id.as_ref() == entry_id)
-        {
-            self.zip_preview = None;
-            cx.emit(LibraryChanged);
-        }
     }
 
     // ── Other details disclosure ─────────────────────────────────────────────

@@ -27,7 +27,7 @@ use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
 use dtrpg_core::util::sort::*;
-use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, Point, SharedString, Task};
+use gpui::{BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task};
 use rust_i18n::t;
 
 use crate::controllers::activity::ActivityController;
@@ -127,24 +127,6 @@ pub struct LibrarySnapshot {
     /// `bulk_selected_ids.len()`, exposed directly so views don't need to
     /// clone the set just to show a count.
     pub bulk_selection_count:      usize,
-}
-
-/// A Zip content preview popover open for one file row within a detail
-/// tab's item tier (see `zip-content-preview`).
-#[derive(Clone)]
-struct ZipPreviewState {
-    /// Catalog entry id owning the previewed file row.
-    entry_id:   Arc<str>,
-    /// The file's position within the entry's `files` list.
-    row_ix:     usize,
-    /// Screen position the popover is anchored to, captured once when the
-    /// preview opens — never updated by subsequent mouse movement, so the
-    /// popover stays put while the pointer wanders (mirrors
-    /// `CatalogView::popover_anchor_pos`).
-    anchor_pos: Point<Pixels>,
-    /// Whether a click has pinned this preview open, so it survives
-    /// mouse-out until a second click or an explicit close.
-    pinned:     bool,
 }
 
 /// Error from a cover/avatar thumbnail fetch, carrying the `Retry-After`
@@ -328,13 +310,7 @@ pub struct LibraryController {
     /// `selected_item_file`. Ephemeral — never persisted, and defaults to
     /// collapsed.
     file_other_details_open:       HashMap<Arc<str>, bool>,
-    /// The Zip content preview popover currently open (hovered or pinned) in
-    /// a detail tab's item tier, if any (see `zip-content-preview`). At most
-    /// one is shown at a time. Ephemeral — never persisted, and cleared
-    /// whenever the entry's detail tab is closed or reopened, same
-    /// convention as `selected_item_file`.
-    zip_preview:                   Option<ZipPreviewState>,
-    /// Per-file Info column metadata (PDF page count, Zip file count, image
+    /// Per-file Info column metadata (PDF page count, container entry count, image
     /// dimensions), keyed by `(entry_id, row_ix)` and computed once on first
     /// access — see [`Self::file_info`]. Evicted per-entry whenever a file's
     /// `downloaded` flag transitions, since re-downloading may change the

@@ -165,9 +165,6 @@ detail:
   inspector_contents_loading: "Loading archive contents…"
   inspector_contents_unavailable: "Archive contents are unavailable."
   inspector_summary_empty: "No summary is available for this item."
-  zip_preview_heading: "Zip contents"
-  zip_preview_empty: "This archive has no entries."
-  zip_preview_unavailable: "Preview unavailable"
 
 settings:
   title: "Settings"

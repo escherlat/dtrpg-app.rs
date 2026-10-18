@@ -147,9 +147,6 @@ detail:
   inspector_contents_loading: "Archivinhalt wird geladen…"
   inspector_contents_unavailable: "Archivinhalt ist nicht verfügbar."
   inspector_summary_empty: "Für diesen Eintrag ist keine Zusammenfassung verfügbar."
-  zip_preview_heading: "Zip-Inhalt"
-  zip_preview_empty: "Dieses Archiv enthält keine Einträge."
-  zip_preview_unavailable: "Vorschau nicht verfügbar"
 
 settings:
   title: "Einstellungen"
