@@ -51,10 +51,10 @@ pub fn start_theme_watcher(cx: &App) {
 /// Sends a signal for events that touch a theme TOML file.
 fn event_handler(tx: UnboundedSender<()>) -> impl notify::EventHandler {
     move |event: notify::Result<notify::Event>| {
-        if let Ok(event) = event {
-            if event_touches_theme_file(&event) {
-                let _ = tx.unbounded_send(());
-            }
+        if let Ok(event) = event
+           && event_touches_theme_file(&event)
+        {
+            let _ = tx.unbounded_send(());
         }
     }
 }
