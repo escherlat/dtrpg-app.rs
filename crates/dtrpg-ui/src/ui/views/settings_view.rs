@@ -25,7 +25,9 @@ use gpui_kit::component::sidebar::{Sidebar, SidebarMenu, SidebarMenuItem};
 use rust_i18n::t;
 
 use crate::controllers::library::LibraryController;
-use crate::controllers::settings::{AuthStateSnapshot, CacheCounts, SettingsController};
+use crate::controllers::settings::{
+    AuthStateSnapshot, CacheCounts, RuleEditorType, SettingsController,
+};
 use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::views::{
     settings_account_view::render_account_section,
@@ -68,6 +70,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              collection_rule_input: Option<Entity<InputState>>,
                              size_rule_input: Option<Entity<InputState>>,
                              rule_target_root_id: u32, publisher_names: Vec<String>,
+                             rule_editor_type: RuleEditorType,
                              entity: Entity<SettingsController>,
                              library: Entity<LibraryController>, focus_handle: &FocusHandle,
                              colors: &ColorTokens, theme: &LibriTheme,
@@ -124,7 +127,8 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                     collection_rule_input,
                                     size_rule_input,
                                     rule_target_root_id,
-                                    publisher_names).into_any_element(),
+                                    publisher_names,
+                                    rule_editor_type).into_any_element(),
         3 => render_file_openers_section(file_openers,
                                          entity.clone(),
                                          colors,
