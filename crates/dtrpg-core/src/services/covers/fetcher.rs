@@ -21,7 +21,7 @@ use crate::{
 /// Fetches cover images, reading the on-disk cache before the network and
 /// saving what it downloads.
 pub struct CoverFetcher {
-    transport: Arc<dyn CoverTransport>,
+    transport:   Arc<dyn CoverTransport>,
     covers_root: PathBuf,
 }
 
@@ -29,7 +29,8 @@ impl CoverFetcher {
     /// Creates a fetcher that caches covers under `covers_root`.
     #[must_use]
     pub fn new(transport: Arc<dyn CoverTransport>, covers_root: PathBuf) -> Self {
-        Self { transport, covers_root }
+        Self { transport,
+               covers_root }
     }
 
     /// Returns the cover image bytes for `key`, fetching `url` if needed.
@@ -57,7 +58,9 @@ impl CoverFetcher {
     ///
     /// let transport = HttpCoverTransport::new(Arc::new(NetworkMonitor::new()));
     /// let fetcher = CoverFetcher::new(Arc::new(transport), std::env::temp_dir());
-    /// let bytes = fetcher.fetch("item-1", "https://example.com/cover.jpg", false,
+    /// let bytes = fetcher.fetch("item-1",
+    ///                           "https://example.com/cover.jpg",
+    ///                           false,
     ///                           &AtomicBool::new(false))?;
     /// # let _ = bytes;
     /// # Ok::<(), dtrpg_core::services::covers::CoverFetchError>(())
@@ -72,8 +75,8 @@ impl CoverFetcher {
         }
 
         let config = RetryConfig { max_attempts: IMAGE_CACHE_MAX_ATTEMPTS,
-                                   base_secs: IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
-                                   max_secs: IMAGE_CACHE_RETRY_MAX_DELAY_SECS };
+                                   base_secs:    IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+                                   max_secs:     IMAGE_CACHE_RETRY_MAX_DELAY_SECS, };
         let mut on_retry = |attempt: u32, delay: Duration, reason: &CoverFetchError| {
             tracing::debug!(url, attempt, delay_secs = delay.as_secs(), reason = %reason,
                             "cover thumbnail fetch retrying");

@@ -21,9 +21,9 @@ use crate::{
 /// Fetches a user's avatar, reading the on-disk cache before the network and
 /// saving what it downloads.
 pub struct AvatarFetcher {
-    transport: Arc<dyn AvatarTransport>,
+    transport:  Arc<dyn AvatarTransport>,
     cache_path: PathBuf,
-    retry: RetryConfig,
+    retry:      RetryConfig,
 }
 
 impl AvatarFetcher {
@@ -31,9 +31,11 @@ impl AvatarFetcher {
     #[must_use]
     pub fn new(transport: Arc<dyn AvatarTransport>, cache_path: PathBuf) -> Self {
         let retry = RetryConfig { max_attempts: IMAGE_CACHE_MAX_ATTEMPTS,
-                                  base_secs: IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
-                                  max_secs: IMAGE_CACHE_RETRY_MAX_DELAY_SECS };
-        Self { transport, cache_path, retry }
+                                  base_secs:    IMAGE_CACHE_RETRY_BASE_DELAY_SECS,
+                                  max_secs:     IMAGE_CACHE_RETRY_MAX_DELAY_SECS, };
+        Self { transport,
+               cache_path,
+               retry }
     }
 
     /// Replaces the retry policy, which defaults to the one cover images use.

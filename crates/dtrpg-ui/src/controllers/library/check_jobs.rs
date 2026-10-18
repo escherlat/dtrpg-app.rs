@@ -75,12 +75,11 @@ impl CheckJobs {
     /// Forgets every waiting check, returning each id so it can be cancelled.
     /// Checks that have started are left to finish.
     pub(super) fn remove_all_pending(&mut self) -> Vec<JobId> {
-        let waiting: Vec<(Arc<str>, JobId)> =
-            self.jobs
-                .iter()
-                .filter(|(_, job)| !job.started)
-                .map(|(id, job)| (Arc::clone(&job.item_id), *id))
-                .collect();
+        let waiting: Vec<(Arc<str>, JobId)> = self.jobs
+                                                  .iter()
+                                                  .filter(|(_, job)| !job.started)
+                                                  .map(|(id, job)| (Arc::clone(&job.item_id), *id))
+                                                  .collect();
         for (item_id, id) in &waiting {
             self.by_item.remove(item_id);
             self.jobs.remove(id);
@@ -164,7 +163,8 @@ mod tests {
         jobs.add(ids[0], job("a"));
         jobs.mark_started(ids[0]);
 
-        assert_eq!(jobs.finish(ids[0]).map(|job| job.item_id).as_deref(), Some("a"));
+        assert_eq!(jobs.finish(ids[0]).map(|job| job.item_id).as_deref(),
+                   Some("a"));
 
         assert!(jobs.finish(ids[0]).is_none());
         assert!(!jobs.is_running("a"));

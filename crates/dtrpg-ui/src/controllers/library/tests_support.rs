@@ -62,8 +62,12 @@ impl Permits {
                 *available -= 1;
                 return true;
             }
-            assert!(Instant::now() < deadline, "no permit was released for {what}");
-            available = self.changed.wait_timeout(available, Duration::from_millis(5)).unwrap().0;
+            assert!(Instant::now() < deadline,
+                    "no permit was released for {what}");
+            available = self.changed
+                            .wait_timeout(available, Duration::from_millis(5))
+                            .unwrap()
+                            .0;
         }
     }
 }
@@ -123,17 +127,17 @@ impl CoverTransport for ScriptedTransport {
 /// a retry for chosen order products, and notice cancellation. It writes
 /// nothing to disk.
 pub(super) struct ScriptedLibrary {
-    permits:        Permits,
-    failing:        HashSet<u64>,
-    retrying:       HashSet<u64>,
-    started:        Mutex<Vec<u64>>,
-    cancelled:      Mutex<Vec<u64>>,
-    check_permits:  Permits,
-    missing:        HashSet<u64>,
-    erroring:       HashSet<u64>,
-    checked:        Mutex<Vec<u64>>,
+    permits:       Permits,
+    failing:       HashSet<u64>,
+    retrying:      HashSet<u64>,
+    started:       Mutex<Vec<u64>>,
+    cancelled:     Mutex<Vec<u64>>,
+    check_permits: Permits,
+    missing:       HashSet<u64>,
+    erroring:      HashSet<u64>,
+    checked:       Mutex<Vec<u64>>,
     /// A progress report every download makes as soon as it begins.
-    progress:       Option<(u64, Option<u64>)>,
+    progress:      Option<(u64, Option<u64>)>,
 }
 
 impl ScriptedLibrary {
@@ -252,8 +256,9 @@ impl LibraryService for SharedLibrary {
         if let Some((received, total)) = library.progress {
             control.report_progress(received, total);
         }
-        let go = library.permits
-                        .take("a download", || control.cancel_flag().load(Ordering::SeqCst));
+        let go = library.permits.take("a download", || {
+                                    control.cancel_flag().load(Ordering::SeqCst)
+                                });
         if !go {
             library.cancelled.lock().unwrap().push(order_product_id);
             return Err(LibraryServiceError::new(LibraryServiceErrorKind::Network, "cancelled"));
@@ -281,7 +286,8 @@ impl CollectionsService for UnusedCollections {
         Err(unused())
     }
 
-    fn add_member(&self, _collection_id: u64, _item_id: u64) -> Result<(), CollectionsServiceError> {
+    fn add_member(&self, _collection_id: u64, _item_id: u64)
+                  -> Result<(), CollectionsServiceError> {
         Err(unused())
     }
 
@@ -300,8 +306,20 @@ pub(super) fn url_for(id: &str) -> Arc<str> {
 }
 
 fn bare_item(id: &str) -> LibraryItem {
-    LibraryItem::new(id, id, "Publisher", "Line", "Core", "PDF", 0, 0.0, 2020, 0,
-                     ItemStatus::Cloud, "#000000", "", None)
+    LibraryItem::new(id,
+                     id,
+                     "Publisher",
+                     "Line",
+                     "Core",
+                     "PDF",
+                     0,
+                     0.0,
+                     2020,
+                     0,
+                     ItemStatus::Cloud,
+                     "#000000",
+                     "",
+                     None)
 }
 
 /// An entry with a cover URL and no files.
@@ -322,16 +340,15 @@ pub(super) fn item_numbered(id: &str, numeric_id: u64) -> LibraryItem {
 pub(super) fn item_with_files(id: &str, order_product_id: u64, files: u32) -> LibraryItem {
     let mut item = bare_item(id);
     item.order_product_id = order_product_id;
-    item.files = (0..files).map(|index| {
-                               LibraryItemFile { id:         format!("{id}-{index}").into(),
-                                                 index,
-                                                 name:       format!("File {index}.pdf").into(),
-                                                 format:     "PDF".into(),
-                                                 size_mb:    1.0,
-                                                 downloaded: false,
-                                                 offloaded:  false, }
-                           })
-                          .collect();
+    item.files = (0..files).map(|index| LibraryItemFile { id: format!("{id}-{index}").into(),
+                                                          index,
+                                                          name:
+                                                              format!("File {index}.pdf").into(),
+                                                          format: "PDF".into(),
+                                                          size_mb: 1.0,
+                                                          downloaded: false,
+                                                          offloaded: false })
+                           .collect();
     item
 }
 
@@ -368,11 +385,12 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
     let activity = cx.new(|_| ActivityController::new());
     let controller = cx.new(|cx| {
                            let (mut ctrl, events) =
-                               LibraryController::build(Box::new(SharedLibrary(Arc::clone(&library))),
-                                                        Box::new(UnusedCollections),
-                                                        activity.clone());
+                  LibraryController::build(Box::new(SharedLibrary(Arc::clone(&library))),
+                                           Box::new(UnusedCollections),
+                                           activity.clone());
                            ctrl.cover_fetcher =
-                               Arc::new(CoverFetcher::new(Arc::clone(&transport) as Arc<dyn CoverTransport>,
+                               Arc::new(CoverFetcher::new(Arc::clone(&transport)
+                                                          as Arc<dyn CoverTransport>,
                                                           covers.path().to_path_buf()));
                            ctrl.cache_root = cache_path.clone();
                            ctrl.work.set_limit(limit);
@@ -398,7 +416,8 @@ pub(super) fn wait_for(cx: &mut TestAppContext, mut done: impl FnMut(&mut TestAp
         if done(cx) {
             return;
         }
-        assert!(Instant::now() < deadline, "condition not met within {WAIT:?}");
+        assert!(Instant::now() < deadline,
+                "condition not met within {WAIT:?}");
         std::thread::sleep(Duration::from_millis(5));
     }
 }

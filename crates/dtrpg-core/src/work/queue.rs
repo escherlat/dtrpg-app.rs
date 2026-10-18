@@ -24,7 +24,7 @@ pub struct WorkQueue {
 }
 
 struct Shared {
-    state: Mutex<State>,
+    state:  Mutex<State>,
     events: UnboundedSender<JobEvent>,
 }
 
@@ -50,7 +50,7 @@ impl WorkQueue {
         let (events, receiver) = mpsc::unbounded_channel();
         let shared = Shared { state: Mutex::new(State::new(limit)),
                               events };
-        (Self { shared: Arc::new(shared) }, receiver)
+        (Self { shared: Arc::new(shared), }, receiver)
     }
 
     /// Adds a job to the queue and returns its id. The job starts as soon as
@@ -65,14 +65,15 @@ impl WorkQueue {
     /// use dtrpg_core::work::{JobEvent, JobKind, JobSpec, Outcome, Priority, WorkQueue};
     ///
     /// let (queue, mut events) = WorkQueue::new(3);
-    /// let spec = JobSpec { kind: JobKind::Download,
+    /// let spec = JobSpec { kind:     JobKind::Download,
     ///                      priority: Priority::Interactive,
-    ///                      label: "Example".to_owned() };
+    ///                      label:    "Example".to_owned(), };
     /// let id = queue.submit(spec, |_context| Ok(()));
     ///
     /// assert_eq!(events.blocking_recv(), Some(JobEvent::Started { id }));
     /// assert_eq!(events.blocking_recv(),
-    ///            Some(JobEvent::Finished { id, outcome: Outcome::Succeeded }));
+    ///            Some(JobEvent::Finished { id,
+    ///                                      outcome: Outcome::Succeeded }));
     /// ```
     pub fn submit<F>(&self, spec: JobSpec, job: F) -> JobId
         where F: FnOnce(&JobContext) -> JobResult + Send + 'static {
@@ -135,7 +136,8 @@ impl Shared {
     fn dispatch(self: &Arc<Self>) {
         loop {
             let next = self.lock().take_runnable();
-            let Some(pending) = next else {
+            let Some(pending) = next
+            else {
                 break;
             };
             self.start(pending);
@@ -153,7 +155,9 @@ impl Shared {
                 // Without a runtime the job cannot run. Fail it, so its slot
                 // is freed and whoever is waiting on it hears about it.
                 tracing::error!(%id, %error, "work queue cannot start a job");
-                self.finish(id, &cancel, Ok(Err(format!("unable to start the runtime: {error}"))));
+                self.finish(id,
+                            &cancel,
+                            Ok(Err(format!("unable to start the runtime: {error}"))));
                 return;
             }
         };
@@ -162,11 +166,11 @@ impl Shared {
         // The join handle is dropped on purpose: a blocking task cannot be
         // aborted, and the queue tracks every job to its `Finished` event.
         drop(handle.spawn_blocking(move || {
-                        // The closure is consumed by the call, so nothing it
-                        // touched is observed in a broken state afterwards.
-                        let result = panic::catch_unwind(AssertUnwindSafe(|| job(&context)));
-                        shared.finish(id, &cancel, result);
-                    }));
+                       // The closure is consumed by the call, so nothing it
+                       // touched is observed in a broken state afterwards.
+                       let result = panic::catch_unwind(AssertUnwindSafe(|| job(&context)));
+                       shared.finish(id, &cancel, result);
+                   }));
     }
 
     /// Frees the job's slot, reports how it ended, and starts the next job.

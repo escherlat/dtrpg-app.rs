@@ -28,7 +28,7 @@ const GENERAL_CONNECTIVITY_PROBE: &str = "1.1.1.1:443";
 /// last checked.
 #[derive(Clone, Copy)]
 struct CachedState {
-    reachable: bool,
+    reachable:  bool,
     checked_at: Instant,
 }
 
@@ -52,9 +52,7 @@ impl NetworkMonitor {
     /// Creates a monitor with an empty cache.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            cache: Mutex::new(HashMap::new()),
-        }
+        Self { cache: Mutex::new(HashMap::new()), }
     }
 
     /// Reports whether the device has general network connectivity,
@@ -77,30 +75,24 @@ impl NetworkMonitor {
             // Poisoned-lock recovery: a panic while holding this lock during a
             // probe would be a bug elsewhere, not a reason to make every
             // subsequent connectivity check unusable.
-            let cache = self
-                .cache
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let cache = self.cache
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some(state) = cache.get(key)
-                && now.duration_since(state.checked_at)
-                    < Duration::from_secs(NETWORK_MONITOR_CACHE_TTL_SECS)
+               && now.duration_since(state.checked_at)
+                  < Duration::from_secs(NETWORK_MONITOR_CACHE_TTL_SECS)
             {
                 return state.reachable;
             }
         }
 
         let reachable = probe(key);
-        let mut cache = self
-            .cache
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        cache.insert(
-            key.to_string(),
-            CachedState {
-                reachable,
-                checked_at: now,
-            },
-        );
+        let mut cache = self.cache
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        cache.insert(key.to_string(),
+                     CachedState { reachable,
+                                   checked_at: now });
         reachable
     }
 }

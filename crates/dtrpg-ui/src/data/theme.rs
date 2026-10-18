@@ -97,7 +97,7 @@ impl std::fmt::Display for ThemeMode {
 #[derive(Debug, Clone, Copy)]
 pub struct SemanticColors {
     /// Error / destructive state (red).
-    pub error:       Hsla,
+    pub error:        Hsla,
     /// Warning banner background (amber, low opacity).
     pub warning_bg:   Hsla,
     /// Warning banner text / icon color (amber, full opacity).
@@ -110,16 +110,12 @@ pub struct SemanticColors {
 /// outside the themeable palette: a theme file cannot set them.
 pub fn semantic_colors(mode: ThemeMode) -> SemanticColors {
     match mode {
-        ThemeMode::Light => SemanticColors {
-            error:        hex(0xB0, 0x30, 0x28),
-            warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.12),
-            warning_text: gpui::hsla(0.08, 0.85, 0.35, 1.0),
-        },
-        ThemeMode::Dark => SemanticColors {
-            error:        hex(0xE0, 0x58, 0x58),
-            warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.10),
-            warning_text: gpui::hsla(0.10, 0.90, 0.65, 1.0),
-        },
+        ThemeMode::Light => SemanticColors { error:        hex(0xB0, 0x30, 0x28),
+                                             warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.12),
+                                             warning_text: gpui::hsla(0.08, 0.85, 0.35, 1.0), },
+        ThemeMode::Dark => SemanticColors { error:        hex(0xE0, 0x58, 0x58),
+                                            warning_bg:   gpui::hsla(0.11, 0.9, 0.5, 0.10),
+                                            warning_text: gpui::hsla(0.10, 0.90, 0.65, 1.0), },
     }
 }
 

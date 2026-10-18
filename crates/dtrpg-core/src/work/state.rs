@@ -16,35 +16,33 @@ pub(super) type Job = Box<dyn FnOnce(&JobContext) -> JobResult + Send + 'static>
 
 /// A submitted job that has not started yet.
 pub(super) struct Pending {
-    pub(super) id: JobId,
-    pub(super) spec: JobSpec,
-    pub(super) job: Job,
+    pub(super) id:     JobId,
+    pub(super) spec:   JobSpec,
+    pub(super) job:    Job,
     pub(super) cancel: Arc<AtomicBool>,
 }
 
 /// What the queue remembers about a job that is running.
 struct Running {
-    kind: JobKind,
+    kind:   JobKind,
     cancel: Arc<AtomicBool>,
 }
 
 pub(super) struct State {
-    limit: usize,
-    next_id: u64,
+    limit:       usize,
+    next_id:     u64,
     interactive: VecDeque<Pending>,
-    background: VecDeque<Pending>,
-    running: HashMap<JobId, Running>,
+    background:  VecDeque<Pending>,
+    running:     HashMap<JobId, Running>,
 }
 
 impl State {
     pub(super) fn new(limit: usize) -> Self {
-        Self {
-            limit: limit.max(1),
-            next_id: 0,
-            interactive: VecDeque::new(),
-            background: VecDeque::new(),
-            running: HashMap::new(),
-        }
+        Self { limit:       limit.max(1),
+               next_id:     0,
+               interactive: VecDeque::new(),
+               background:  VecDeque::new(),
+               running:     HashMap::new(), }
     }
 
     pub(super) fn next_job_id(&mut self) -> JobId {
@@ -78,8 +76,8 @@ impl State {
                         .and_then(|position| self.background.remove(position)),
         }?;
         self.running.insert(pending.id,
-                            Running { kind: pending.spec.kind,
-                                      cancel: Arc::clone(&pending.cancel) });
+                            Running { kind:   pending.spec.kind,
+                                      cancel: Arc::clone(&pending.cancel), });
         Some(pending)
     }
 
@@ -96,7 +94,8 @@ impl State {
     /// Asks a running job to stop. Does nothing if the job is not running.
     pub(super) fn signal_cancel(&self, id: JobId) {
         if let Some(running) = self.running.get(&id) {
-            running.cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+            running.cancel
+                   .store(true, std::sync::atomic::Ordering::SeqCst);
         }
     }
 
@@ -113,13 +112,17 @@ impl State {
     /// Whether a job of `kind` may start now: its own cap, if it has one, and
     /// the overall limit, if it counts toward it.
     fn kind_has_room(&self, kind: JobKind) -> bool {
-        let under_cap = kind.max_concurrent().is_none_or(|cap| self.running_of(kind) < cap);
+        let under_cap = kind.max_concurrent()
+                            .is_none_or(|cap| self.running_of(kind) < cap);
         let under_limit = !kind.counts_toward_limit() || self.running_toward_limit() < self.limit;
         under_cap && under_limit
     }
 
     fn running_of(&self, kind: JobKind) -> usize {
-        self.running.values().filter(|running| running.kind == kind).count()
+        self.running
+            .values()
+            .filter(|running| running.kind == kind)
+            .count()
     }
 
     fn running_toward_limit(&self) -> usize {

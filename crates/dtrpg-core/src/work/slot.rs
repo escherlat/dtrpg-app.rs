@@ -28,7 +28,7 @@ impl<T> ResultSlot<T> {
     /// Creates an empty slot.
     #[must_use]
     pub fn new() -> Self {
-        Self { value: Arc::new(Mutex::new(None)) }
+        Self { value: Arc::new(Mutex::new(None)), }
     }
 
     /// Stores `value`, replacing any value already there.
@@ -51,7 +51,7 @@ impl<T> ResultSlot<T> {
 
 impl<T> Clone for ResultSlot<T> {
     fn clone(&self) -> Self {
-        Self { value: Arc::clone(&self.value) }
+        Self { value: Arc::clone(&self.value), }
     }
 }
 

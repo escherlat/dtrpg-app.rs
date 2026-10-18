@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use check_jobs::{CheckJob, CheckJobs};
+use download_jobs::DownloadJobs;
 use dtrpg_core::data::catalog_cache::{
     CacheMetadata, load_cache_metadata, load_catalog_cache, save_catalog_cache,
     save_check_batch_timestamp, save_fresh_install_request_timestamp,
@@ -38,8 +40,6 @@ use gpui::{
 };
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
-use check_jobs::{CheckJob, CheckJobs};
-use download_jobs::DownloadJobs;
 use thumbnail_jobs::ThumbnailJobs;
 
 use crate::controllers::activity::ActivityController;

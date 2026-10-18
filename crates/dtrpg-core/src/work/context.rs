@@ -14,15 +14,14 @@ use super::types::{JobEvent, JobId};
 
 /// Given to a job's closure so it can see cancellation and report progress.
 pub struct JobContext {
-    id: JobId,
+    id:     JobId,
     cancel: Arc<AtomicBool>,
     events: UnboundedSender<JobEvent>,
 }
 
 impl JobContext {
-    pub(super) fn new(
-        id: JobId, cancel: Arc<AtomicBool>, events: UnboundedSender<JobEvent>,
-    ) -> Self {
+    pub(super) fn new(id: JobId, cancel: Arc<AtomicBool>, events: UnboundedSender<JobEvent>)
+                      -> Self {
         Self { id, cancel, events }
     }
 
@@ -58,10 +57,8 @@ impl JobContext {
     /// Reports `done` of `total` units complete, if the total is known.
     pub fn report_progress(&self, done: u64, total: Option<u64>) {
         // A closed channel means nobody is watching; the job carries on.
-        let _ = self.events.send(JobEvent::Progress {
-            id: self.id,
-            done,
-            total,
-        });
+        let _ = self.events.send(JobEvent::Progress { id: self.id,
+                                                      done,
+                                                      total });
     }
 }

@@ -187,8 +187,10 @@ mod tests {
 
         assert_eq!(jobs.cancel(&key("a", 0)), Some((ids[0], Some(42))));
 
-        assert!(!jobs.has_file("a", 0), "the file no longer counts as downloading");
-        assert!(jobs.get(ids[0]).is_some(), "the job stays known until the queue finishes it");
+        assert!(!jobs.has_file("a", 0),
+                "the file no longer counts as downloading");
+        assert!(jobs.get(ids[0]).is_some(),
+                "the job stays known until the queue finishes it");
         assert!(jobs.finish(ids[0]).is_some());
     }
 
@@ -210,7 +212,8 @@ mod tests {
 
         assert!(jobs.finish(ids[0]).is_some());
 
-        assert!(jobs.has_file("a", 0), "the new download for the same file is still tracked");
+        assert!(jobs.has_file("a", 0),
+                "the new download for the same file is still tracked");
         assert!(jobs.finish(ids[1]).is_some());
     }
 

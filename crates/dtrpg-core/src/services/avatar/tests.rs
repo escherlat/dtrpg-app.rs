@@ -24,7 +24,7 @@ const AVATAR: &[u8] = b"avatar-bytes";
 struct FakeTransport {
     reachable: bool,
     responses: Mutex<VecDeque<Result<Vec<u8>, AvatarFetchError>>>,
-    gets: AtomicUsize,
+    gets:      AtomicUsize,
 }
 
 impl FakeTransport {
@@ -46,14 +46,20 @@ impl AvatarTransport for FakeTransport {
 
     fn get(&self, _url: &str) -> Result<Vec<u8>, AvatarFetchError> {
         self.gets.fetch_add(1, Ordering::SeqCst);
-        self.responses.lock().unwrap().pop_front().expect("fake transport ran out of responses")
+        self.responses
+            .lock()
+            .unwrap()
+            .pop_front()
+            .expect("fake transport ran out of responses")
     }
 }
 
 /// A fetcher that retries without waiting, so retry tests are quick.
 fn fetcher(transport: &Arc<FakeTransport>, dir: &tempfile::TempDir) -> AvatarFetcher {
-    AvatarFetcher::new(Arc::clone(transport) as Arc<dyn AvatarTransport>, dir.path().join("avatar"))
-        .with_retry(RetryConfig { max_attempts: 3, base_secs: 0, max_secs: 0 })
+    AvatarFetcher::new(Arc::clone(transport) as Arc<dyn AvatarTransport>,
+                       dir.path().join("avatar")).with_retry(RetryConfig { max_attempts: 3,
+                                                                           base_secs:    0,
+                                                                           max_secs:     0, })
 }
 
 fn transient() -> AvatarFetchError {
@@ -119,7 +125,8 @@ fn a_transient_failure_is_retried() {
 #[test]
 fn transient_failures_stop_after_the_maximum_attempts() {
     let dir = tempfile::tempdir().unwrap();
-    let transport = FakeTransport::new(true, vec![Err(transient()), Err(transient()), Err(transient())]);
+    let transport = FakeTransport::new(true,
+                                       vec![Err(transient()), Err(transient()), Err(transient())]);
 
     assert_eq!(fetcher(&transport, &dir).fetch("someone@example.com"), None);
 
@@ -142,7 +149,8 @@ fn the_cache_directory_is_created_when_missing() {
     let dir = tempfile::tempdir().unwrap();
     let transport = FakeTransport::new(true, vec![Ok(AVATAR.to_vec())]);
     let nested = dir.path().join("not").join("yet").join("avatar");
-    let fetcher = AvatarFetcher::new(Arc::clone(&transport) as Arc<dyn AvatarTransport>, nested.clone());
+    let fetcher = AvatarFetcher::new(Arc::clone(&transport) as Arc<dyn AvatarTransport>,
+                                     nested.clone());
 
     let _ = fetcher.fetch("someone@example.com");
 
@@ -177,16 +185,19 @@ fn http_returns_the_response_body() {
 
 #[test]
 fn http_not_found_is_final() {
-    let url = serve_once("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    let url =
+        serve_once("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
 
-    assert_eq!(get_bytes(&direct_client(), &url), Err(AvatarFetchError::Final));
+    assert_eq!(get_bytes(&direct_client(), &url),
+               Err(AvatarFetchError::Final));
 }
 
 #[test]
 fn http_server_error_is_final() {
     let url = serve_once("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
 
-    assert_eq!(get_bytes(&direct_client(), &url), Err(AvatarFetchError::Final));
+    assert_eq!(get_bytes(&direct_client(), &url),
+               Err(AvatarFetchError::Final));
 }
 
 #[test]
@@ -195,5 +206,6 @@ fn http_connection_failure_is_transient() {
     let url = format!("http://{}/avatar", listener.local_addr().unwrap());
     drop(listener);
 
-    assert!(matches!(get_bytes(&direct_client(), &url), Err(AvatarFetchError::Transient(_))));
+    assert!(matches!(get_bytes(&direct_client(), &url),
+                     Err(AvatarFetchError::Transient(_))));
 }

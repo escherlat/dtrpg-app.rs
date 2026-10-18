@@ -49,9 +49,10 @@ impl AvatarTransport for HttpAvatarTransport {
     }
 
     fn get(&self, url: &str) -> Result<Vec<u8>, AvatarFetchError> {
-        let client = Client::builder().timeout(REQUEST_TIMEOUT)
-                                      .build()
-                                      .map_err(|error| AvatarFetchError::Transient(error.to_string()))?;
+        let client =
+            Client::builder().timeout(REQUEST_TIMEOUT)
+                             .build()
+                             .map_err(|error| AvatarFetchError::Transient(error.to_string()))?;
         get_bytes(&client, url)
     }
 }

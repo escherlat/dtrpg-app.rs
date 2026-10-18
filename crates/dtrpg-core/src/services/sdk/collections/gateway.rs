@@ -23,9 +23,8 @@ pub trait SdkCollectionsGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures.
-    fn list_product_lists(
-        &self, page: u32,
-    ) -> Result<ProductListCollectionResponse, CollectionsServiceError>;
+    fn list_product_lists(&self, page: u32)
+                          -> Result<ProductListCollectionResponse, CollectionsServiceError>;
 
     /// Lists the items within a specific product list, paginating through all
     /// pages.
@@ -33,9 +32,8 @@ pub trait SdkCollectionsGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures.
-    fn list_product_list_items(
-        &self, product_list_id: u64, page: u32,
-    ) -> Result<ProductListItemsResponse, CollectionsServiceError>;
+    fn list_product_list_items(&self, product_list_id: u64, page: u32)
+                               -> Result<ProductListItemsResponse, CollectionsServiceError>;
 
     /// Creates a new product list with the given name and returns it.
     ///
@@ -60,9 +58,8 @@ pub trait SdkCollectionsGateway: Send + Sync {
     /// # Errors
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures.
-    fn add_product_list_item(
-        &self, product_list_id: u64, product_id: u64,
-    ) -> Result<(), CollectionsServiceError>;
+    fn add_product_list_item(&self, product_list_id: u64, product_id: u64)
+                             -> Result<(), CollectionsServiceError>;
 
     /// Removes a product from a product list's membership.
     ///
@@ -70,9 +67,8 @@ pub trait SdkCollectionsGateway: Send + Sync {
     ///
     /// Returns [`CollectionsServiceError`] on network or session failures, or
     /// if no matching item can be found in the product list.
-    fn remove_product_list_item(
-        &self, product_list_id: u64, order_product_id: u64,
-    ) -> Result<(), CollectionsServiceError>;
+    fn remove_product_list_item(&self, product_list_id: u64, order_product_id: u64)
+                                -> Result<(), CollectionsServiceError>;
 }
 
 pub(super) struct HttpSdkCollectionsGateway {
@@ -80,9 +76,8 @@ pub(super) struct HttpSdkCollectionsGateway {
 }
 
 impl HttpSdkCollectionsGateway {
-    pub(super) fn from_keyring_with_tokens(
-        tokens: LoginTokens, token_status: TokenStatusHandle,
-    ) -> Result<Self, CollectionsServiceError> {
+    pub(super) fn from_keyring_with_tokens(tokens: LoginTokens, token_status: TokenStatusHandle)
+                                           -> Result<Self, CollectionsServiceError> {
         let connection = connection::connect_from_keyring_with_tokens(tokens, token_status)
             .map_err(map_connection_error)?;
         Ok(Self { connection })
@@ -98,16 +93,15 @@ impl HttpSdkCollectionsGateway {
     /// Paginates a product list's items looking for one whose
     /// `order_product_id`/`product_id` matches `member_id`, returning that
     /// entry's own `productListItemId`.
-    fn find_product_list_item_id(
-        &self, product_list_id: u64, member_id: u64,
-    ) -> Result<Option<u64>, CollectionsServiceError> {
+    fn find_product_list_item_id(&self, product_list_id: u64, member_id: u64)
+                                 -> Result<Option<u64>, CollectionsServiceError> {
         let mut page: u32 = 1;
         loop {
             let response = self.list_product_list_items(product_list_id, page)?;
 
             for item in &response.data {
                 if extract_member_id(item) == Some(member_id)
-                    && let Some(item_id) = extract_product_list_item_id(item)
+                   && let Some(item_id) = extract_product_list_item_id(item)
                 {
                     return Ok(Some(item_id));
                 }
@@ -122,35 +116,25 @@ impl HttpSdkCollectionsGateway {
 }
 
 impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
-    fn list_product_lists(
-        &self, page: u32,
-    ) -> Result<ProductListCollectionResponse, CollectionsServiceError> {
+    fn list_product_lists(&self, page: u32)
+                          -> Result<ProductListCollectionResponse, CollectionsServiceError> {
         self.connection
             .run(|client| async move {
-                client
-                    .list_product_lists(PageParams {
-                        page: Some(page),
-                        page_size: None,
-                    })
-                    .await
+                client.list_product_lists(PageParams { page:      Some(page),
+                                                       page_size: None, })
+                      .await
             })
             .map_err(map_client_error)
     }
 
-    fn list_product_list_items(
-        &self, product_list_id: u64, page: u32,
-    ) -> Result<ProductListItemsResponse, CollectionsServiceError> {
+    fn list_product_list_items(&self, product_list_id: u64, page: u32)
+                               -> Result<ProductListItemsResponse, CollectionsServiceError> {
         self.connection
             .run(|client| async move {
-                client
-                    .list_product_list_items(
-                        product_list_id,
-                        PageParams {
-                            page: Some(page),
-                            page_size: None,
-                        },
-                    )
-                    .await
+                client.list_product_list_items(product_list_id,
+                                               PageParams { page:      Some(page),
+                                                            page_size: None, })
+                      .await
             })
             .map_err(map_client_error)
     }
@@ -167,34 +151,31 @@ impl SdkCollectionsGateway for HttpSdkCollectionsGateway {
             .map_err(map_client_error)
     }
 
-    fn add_product_list_item(
-        &self, product_list_id: u64, product_id: u64,
-    ) -> Result<(), CollectionsServiceError> {
+    fn add_product_list_item(&self, product_list_id: u64, product_id: u64)
+                             -> Result<(), CollectionsServiceError> {
         self.connection
             .run(|client| async move {
-                client
-                    .add_product_list_item(product_list_id, product_id)
-                    .await
+                client.add_product_list_item(product_list_id, product_id)
+                      .await
             })
             .map_err(map_client_error)
             .map(|_| ())
     }
 
-    fn remove_product_list_item(
-        &self, product_list_id: u64, order_product_id: u64,
-    ) -> Result<(), CollectionsServiceError> {
+    fn remove_product_list_item(&self, product_list_id: u64, order_product_id: u64)
+                                -> Result<(), CollectionsServiceError> {
         // `DELETE /product_list_items/{id}` takes the item's own id, not the
         // product's id, so the matching list entry must be located first.
-        let product_list_item_id = self
-            .find_product_list_item_id(product_list_id, order_product_id)?
-            .ok_or_else(|| {
-                CollectionsServiceError::new(
+        let product_list_item_id = self.find_product_list_item_id(product_list_id,
+                                                                  order_product_id)?
+                                       .ok_or_else(|| {
+                                           CollectionsServiceError::new(
                     CollectionsServiceErrorKind::Network,
                     format!(
                         "Item {order_product_id} was not found in collection {product_list_id}."
                     ),
                 )
-            })?;
+                                       })?;
 
         self.connection
             .run(
@@ -220,15 +201,13 @@ impl UnavailableCollectionsGateway {
 }
 
 impl SdkCollectionsGateway for UnavailableCollectionsGateway {
-    fn list_product_lists(
-        &self, _page: u32,
-    ) -> Result<ProductListCollectionResponse, CollectionsServiceError> {
+    fn list_product_lists(&self, _page: u32)
+                          -> Result<ProductListCollectionResponse, CollectionsServiceError> {
         Err(self.error.clone())
     }
 
-    fn list_product_list_items(
-        &self, _product_list_id: u64, _page: u32,
-    ) -> Result<ProductListItemsResponse, CollectionsServiceError> {
+    fn list_product_list_items(&self, _product_list_id: u64, _page: u32)
+                               -> Result<ProductListItemsResponse, CollectionsServiceError> {
         Err(self.error.clone())
     }
 
@@ -240,15 +219,13 @@ impl SdkCollectionsGateway for UnavailableCollectionsGateway {
         Err(self.error.clone())
     }
 
-    fn add_product_list_item(
-        &self, _product_list_id: u64, _product_id: u64,
-    ) -> Result<(), CollectionsServiceError> {
+    fn add_product_list_item(&self, _product_list_id: u64, _product_id: u64)
+                             -> Result<(), CollectionsServiceError> {
         Err(self.error.clone())
     }
 
-    fn remove_product_list_item(
-        &self, _product_list_id: u64, _order_product_id: u64,
-    ) -> Result<(), CollectionsServiceError> {
+    fn remove_product_list_item(&self, _product_list_id: u64, _order_product_id: u64)
+                                -> Result<(), CollectionsServiceError> {
         Err(self.error.clone())
     }
 }

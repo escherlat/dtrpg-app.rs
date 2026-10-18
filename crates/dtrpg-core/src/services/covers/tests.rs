@@ -26,7 +26,7 @@ const PNG: &[u8] = b"\x89PNG\r\n\x1a\n-cover";
 struct FakeTransport {
     reachable: bool,
     responses: Mutex<VecDeque<Result<Vec<u8>, CoverFetchError>>>,
-    gets: AtomicUsize,
+    gets:      AtomicUsize,
 }
 
 impl FakeTransport {
@@ -48,12 +48,17 @@ impl CoverTransport for FakeTransport {
 
     fn get(&self, _url: &str) -> Result<Vec<u8>, CoverFetchError> {
         self.gets.fetch_add(1, Ordering::SeqCst);
-        self.responses.lock().unwrap().pop_front().expect("fake transport ran out of responses")
+        self.responses
+            .lock()
+            .unwrap()
+            .pop_front()
+            .expect("fake transport ran out of responses")
     }
 }
 
 fn fetcher(transport: &Arc<FakeTransport>, root: &tempfile::TempDir) -> CoverFetcher {
-    CoverFetcher::new(Arc::clone(transport) as Arc<dyn CoverTransport>, root.path().to_path_buf())
+    CoverFetcher::new(Arc::clone(transport) as Arc<dyn CoverTransport>,
+                      root.path().to_path_buf())
 }
 
 fn not_cancelled() -> AtomicBool {
@@ -62,8 +67,8 @@ fn not_cancelled() -> AtomicBool {
 
 /// A failure that asks for no wait, so retries do not slow the tests down.
 fn rate_limited() -> CoverFetchError {
-    CoverFetchError { message: "rate limited (HTTP 429)".to_owned(),
-                      retry_after: Some(Duration::ZERO) }
+    CoverFetchError { message:     "rate limited (HTTP 429)".to_owned(),
+                      retry_after: Some(Duration::ZERO), }
 }
 
 #[test]
@@ -82,7 +87,8 @@ fn a_cache_hit_makes_no_request() {
     let root = tempfile::tempdir().unwrap();
     let transport = FakeTransport::new(true, vec![Ok(PNG.to_vec())]);
     let fetcher = fetcher(&transport, &root);
-    fetcher.fetch("item", "https://x/c", false, &not_cancelled()).unwrap();
+    fetcher.fetch("item", "https://x/c", false, &not_cancelled())
+           .unwrap();
 
     let bytes = fetcher.fetch("item", "https://x/c", false, &not_cancelled());
 
@@ -96,7 +102,8 @@ fn forcing_the_network_skips_the_cache_and_replaces_it() {
     let newer = b"\x89PNG\r\n\x1a\n-newer".to_vec();
     let transport = FakeTransport::new(true, vec![Ok(PNG.to_vec()), Ok(newer.clone())]);
     let fetcher = fetcher(&transport, &root);
-    fetcher.fetch("item", "https://x/c", false, &not_cancelled()).unwrap();
+    fetcher.fetch("item", "https://x/c", false, &not_cancelled())
+           .unwrap();
 
     let bytes = fetcher.fetch("item", "https://x/c", true, &not_cancelled());
 
@@ -120,7 +127,8 @@ fn an_unreachable_host_fails_without_a_request() {
 fn a_cache_hit_works_while_offline() {
     let root = tempfile::tempdir().unwrap();
     let online = FakeTransport::new(true, vec![Ok(PNG.to_vec())]);
-    fetcher(&online, &root).fetch("item", "https://x/c", false, &not_cancelled()).unwrap();
+    fetcher(&online, &root).fetch("item", "https://x/c", false, &not_cancelled())
+                           .unwrap();
     let offline = FakeTransport::new(false, vec![]);
 
     let bytes = fetcher(&offline, &root).fetch("item", "https://x/c", false, &not_cancelled());
@@ -142,7 +150,8 @@ fn a_failed_request_is_retried() {
 #[test]
 fn retries_stop_after_the_maximum_attempts() {
     let root = tempfile::tempdir().unwrap();
-    let failures = (0..IMAGE_CACHE_MAX_ATTEMPTS).map(|_| Err(rate_limited())).collect();
+    let failures = (0..IMAGE_CACHE_MAX_ATTEMPTS).map(|_| Err(rate_limited()))
+                                                .collect();
     let transport = FakeTransport::new(true, failures);
 
     let error = fetcher(&transport, &root).fetch("item", "https://x/c", false, &not_cancelled())
@@ -158,8 +167,9 @@ fn a_cancelled_fetch_makes_no_request() {
     let root = tempfile::tempdir().unwrap();
     let transport = FakeTransport::new(true, vec![]);
 
-    let error = fetcher(&transport, &root).fetch("item", "https://x/c", false, &AtomicBool::new(true))
-                                          .unwrap_err();
+    let error =
+        fetcher(&transport, &root).fetch("item", "https://x/c", false, &AtomicBool::new(true))
+                                  .unwrap_err();
 
     assert!(error.message.contains("cancelled"));
     assert_eq!(transport.gets(), 0);

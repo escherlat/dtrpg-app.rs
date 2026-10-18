@@ -164,13 +164,14 @@ impl LibraryController {
         let spec = JobSpec { kind: JobKind::Check,
                              priority,
                              label: id.to_string() };
-        let job_id = self.work.submit(spec, move |_context| {
-                                 // A failed check is still a result: the caller decides
-                                 // from the error whether the item is gone or the
-                                 // network was merely unavailable.
-                                 job_result.put(service.get_item(numeric_id));
-                                 Ok(())
-                             });
+        let job_id =
+            self.work.submit(spec, move |_context| {
+                         // A failed check is still a result: the caller decides
+                         // from the error whether the item is gone or the
+                         // network was merely unavailable.
+                         job_result.put(service.get_item(numeric_id));
+                         Ok(())
+                     });
         self.check_jobs.add(job_id, CheckJob::new(id, result));
     }
 

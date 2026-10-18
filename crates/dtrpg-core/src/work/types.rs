@@ -62,11 +62,11 @@ pub enum Priority {
 #[derive(Clone, Debug)]
 pub struct JobSpec {
     /// What the job does.
-    pub kind: JobKind,
+    pub kind:     JobKind,
     /// How soon it should run relative to other pending jobs.
     pub priority: Priority,
     /// A short description, for display by whoever observes the queue.
-    pub label: String,
+    pub label:    String,
 }
 
 /// What a job's closure returns. `Err` carries a message for the user or log.
@@ -90,9 +90,9 @@ pub type JobEvents = tokio::sync::mpsc::UnboundedReceiver<JobEvent>;
 /// A change in a job's lifecycle.
 ///
 /// Events for one job arrive in order: `Started`, any number of `Progress` and
-/// `Retrying`, then `Finished`. A job cancelled while pending only ever produces
-/// `Finished`. Events from different jobs may interleave, and an event can
-/// arrive before the call that submitted its job has returned.
+/// `Retrying`, then `Finished`. A job cancelled while pending only ever
+/// produces `Finished`. Events from different jobs may interleave, and an event
+/// can arrive before the call that submitted its job has returned.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum JobEvent {
     /// The job left the pending list and began running.
@@ -103,25 +103,25 @@ pub enum JobEvent {
     /// The job reported how far along it is.
     Progress {
         /// The job reporting.
-        id: JobId,
+        id:    JobId,
         /// Units completed so far, such as bytes.
-        done: u64,
+        done:  u64,
         /// Total units, when known.
         total: Option<u64>,
     },
     /// The job's latest attempt failed and it will try again after `delay`.
     Retrying {
         /// The job retrying.
-        id: JobId,
+        id:      JobId,
         /// The attempt about to be made, counting the first as 1.
         attempt: u32,
         /// How long the job waits before that attempt.
-        delay: Duration,
+        delay:   Duration,
     },
     /// The job is over and its slot is free.
     Finished {
         /// The job that finished.
-        id: JobId,
+        id:      JobId,
         /// How it ended.
         outcome: Outcome,
     },

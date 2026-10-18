@@ -44,7 +44,8 @@ fn next_event(events: &mut JobEvents) -> JobEvent {
 /// Reads events until `id` finishes, returning its outcome.
 fn outcome_of(events: &mut JobEvents, id: JobId) -> Outcome {
     loop {
-        if let JobEvent::Finished { id: finished, outcome } = next_event(events)
+        if let JobEvent::Finished { id: finished,
+                                    outcome, } = next_event(events)
            && finished == id
         {
             return outcome;
@@ -53,8 +54,7 @@ fn outcome_of(events: &mut JobEvents, id: JobId) -> Outcome {
 }
 
 /// Reads events until `count` jobs have finished, whatever order they end in.
-fn finished_outcomes(events: &mut JobEvents, count: usize)
-                     -> Vec<(JobId, Outcome)> {
+fn finished_outcomes(events: &mut JobEvents, count: usize) -> Vec<(JobId, Outcome)> {
     let mut finished = Vec::new();
     while finished.len() < count {
         if let JobEvent::Finished { id, outcome } = next_event(events) {
@@ -67,7 +67,8 @@ fn finished_outcomes(events: &mut JobEvents, count: usize)
 fn wait_until(mut condition: impl FnMut() -> bool) {
     let deadline = Instant::now() + WAIT;
     while !condition() {
-        assert!(Instant::now() < deadline, "condition not met within {WAIT:?}");
+        assert!(Instant::now() < deadline,
+                "condition not met within {WAIT:?}");
         thread::sleep(Duration::from_millis(2));
     }
 }
@@ -75,7 +76,7 @@ fn wait_until(mut condition: impl FnMut() -> bool) {
 /// Holds jobs until the test opens it.
 #[derive(Default)]
 struct Gate {
-    open: Mutex<bool>,
+    open:    Mutex<bool>,
     changed: Condvar,
 }
 
@@ -120,9 +121,12 @@ fn a_job_reports_started_then_finished() {
 #[test]
 fn a_failing_job_reports_its_message() {
     let (queue, mut events) = new_queue(3);
-    let id = queue.submit(background(JobKind::Download), |_context| Err("disk full".to_owned()));
+    let id = queue.submit(background(JobKind::Download), |_context| {
+                      Err("disk full".to_owned())
+                  });
 
-    assert_eq!(outcome_of(&mut events, id), Outcome::Failed("disk full".to_owned()));
+    assert_eq!(outcome_of(&mut events, id),
+               Outcome::Failed("disk full".to_owned()));
 }
 
 #[test]
@@ -179,7 +183,8 @@ fn the_limit_bounds_how_many_jobs_run_at_once() {
     wait_until(|| current.load(Ordering::SeqCst) == 2);
     gate.open();
     let finished = finished_outcomes(&mut events, 4);
-    assert!(finished.iter().all(|(_, outcome)| *outcome == Outcome::Succeeded));
+    assert!(finished.iter()
+                    .all(|(_, outcome)| *outcome == Outcome::Succeeded));
     assert_eq!(peak.load(Ordering::SeqCst), 2);
 }
 
@@ -370,7 +375,8 @@ fn a_job_can_pass_its_cancel_flag_to_other_code() {
     let seen_in_job = Arc::clone(&seen);
 
     let id = queue.submit(background(JobKind::Download), move |context| {
-                      seen_in_job.store(context.cancel_flag().load(Ordering::SeqCst), Ordering::SeqCst);
+                      seen_in_job.store(context.cancel_flag().load(Ordering::SeqCst),
+                                        Ordering::SeqCst);
                       Ok(())
                   });
 
@@ -401,7 +407,11 @@ fn every_kind_of_job_counts_against_the_same_limit() {
     let (queue, mut events) = new_queue(2);
     let gate = Arc::new(Gate::default());
     let entered = Arc::new(AtomicUsize::new(0));
-    for kind in [JobKind::Thumbnail, JobKind::Download, JobKind::Thumbnail, JobKind::Download] {
+    for kind in [JobKind::Thumbnail,
+                 JobKind::Download,
+                 JobKind::Thumbnail,
+                 JobKind::Download]
+    {
         submit_gated(&queue, background(kind), &gate, &entered);
     }
 
@@ -412,7 +422,8 @@ fn every_kind_of_job_counts_against_the_same_limit() {
 
     gate.open();
     let finished = finished_outcomes(&mut events, 4);
-    assert!(finished.iter().all(|(_, outcome)| *outcome == Outcome::Succeeded));
+    assert!(finished.iter()
+                    .all(|(_, outcome)| *outcome == Outcome::Succeeded));
 }
 
 #[test]

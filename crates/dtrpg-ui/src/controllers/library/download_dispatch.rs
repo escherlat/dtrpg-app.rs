@@ -35,21 +35,21 @@ impl LibraryController {
                              priority: Priority::Interactive,
                              label:    format!("{title}: {file_name}"), };
         let id = self.work.submit(spec, move |context| {
-                             let path = resolved_file_path_in_collections(&StorageConfig::load(),
-                                                                          &item,
-                                                                          &file,
-                                                                          &collection_ids);
-                             job_dest.put(path.clone());
-                             let mut on_retry =
-                                 |attempt, delay| context.report_retry(attempt, delay);
-                             let mut on_progress =
-                                 |received, total| context.report_progress(received, total);
-                             let control = DownloadControl::new(context.cancel_flag())
+                              let path = resolved_file_path_in_collections(&StorageConfig::load(),
+                                                                           &item,
+                                                                           &file,
+                                                                           &collection_ids);
+                              job_dest.put(path.clone());
+                              let mut on_retry =
+                                  |attempt, delay| context.report_retry(attempt, delay);
+                              let mut on_progress =
+                                  |received, total| context.report_progress(received, total);
+                              let control = DownloadControl::new(context.cancel_flag())
                                  .on_retry(&mut on_retry)
                                  .on_progress(&mut on_progress);
-                             service.download_item(order_product_id, index, &path, control)
-                                    .map_err(|error| error.to_string())
-                         });
+                              service.download_item(order_product_id, index, &path, control)
+                                     .map_err(|error| error.to_string())
+                          });
         self.download_jobs.add(id,
                                DownloadJob { key,
                                              title,
@@ -175,12 +175,14 @@ impl LibraryController {
                                error = %error,
                                "download failed");
                 if let Some(activity_id) = activity_id {
-                    self.activity.update(cx, |a, cx| a.error(activity_id, error, cx));
+                    self.activity
+                        .update(cx, |a, cx| a.error(activity_id, error, cx));
                 }
             }
             _ => {
                 if let Some(activity_id) = activity_id {
-                    self.activity.update(cx, |a, cx| a.complete(activity_id, cx));
+                    self.activity
+                        .update(cx, |a, cx| a.complete(activity_id, cx));
                 }
             }
         }

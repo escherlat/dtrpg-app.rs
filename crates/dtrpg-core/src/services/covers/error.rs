@@ -9,7 +9,7 @@ use std::{fmt, time::Duration};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoverFetchError {
     /// A description of the failure, suitable for logging as-is.
-    pub message: String,
+    pub message:     String,
     /// The wait the server asked for, when the failure was an HTTP 429
     /// response that included a `Retry-After` header.
     pub retry_after: Option<Duration>,
@@ -19,7 +19,8 @@ impl CoverFetchError {
     /// An error with no server-specified wait.
     #[must_use]
     pub fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into(), retry_after: None }
+        Self { message:     message.into(),
+               retry_after: None, }
     }
 }
 

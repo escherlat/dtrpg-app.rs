@@ -67,15 +67,16 @@ impl LibraryController {
                              priority,
                              label: key.to_string() };
         let id = self.work.submit(spec, move |context| {
-                             let fetched = fetcher.fetch(&job_key,
-                                                         &job_url,
-                                                         force_network,
-                                                         context.cancel_flag())
-                                                  .map_err(|error| error.to_string())?;
-                             job_bytes.put(fetched);
-                             Ok(())
-                         });
-        self.thumbnail_jobs.add(id, ThumbnailJob { key, url, bytes });
+                              let fetched = fetcher.fetch(&job_key,
+                                                          &job_url,
+                                                          force_network,
+                                                          context.cancel_flag())
+                                                   .map_err(|error| error.to_string())?;
+                              job_bytes.put(fetched);
+                              Ok(())
+                          });
+        self.thumbnail_jobs
+            .add(id, ThumbnailJob { key, url, bytes });
     }
 
     /// Cancels the fetch for `key` if it has not started. A fetch already
@@ -115,7 +116,8 @@ impl LibraryController {
 
     /// Applies a finished fetch: caches the image (or records the failure),
     /// then advances the batch's progress.
-    pub(super) fn thumbnail_finished(&mut self, id: JobId, outcome: Outcome, cx: &mut Context<Self>) {
+    pub(super) fn thumbnail_finished(&mut self, id: JobId, outcome: Outcome,
+                                     cx: &mut Context<Self>) {
         let Some(job) = self.thumbnail_jobs.finish(id)
         else {
             // Cancelled before it started, and already forgotten.
@@ -165,17 +167,20 @@ impl LibraryController {
         let processed = self.thumbnail_processed;
         let remaining = self.thumbnail_jobs.outstanding();
         if remaining == 0 {
-            self.activity.update(cx, |a, cx| a.complete(activity_id, cx));
+            self.activity
+                .update(cx, |a, cx| a.complete(activity_id, cx));
             self.thumbnail_activity_id = None;
             self.thumbnail_processed = 0;
             return;
         }
 
         let label = if self.thumbnail_refresh_active {
-            t!("activity.refreshing_thumbnails_remaining", remaining = remaining).to_string()
+            t!("activity.refreshing_thumbnails_remaining",
+               remaining = remaining).to_string()
         }
         else {
-            t!("activity.loading_thumbnails_remaining", remaining = remaining).to_string()
+            t!("activity.loading_thumbnails_remaining",
+               remaining = remaining).to_string()
         };
         let total = (processed + remaining) as f32;
         let progress = processed as f32 / total;
@@ -257,14 +262,14 @@ impl LibraryController {
     /// skip items already present in the cache — every eligible item is
     /// re-queued with a forced network re-fetch.
     pub fn refresh_all_thumbnails(&mut self, cx: &mut Context<Self>) {
-        let to_enqueue: Vec<(Arc<str>, Arc<str>)> =
-            self.catalog
-                .iter()
-                .filter_map(|item| {
-                    let url = item.cover_url.as_ref()?;
-                    Some((Arc::clone(&item.id), Arc::clone(url)))
-                })
-                .collect();
+        let to_enqueue: Vec<(Arc<str>, Arc<str>)> = self.catalog
+                                                        .iter()
+                                                        .filter_map(|item| {
+                                                            let url = item.cover_url.as_ref()?;
+                                                            Some((Arc::clone(&item.id),
+                                                                  Arc::clone(url)))
+                                                        })
+                                                        .collect();
 
         if to_enqueue.is_empty() {
             cx.emit(ThumbnailRefreshNoOp);

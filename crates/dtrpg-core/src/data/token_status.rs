@@ -18,7 +18,7 @@ pub struct TokenStatus {
     pub acquired_at: i64,
     /// When the token stops being accepted, or `None` if the token does not
     /// say.
-    pub expires_at: Option<i64>,
+    pub expires_at:  Option<i64>,
 }
 
 /// The timing claims of an access token's JWT payload.
@@ -36,10 +36,8 @@ impl TokenStatus {
     /// app got the token) is used as the acquisition time instead.
     pub fn from_access_token(access_token: &str, received_at: i64) -> Self {
         let claims = decode_claims(access_token);
-        Self {
-            acquired_at: claims.as_ref().and_then(|c| c.iat).unwrap_or(received_at),
-            expires_at: claims.and_then(|c| c.exp),
-        }
+        Self { acquired_at: claims.as_ref().and_then(|c| c.iat).unwrap_or(received_at),
+               expires_at:  claims.and_then(|c| c.exp), }
     }
 }
 
@@ -89,26 +87,18 @@ mod tests {
 
         let status = TokenStatus::from_access_token(&token, 5);
 
-        assert_eq!(
-            status,
-            TokenStatus {
-                acquired_at: 1_768_955_233,
-                expires_at: Some(1_768_976_833),
-            }
-        );
+        assert_eq!(status,
+                   TokenStatus { acquired_at: 1_768_955_233,
+                                 expires_at:  Some(1_768_976_833), });
     }
 
     #[test]
     fn falls_back_to_receipt_time_when_token_is_not_a_jwt() {
         let status = TokenStatus::from_access_token("not-a-jwt", 1_000);
 
-        assert_eq!(
-            status,
-            TokenStatus {
-                acquired_at: 1_000,
-                expires_at: None,
-            }
-        );
+        assert_eq!(status,
+                   TokenStatus { acquired_at: 1_000,
+                                 expires_at:  None, });
     }
 
     #[test]
@@ -117,13 +107,9 @@ mod tests {
 
         let status = TokenStatus::from_access_token(&token, 1_000);
 
-        assert_eq!(
-            status,
-            TokenStatus {
-                acquired_at: 1_000,
-                expires_at: Some(2_000),
-            }
-        );
+        assert_eq!(status,
+                   TokenStatus { acquired_at: 1_000,
+                                 expires_at:  Some(2_000), });
     }
 
     #[test]
@@ -132,10 +118,8 @@ mod tests {
         let other = handle.clone();
         assert_eq!(handle.get(), None);
 
-        let status = TokenStatus {
-            acquired_at: 1,
-            expires_at: Some(2),
-        };
+        let status = TokenStatus { acquired_at: 1,
+                                   expires_at:  Some(2), };
         other.set(status);
         assert_eq!(handle.get(), Some(status));
 

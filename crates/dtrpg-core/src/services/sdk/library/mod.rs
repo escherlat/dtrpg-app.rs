@@ -55,9 +55,9 @@ impl RustSdkLibraryService {
     /// Reads only the API key from the platform keyring; tokens are never
     /// persisted to the keychain. Falls back to [`UnavailableSdkGateway`]
     /// when the API key cannot be found.
-    pub fn from_keyring_with_tokens(
-        tokens: crate::services::LoginTokens, token_status: TokenStatusHandle,
-    ) -> Self {
+    pub fn from_keyring_with_tokens(tokens: crate::services::LoginTokens,
+                                    token_status: TokenStatusHandle)
+                                    -> Self {
         match HttpSdkLibraryGateway::from_keyring_with_tokens(tokens, token_status) {
             Ok(gateway) => Self::new(Box::new(gateway)),
             Err(error) => Self::new(Box::new(UnavailableSdkGateway::new(error))),
@@ -72,10 +72,9 @@ impl LibraryService for RustSdkLibraryService {
         Ok(all_items)
     }
 
-    fn list_items_paged(
-        &self, on_page: &mut dyn FnMut(Vec<LibraryItem>),
-        mut on_total: Option<&mut dyn FnMut(usize)>,
-    ) -> Result<(), LibraryServiceError> {
+    fn list_items_paged(&self, on_page: &mut dyn FnMut(Vec<LibraryItem>),
+                        mut on_total: Option<&mut dyn FnMut(usize)>)
+                        -> Result<(), LibraryServiceError> {
         let mut all_included: Vec<IncludedItem> = Vec::new();
         let mut page: u32 = 1;
         let mut global_index: u32 = 0;
@@ -83,25 +82,22 @@ impl LibraryService for RustSdkLibraryService {
         let page_size: u32 = 100;
 
         loop {
-            let params = LibraryItemsParams {
-                page: Some(page),
-                page_size: Some(page_size),
-                get_checksum: Some(false),
-                get_filters: Some(true),
-                library: Some(true),
-                archived: Some(false),
-                updated_date_after: None,
-            };
+            let params = LibraryItemsParams { page:               Some(page),
+                                              page_size:          Some(page_size),
+                                              get_checksum:       Some(false),
+                                              get_filters:        Some(true),
+                                              library:            Some(true),
+                                              archived:           Some(false),
+                                              updated_date_after: None, };
 
             let response = self.gateway.list_order_products(params)?;
 
             // Derive estimated total from `links.last` on the first page
             // response.
             if !total_reported {
-                if let (Some(cb), Some(last_page)) = (
-                    on_total.as_deref_mut(),
-                    last_page_from_links(&response.links),
-                ) {
+                if let (Some(cb), Some(last_page)) =
+                    (on_total.as_deref_mut(), last_page_from_links(&response.links))
+                {
                     let estimated = (last_page as usize).saturating_mul(page_size as usize);
                     cb(estimated);
                 }
@@ -112,16 +108,15 @@ impl LibraryService for RustSdkLibraryService {
             // — rebuilt fresh per page rather than accumulated,
             // since each ordered product's relationship points at
             // its own distinct `Product` resource.
-            let products = response
-                .included
-                .as_deref()
-                .map(product_lookup)
-                .unwrap_or_default();
+            let products = response.included
+                                   .as_deref()
+                                   .map(product_lookup)
+                                   .unwrap_or_default();
 
             if let Some(included) = &response.included {
                 for entry in included {
                     if entry.resource_type == "Publisher"
-                        && !all_included.iter().any(|p| p.id == entry.id)
+                       && !all_included.iter().any(|p| p.id == entry.id)
                     {
                         all_included.push(entry.clone());
                     }
@@ -130,14 +125,14 @@ impl LibraryService for RustSdkLibraryService {
 
             let has_next = response.links.next.is_some();
             let publishers = publisher_lookup(&all_included);
-            let page_items: Vec<LibraryItem> = response
-                .data
-                .iter()
-                .enumerate()
-                .map(|(i, item)| {
-                    map_order_product(item, &publishers, &products, global_index + i as u32)
-                })
-                .collect();
+            let page_items: Vec<LibraryItem> =
+                response.data
+                        .iter()
+                        .enumerate()
+                        .map(|(i, item)| {
+                            map_order_product(item, &publishers, &products, global_index + i as u32)
+                        })
+                        .collect();
 
             global_index += page_items.len() as u32;
             on_page(page_items);
@@ -156,16 +151,14 @@ impl LibraryService for RustSdkLibraryService {
         // The detail endpoint sideloads the same Publisher/Product `included`
         // array as the list endpoint; resolve it the same way rather
         // than falling back to `attributes.product` embedding alone.
-        let products = response
-            .included
-            .as_deref()
-            .map(product_lookup)
-            .unwrap_or_default();
-        let publishers = response
-            .included
-            .as_deref()
-            .map(publisher_lookup)
-            .unwrap_or_default();
+        let products = response.included
+                               .as_deref()
+                               .map(product_lookup)
+                               .unwrap_or_default();
+        let publishers = response.included
+                                 .as_deref()
+                                 .map(publisher_lookup)
+                                 .unwrap_or_default();
 
         Ok(map_order_product(&response.data, &publishers, &products, 0))
     }
@@ -177,96 +170,92 @@ impl LibraryService for RustSdkLibraryService {
         // changes without fetching all pages. Falls back to the single
         // returned page's length when there is no `last` link (i.e. the
         // whole library fits on one page of size 1: 0 or 1 items).
-        let params = LibraryItemsParams {
-            page: Some(1),
-            page_size: Some(1),
-            get_checksum: Some(false),
-            get_filters: Some(false),
-            library: Some(true),
-            archived: Some(false),
-            updated_date_after: None,
-        };
+        let params = LibraryItemsParams { page:               Some(1),
+                                          page_size:          Some(1),
+                                          get_checksum:       Some(false),
+                                          get_filters:        Some(false),
+                                          library:            Some(true),
+                                          archived:           Some(false),
+                                          updated_date_after: None, };
 
         Some(self.gateway.list_order_products(params).map(|response| {
-            last_page_from_links(&response.links)
+                                                         last_page_from_links(&response.links)
                 .map(|last_page| last_page as usize)
                 .unwrap_or(response.data.len())
-        }))
+                                                     }))
     }
 
-    fn list_items_updated_since(
-        &self, since_iso8601: &str, on_page: &mut dyn FnMut(Vec<LibraryItem>),
-    ) -> Option<Result<(), LibraryServiceError>> {
+    fn list_items_updated_since(&self, since_iso8601: &str,
+                                on_page: &mut dyn FnMut(Vec<LibraryItem>))
+                                -> Option<Result<(), LibraryServiceError>> {
         Some((|| {
-            let mut all_included: Vec<IncludedItem> = Vec::new();
-            let mut page: u32 = 1;
-            let mut global_index: u32 = 0;
-            let page_size: u32 = 100;
+                 let mut all_included: Vec<IncludedItem> = Vec::new();
+                 let mut page: u32 = 1;
+                 let mut global_index: u32 = 0;
+                 let page_size: u32 = 100;
 
-            loop {
-                let params = LibraryItemsParams {
-                    page: Some(page),
-                    page_size: Some(page_size),
-                    get_checksum: Some(false),
-                    get_filters: Some(true),
-                    library: Some(true),
-                    archived: Some(false),
-                    updated_date_after: Some(since_iso8601.to_string()),
-                };
+                 loop {
+                     let params = LibraryItemsParams { page:               Some(page),
+                                                       page_size:          Some(page_size),
+                                                       get_checksum:       Some(false),
+                                                       get_filters:        Some(true),
+                                                       library:            Some(true),
+                                                       archived:           Some(false),
+                                                       updated_date_after:
+                                                           Some(since_iso8601.to_string()), };
 
-                let response = self.gateway.list_order_products(params)?;
+                     let response = self.gateway.list_order_products(params)?;
 
-                let products = response
-                    .included
-                    .as_deref()
-                    .map(product_lookup)
-                    .unwrap_or_default();
+                     let products = response.included
+                                            .as_deref()
+                                            .map(product_lookup)
+                                            .unwrap_or_default();
 
-                if let Some(included) = &response.included {
-                    for entry in included {
-                        if entry.resource_type == "Publisher"
-                            && !all_included.iter().any(|p| p.id == entry.id)
-                        {
-                            all_included.push(entry.clone());
-                        }
-                    }
-                }
+                     if let Some(included) = &response.included {
+                         for entry in included {
+                             if entry.resource_type == "Publisher"
+                                && !all_included.iter().any(|p| p.id == entry.id)
+                             {
+                                 all_included.push(entry.clone());
+                             }
+                         }
+                     }
 
-                let has_next = response.links.next.is_some();
-                let publishers = publisher_lookup(&all_included);
-                let page_items: Vec<LibraryItem> = response
-                    .data
-                    .iter()
-                    .enumerate()
-                    .map(|(i, item)| {
-                        map_order_product(item, &publishers, &products, global_index + i as u32)
-                    })
-                    .collect();
+                     let has_next = response.links.next.is_some();
+                     let publishers = publisher_lookup(&all_included);
+                     let page_items: Vec<LibraryItem> = response.data
+                                                                .iter()
+                                                                .enumerate()
+                                                                .map(|(i, item)| {
+                                                                    map_order_product(item,
+                                                                                      &publishers,
+                                                                                      &products,
+                                                                                      global_index
+                                                                                      + i as u32)
+                                                                })
+                                                                .collect();
 
-                global_index += page_items.len() as u32;
-                on_page(page_items);
+                     global_index += page_items.len() as u32;
+                     on_page(page_items);
 
-                if !has_next {
-                    break;
-                }
-                page += 1;
-            }
+                     if !has_next {
+                         break;
+                     }
+                     page += 1;
+                 }
 
-            Ok(())
-        })())
+                 Ok(())
+             })())
     }
 
-    fn download_item(
-        &self, order_product_id: u64, index: u32, dest: &std::path::Path,
-        control: DownloadControl<'_>,
-    ) -> Result<(), LibraryServiceError> {
-        download::download_item(
-            self.gateway.as_ref(),
-            order_product_id,
-            index,
-            dest,
-            control,
-        )
+    fn download_item(&self, order_product_id: u64, index: u32, dest: &std::path::Path,
+                     control: DownloadControl<'_>)
+                     -> Result<(), LibraryServiceError> {
+        download::download_item(self.gateway.as_ref(),
+                                order_product_id,
+                                index,
+                                dest,
+                                control)
     }
 }
 
@@ -284,7 +273,7 @@ mod tests {
     use super::*;
 
     struct FakeSdkGateway {
-        list_result: Result<OrderProductListResponse, LibraryServiceError>,
+        list_result:   Result<OrderProductListResponse, LibraryServiceError>,
         detail_result: Result<OrderProductItemResponse, LibraryServiceError>,
     }
 
@@ -301,71 +290,54 @@ mod tests {
                 product: None,
                 order: None,
             });
-            Self {
-                list_result: Ok(OrderProductListResponse {
-                    links: pagination_links(None),
-                    meta: PaginationMeta {
-                        items_per_page: 100,
-                        current_page: 1,
-                    },
-                    data: vec![item.clone()],
-                    included: Some(vec![IncludedItem {
-                        id: "/api/vBeta/publishers/7".to_string(),
-                        resource_type: "Publisher".to_string(),
-                        attributes: serde_json::json!({
-                            "name": "Lantern Press",
-                            "publisherId": 7,
-                            "slug": "lantern-press",
-                        }),
-                    }]),
-                }),
-                detail_result: Ok(OrderProductItemResponse {
-                    data: item,
-                    included: Some(vec![IncludedItem {
-                        id: "/api/vBeta/publishers/7".to_string(),
-                        resource_type: "Publisher".to_string(),
-                        attributes: serde_json::json!({
-                            "name": "Lantern Press",
-                            "publisherId": 7,
-                            "slug": "lantern-press",
-                        }),
-                    }]),
-                }),
-            }
+            Self { list_result:
+                       Ok(OrderProductListResponse { links:    pagination_links(None),
+                                                     meta:     PaginationMeta { items_per_page: 100,
+                                                                                current_page:   1, },
+                                                     data:     vec![item.clone()],
+                                                     included: Some(vec![
+                    IncludedItem { id:            "/api/vBeta/publishers/7".to_string(),
+                                   resource_type: "Publisher".to_string(),
+                                   attributes:    serde_json::json!({
+                                       "name": "Lantern Press",
+                                       "publisherId": 7,
+                                       "slug": "lantern-press",
+                                   }), },
+                ]), }),
+                   detail_result: Ok(OrderProductItemResponse { data:     item,
+                                                                included: Some(vec![
+                IncludedItem { id:            "/api/vBeta/publishers/7".to_string(),
+                               resource_type: "Publisher".to_string(),
+                               attributes:    serde_json::json!({
+                                   "name": "Lantern Press",
+                                   "publisherId": 7,
+                                   "slug": "lantern-press",
+                               }), },
+            ]), }), }
         }
 
         fn session_error() -> Self {
-            let error = LibraryServiceError::new(
-                LibraryServiceErrorKind::Session,
-                "SDK session expired in test.",
-            );
-            Self {
-                list_result: Err(error.clone()),
-                detail_result: Err(error),
-            }
+            let error = LibraryServiceError::new(LibraryServiceErrorKind::Session,
+                                                 "SDK session expired in test.");
+            Self { list_result:   Err(error.clone()),
+                   detail_result: Err(error), }
         }
     }
 
     impl SdkLibraryGateway for FakeSdkGateway {
-        fn list_order_products(
-            &self, _params: LibraryItemsParams,
-        ) -> Result<OrderProductListResponse, LibraryServiceError> {
+        fn list_order_products(&self, _params: LibraryItemsParams)
+                               -> Result<OrderProductListResponse, LibraryServiceError> {
             self.list_result.clone()
         }
 
-        fn get_order_product(
-            &self, _id: u64,
-        ) -> Result<OrderProductItemResponse, LibraryServiceError> {
+        fn get_order_product(&self, _id: u64)
+                             -> Result<OrderProductItemResponse, LibraryServiceError> {
             self.detail_result.clone()
         }
 
-        fn prepare_download(
-            &self, _order_product_id: u64, _index: u32,
-        ) -> Result<serde_json::Value, LibraryServiceError> {
-            Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::NotFound,
-                "not used",
-            ))
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
     }
 
@@ -376,50 +348,37 @@ mod tests {
     }
 
     impl SdkLibraryGateway for TwoPageGateway {
-        fn list_order_products(
-            &self, _params: LibraryItemsParams,
-        ) -> Result<OrderProductListResponse, LibraryServiceError> {
+        fn list_order_products(&self, _params: LibraryItemsParams)
+                               -> Result<OrderProductListResponse, LibraryServiceError> {
             let call = self.call_count.fetch_add(1, Ordering::Relaxed);
 
             if call == 0 {
-                Ok(OrderProductListResponse {
-                    links: pagination_links(Some("page=2".to_string())),
-                    meta: PaginationMeta {
-                        items_per_page: 1,
-                        current_page: 1,
-                    },
-                    data: vec![order_product_item(42, "Item Page One")],
-                    included: None,
-                })
-            } else {
-                Ok(OrderProductListResponse {
-                    links: pagination_links(None),
-                    meta: PaginationMeta {
-                        items_per_page: 1,
-                        current_page: 2,
-                    },
-                    data: vec![order_product_item(99, "Item Page Two")],
-                    included: None,
-                })
+                Ok(OrderProductListResponse { links:
+                                                  pagination_links(Some("page=2".to_string())),
+                                              meta:     PaginationMeta { items_per_page: 1,
+                                                                         current_page:   1, },
+                                              data:     vec![order_product_item(42,
+                                                                                "Item Page One")],
+                                              included: None, })
+            }
+            else {
+                Ok(OrderProductListResponse { links:    pagination_links(None),
+                                              meta:     PaginationMeta { items_per_page: 1,
+                                                                         current_page:   2, },
+                                              data:     vec![order_product_item(99,
+                                                                                "Item Page Two")],
+                                              included: None, })
             }
         }
 
-        fn get_order_product(
-            &self, _id: u64,
-        ) -> Result<OrderProductItemResponse, LibraryServiceError> {
-            Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::NotFound,
-                "not used",
-            ))
+        fn get_order_product(&self, _id: u64)
+                             -> Result<OrderProductItemResponse, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
 
-        fn prepare_download(
-            &self, _order_product_id: u64, _index: u32,
-        ) -> Result<serde_json::Value, LibraryServiceError> {
-            Err(LibraryServiceError::new(
-                LibraryServiceErrorKind::NotFound,
-                "not used",
-            ))
+        fn prepare_download(&self, _order_product_id: u64, _index: u32)
+                            -> Result<serde_json::Value, LibraryServiceError> {
+            Err(LibraryServiceError::new(LibraryServiceErrorKind::NotFound, "not used"))
         }
     }
 
@@ -487,10 +446,8 @@ mod tests {
 
         let count = service.count_items().expect("count supported");
 
-        assert_eq!(
-            count.expect_err("session error propagated").kind,
-            LibraryServiceErrorKind::Session
-        );
+        assert_eq!(count.expect_err("session error propagated").kind,
+                   LibraryServiceErrorKind::Session);
     }
 
     #[test]
@@ -504,22 +461,16 @@ mod tests {
 
     #[test]
     fn sdk_service_fetches_all_pages_via_pagination() {
-        let gateway = TwoPageGateway {
-            call_count: AtomicU32::new(0),
-        };
+        let gateway = TwoPageGateway { call_count: AtomicU32::new(0), };
         let service = RustSdkLibraryService::new(Box::new(gateway));
 
         let items = service.list_items().expect("list items");
 
         assert_eq!(items.len(), 2, "should have items from both pages");
-        assert!(
-            items.iter().any(|i| i.numeric_id == 42),
-            "page 1 item should be present"
-        );
-        assert!(
-            items.iter().any(|i| i.numeric_id == 99),
-            "page 2 item should be present"
-        );
+        assert!(items.iter().any(|i| i.numeric_id == 42),
+                "page 1 item should be present");
+        assert!(items.iter().any(|i| i.numeric_id == 99),
+                "page 2 item should be present");
     }
 
     fn order_product_item(id: u64, name: &str) -> OrderProductItem {
@@ -572,12 +523,10 @@ mod tests {
     }
 
     fn pagination_links(next: Option<String>) -> PaginationLinks {
-        PaginationLinks {
-            self_: "self".to_string(),
-            first: None,
-            last: None,
-            prev: None,
-            next,
-        }
+        PaginationLinks { self_: "self".to_string(),
+                          first: None,
+                          last: None,
+                          prev: None,
+                          next }
     }
 }
