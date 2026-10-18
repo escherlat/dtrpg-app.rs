@@ -12,13 +12,19 @@ comma, because Linux stores a file's tags as a comma-separated list.
 
 ## 2. Projection
 
-- [ ] 2.1 Add the `xattr` dependency under `[target.'cfg(unix)'.dependencies]`
-- [ ] 2.2 `PlatformIntegration` methods to read and write a file's tags; `Capabilities::filesystem_tags`
+`PlatformIntegration::read_tags` and `write_tags` read and write a file's tags; they default to `Unsupported`, which
+is what Windows reports. macOS and Linux share one module (`platform/tags.rs`) and the `plist` and `xattr` crates,
+so the macOS format is encoded, decoded and tested on Linux too. Only the attribute name differs by platform.
+Writing an empty list removes the attribute. Not verified on a real Mac: reading and writing the attribute on an
+actual APFS volume and having Finder show the tags (task 5.4).
+
+- [x] 2.1 Add the `xattr` dependency under `[target.'cfg(unix)'.dependencies]`
+- [x] 2.2 `PlatformIntegration` methods to read and write a file's tags; `Capabilities::filesystem_tags`
       decides whether they are used
-- [ ] 2.3 macOS: `com.apple.metadata:_kMDItemUserTags` as a binary property list of strings, keeping any
+- [x] 2.3 macOS: `com.apple.metadata:_kMDItemUserTags` as a binary property list of strings, keeping any
       existing color suffix
-- [ ] 2.4 Linux: `user.xdg.tags` as a comma-separated list
-- [ ] 2.5 Windows: reading and writing report `Unsupported`, and nothing calls them
+- [x] 2.4 Linux: `user.xdg.tags` as a comma-separated list
+- [x] 2.5 Windows: reading and writing report `Unsupported`, and nothing calls them
 
 ## 3. Reconciliation
 
