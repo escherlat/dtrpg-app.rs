@@ -129,6 +129,8 @@ fn render_entry_list(
                 .overflow_y_scrollbar()
                 .gap(px(4.0))
                 .children(entries.iter().map(|entry| {
+                    let depth = entry_depth(&entry.name);
+                    let label = entry_label(&entry.name);
                     div()
                         .flex()
                         .items_center()
@@ -138,10 +140,15 @@ fn render_entry_list(
                             div()
                                 .flex_1()
                                 .min_w_0()
+                                .pl(px(depth as f32 * 12.0))
                                 .text_sm()
                                 .text_color(text_primary)
                                 .truncate()
-                                .child(entry.name.clone()),
+                                .child(if entry.is_directory {
+                                    format!("▸ {label}")
+                                } else {
+                                    label
+                                }),
                         )
                         .child(
                             div()
@@ -153,4 +160,34 @@ fn render_entry_list(
                 })),
         )
         .into_any_element()
+}
+
+fn entry_depth(name: &str) -> usize {
+    name.trim_end_matches('/').matches('/').count()
+}
+
+fn entry_label(name: &str) -> String {
+    name.trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or(name)
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{entry_depth, entry_label};
+
+    #[test]
+    fn entry_depth_matches_nested_paths() {
+        assert_eq!(entry_depth("manual.pdf"), 0);
+        assert_eq!(entry_depth("books/core/manual.pdf"), 2);
+        assert_eq!(entry_depth("books/core/"), 1);
+    }
+
+    #[test]
+    fn entry_label_removes_parent_path_and_trailing_separator() {
+        assert_eq!(entry_label("books/core/manual.pdf"), "manual.pdf");
+        assert_eq!(entry_label("books/core/"), "core");
+    }
 }
