@@ -180,6 +180,12 @@ pub fn save_library_window_bounds(window: &Window) {
                                                                                 .as_f32(), });
 }
 
+/// The smallest the settings window can be resized to: wide enough for its
+/// page list beside a page's content, and tall enough for a page's first
+/// rows.
+const SETTINGS_MIN_SIZE: Size<Pixels> = Size { width:  px(560.),
+                                               height: px(360.), };
+
 /// Opens the settings window as a separate, non-modal window.
 ///
 /// Shares `settings` and `library` with the caller's `LibraryRootView` rather
@@ -203,16 +209,14 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
     let (window, _view) = gpui_kit::open_window(
         WindowOptions {
             // `appears_transparent: true` hides the native opaque title
-            // bar and title text (same
-            // pattern as the main library window's
+            // bar and title text (same pattern as the main library window's
             // `title_bar_view.rs`) while keeping the macOS traffic-light
             // window controls, which `titlebar: None` removes entirely on
-            // this platform (there is no dedicated close-only chrome
-            // option
-            // in gpui). `is_minimizable: false` and `is_resizable: false`
-            // disable the minimize and zoom buttons, leaving only close —
-            // resizing is no longer needed now that the panel content
-            // scrolls (see `settings_view::render_settings_panel`).
+            // this platform (there is no dedicated close-only chrome option
+            // in gpui). `is_minimizable: false` leaves no minimize button.
+            // The window can be resized, down to `SETTINGS_MIN_SIZE`: the
+            // panel content scrolls, and a longer page (Advanced, Storage)
+            // or a larger text scale needs more room than the default size.
             titlebar: Some(TitlebarOptions {
                 appears_transparent: true,
                 // Vertically centers the
@@ -229,7 +233,8 @@ pub fn open_settings_window(settings: Entity<SettingsController>,
                 ..Default::default()
             }),
             window_bounds: Some(WindowBounds::centered(window_size, cx)),
-            is_resizable: false,
+            window_min_size: Some(SETTINGS_MIN_SIZE),
+            is_resizable: true,
             is_minimizable: false,
             ..Default::default()
         },
