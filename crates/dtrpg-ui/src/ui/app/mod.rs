@@ -12,6 +12,7 @@ use gpui_kit::component::{Root, init};
 use rust_i18n::t;
 use tracing::{debug, warn};
 
+use crate::controllers::library::LibraryController;
 use crate::controllers::settings::SettingsController;
 use crate::controllers::tabs::{TabTarget, TabsController, TabsSnapshot};
 use crate::ui::actions::*;
@@ -200,7 +201,7 @@ const SETTINGS_MIN_SIZE: Size<Pixels> = Size { width:  px(560.),
 /// Panics if the window cannot be opened.
 #[allow(clippy::expect_used)]
 pub fn open_settings_window(settings: Entity<SettingsController>,
-                            library: Entity<crate::controllers::library::LibraryController>,
+                            library: Entity<LibraryController>,
                             file_opener_extension_input: Entity<InputState>, cx: &mut App)
                             -> WindowHandle<Root> {
     let settings_for_close = settings.clone();
@@ -404,6 +405,59 @@ pub fn setup(cx: &mut App) {
                 .ok();
       });
 
+    // The View menu's items are the same: without a fallback they are disabled
+    // whenever focus is somewhere the library view's handlers do not reach.
+    cx.on_action::<ReloadCatalog>(|_, cx| update_library(cx, |ctrl, cx| ctrl.reload_catalog(cx)));
+    cx.on_action::<RefreshThumbnails>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.refresh_all_thumbnails(cx));
+      });
+    cx.on_action::<CheckItemAvailability>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.request_manual_check_batch(cx));
+      });
+    cx.on_action::<ViewAsList>(|_, cx| {
+          update_library(cx, |ctrl, cx| {
+              ctrl.set_presentation(CatalogPresentation::List, cx)
+          });
+      });
+    cx.on_action::<ViewAsThumbs>(|_, cx| {
+          update_library(cx, |ctrl, cx| {
+              ctrl.set_presentation(CatalogPresentation::Thumbs, cx)
+          });
+      });
+    cx.on_action::<ViewAsGrid>(|_, cx| {
+          update_library(cx, |ctrl, cx| {
+              ctrl.set_presentation(CatalogPresentation::Grid, cx)
+          });
+      });
+    cx.on_action::<SortByTitle>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Title, cx));
+      });
+    cx.on_action::<SortByPublisher>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.set_sort(SortMethod::Publisher, cx));
+      });
+    cx.on_action::<SortByDateAdded>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.set_sort(SortMethod::DateAdded, cx));
+      });
+    cx.on_action::<SortByPages>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.set_sort(SortMethod::PageCount, cx));
+      });
+    cx.on_action::<SortAscending>(|_, cx| {
+          update_library(cx, |ctrl, cx| {
+              ctrl.set_sort_direction(SortDirection::Ascending, cx)
+          });
+      });
+    cx.on_action::<SortDescending>(|_, cx| {
+          update_library(cx, |ctrl, cx| {
+              ctrl.set_sort_direction(SortDirection::Descending, cx)
+          });
+      });
+    cx.on_action::<ToggleGroupByPublisher>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.toggle_group_by(GroupBy::Publisher, cx));
+      });
+    cx.on_action::<ToggleGroupByTag>(|_, cx| {
+          update_library(cx, |ctrl, cx| ctrl.toggle_group_by(GroupBy::Tag, cx));
+      });
+
     // Menu bar
     cx.set_menus(build_menus(&ViewMenuState::default(), &TabsController::new().snapshot()));
 
@@ -419,6 +473,21 @@ pub fn setup(cx: &mut App) {
 
     open_library_window(startup_api_key, cx);
     cx.activate(true);
+}
+
+/// Runs `change` on the library window's controller, if the window is open.
+///
+/// Used by the View menu's app-level fallbacks, which must not depend on which
+/// element of the library window has keyboard focus.
+fn update_library(cx: &mut App,
+                  change: impl FnOnce(&mut LibraryController, &mut Context<LibraryController>)) {
+    let Some(controller) =
+        cx.try_global::<LibraryWindowHandle>()
+          .map(|handle| handle.view.read(cx).controller())
+    else {
+        return;
+    };
+    controller.update(cx, change);
 }
 
 /// Builds the full native menu bar, applying checkmarks to the View menu's

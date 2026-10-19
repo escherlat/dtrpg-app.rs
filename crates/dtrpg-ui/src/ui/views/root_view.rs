@@ -893,6 +893,12 @@ impl LibraryRootView {
                last_menu_state: None }
     }
 
+    /// The library controller, for app-level menu fallbacks that act on the
+    /// catalog without going through this view.
+    pub(crate) fn controller(&self) -> Entity<LibraryController> {
+        self.controller.clone()
+    }
+
     /// Opens the Settings window, or brings an already-open one to front.
     ///
     /// Extracted so both the `ShowSettings` action bound on this view's root
@@ -1149,7 +1155,8 @@ impl Render for LibraryRootView {
                                      self.collection_name_input.clone(),
                                      publisher_search,
                                      collection_search,
-                                     tags);
+                                     tags,
+                                     snap.sidebar_open);
         let toolbar = render_toolbar(&filter,
                                      snap.filter_count,
                                      matched_count,
