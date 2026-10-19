@@ -101,6 +101,8 @@ mod tests_tags;
 mod tests_thumbnails;
 #[cfg(test)]
 mod tests_ui;
+#[cfg(test)]
+mod tests_view_cache;
 
 // Re-export the free helpers so `super::*` sees them in the split impl
 // modules and the tests keep addressing them by their original path.
@@ -111,6 +113,36 @@ pub(crate) use self::diagnostics::app_backtrace;
 // the dispatch path in `download_dispatch` reaches it through `super::*`.
 pub(crate) use self::downloads::create_collections_symlinks;
 pub(crate) use self::helpers::*;
+
+/// A collapsible section of the sidebar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SidebarSection {
+    Publishers,
+    Collections,
+    Tags,
+}
+
+/// Which sidebar sections are expanded.
+///
+/// Read from disk once, when the controller is made, and kept here, because the
+/// sidebar is drawn on every change and drawing must not read files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SidebarOpen {
+    pub publishers:  bool,
+    pub collections: bool,
+    pub tags:        bool,
+}
+
+impl SidebarOpen {
+    /// The sections as they were left, as `ui_state` has them saved.
+    #[must_use]
+    pub fn saved() -> Self {
+        let saved = dtrpg_core::data::ui_state::UiState::load();
+        Self { publishers:  saved.publishers_open(),
+               collections: saved.collections_open(),
+               tags:        saved.tags_open(), }
+    }
+}
 
 /// Snapshot of all data needed by the root view for a single render pass.
 pub struct LibrarySnapshot {
@@ -125,7 +157,7 @@ pub struct LibrarySnapshot {
     pub collections_loaded:        bool,
     /// All numeric product IDs in the full catalog; used by the sidebar to
     /// compute per-collection resolved item counts.
-    pub catalog_ids:               HashSet<u64>,
+    pub catalog_ids:               Arc<HashSet<u64>>,
     /// Total items in the full catalog (no filter, no search).
     pub total_count:               usize,
     pub total_mb:                  f64,
@@ -141,11 +173,13 @@ pub struct LibrarySnapshot {
     /// Current sidebar Collections sort direction.
     pub collection_sort_direction: SortDirection,
     pub group_by:                  GroupBy,
+    /// Which sidebar sections are expanded.
+    pub sidebar_open:              SidebarOpen,
     /// The optional list columns that are shown.
     pub list_columns:              Vec<ListColumn>,
     pub presentation:              CatalogPresentation,
     pub selected_item:             Option<LibraryItem>,
-    pub items:                     Vec<LibraryItem>,
+    pub items:                     Arc<Vec<LibraryItem>>,
     pub catalog_loading:           bool,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
@@ -192,6 +226,8 @@ pub struct LibraryController {
     /// Current sidebar Collections sort direction, persisted via
     /// `UiPreferences`.
     pub collection_sort_direction: SortDirection,
+    /// Which sidebar sections are expanded.
+    pub sidebar_open:              SidebarOpen,
     /// What the catalog is grouped by.
     pub group_by:                  GroupBy,
     /// The optional list columns that are shown, in their usual order.
@@ -287,7 +323,14 @@ pub struct LibraryController {
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
-    items_cache:                   Option<Vec<LibraryItem>>,
+    /// The filtered, sorted result set. Shared, so handing it to a render pass
+    /// costs a reference count rather than a copy of every item.
+    items_cache:                   Option<Arc<Vec<LibraryItem>>>,
+    /// How many catalog items the sidebar filter alone matches, kept with
+    /// `items_cache`.
+    filter_count_cache:            usize,
+    /// Every product id in the catalog, kept with `items_cache`.
+    catalog_ids_cache:             Arc<HashSet<u64>>,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
     publisher_search_open:         bool,

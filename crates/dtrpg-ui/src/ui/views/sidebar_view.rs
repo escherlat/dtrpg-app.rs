@@ -10,7 +10,6 @@ use std::sync::Arc;
 use dtrpg_core::data::collection::CollectionEntry;
 use dtrpg_core::data::library::SectionCounts;
 use dtrpg_core::data::tag_library::TagEntry;
-use dtrpg_core::data::ui_state::UiState;
 use dtrpg_core::util::filter::SidebarFilter;
 use dtrpg_core::util::matching::name_matches_query;
 use dtrpg_core::util::sort::{CollectionSortMethod, SortDirection};
@@ -32,7 +31,7 @@ use gpui_kit::component::{
 };
 use rust_i18n::t;
 
-use crate::controllers::library::LibraryController;
+use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection};
 use crate::controllers::tabs::{TabTarget, TabsController};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::sidebar_tags::tags_menu;
@@ -121,9 +120,9 @@ type CollectionsToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 /// `catalog-drag-drop-to-collection`), so only this section forgoes
 /// `SidebarMenuItem`; smart-filter and publisher rows are unaffected.
 ///
-/// The open/closed state is read from `UiState` on every render (same as
-/// before), so — unlike `SidebarMenuItem`, which tracks its own internal
-/// open state — no separate collapse-toggle plumbing is needed here.
+/// The open/closed state comes from the controller on every render, so — unlike
+/// `SidebarMenuItem`, which tracks its own internal open state — no separate
+/// collapse-toggle plumbing is needed here.
 #[derive(Clone)]
 struct CollectionsSection {
     title:     SharedString,
@@ -348,17 +347,17 @@ fn render_collection_row(id: impl Into<ElementId>, row: CollectionRow,
 pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                       publishers: Vec<PublisherEntry>, collections: Vec<CollectionEntry>,
                       collections_loaded: bool, catalog_loading: bool,
-                      catalog_ids: HashSet<u64>, collection_sort: CollectionSortMethod,
+                      catalog_ids: Arc<HashSet<u64>>, collection_sort: CollectionSortMethod,
                       collection_sort_direction: SortDirection,
                       entity: Entity<LibraryController>, tabs: Entity<TabsController>,
                       collection_name_input: Entity<InputState>,
                       publisher_search: SidebarSectionSearch,
-                      collection_search: SidebarSectionSearch, tags: Vec<TagEntry>)
+                      collection_search: SidebarSectionSearch, tags: Vec<TagEntry>,
+                      sidebar_open: SidebarOpen)
                       -> impl IntoElement + 'static {
     let active = filter.clone();
-    let prefs = UiState::load();
-    let publishers_open = prefs.publishers_open();
-    let collections_open = prefs.collections_open();
+    let publishers_open = sidebar_open.publishers;
+    let collections_open = sidebar_open.collections;
 
     // ── Library smart-filter menu
     // ─────────────────────────────────────────────
@@ -430,8 +429,9 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
             .default_open(publishers_open)
             .click_to_toggle(true)
             .on_click(move |_, _, cx| {
-                UiState::load().save_publishers_open(!publishers_open);
-                entity_for_pub.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
+                entity_for_pub.update(cx, |ctrl, cx| {
+                                  ctrl.toggle_sidebar_section(SidebarSection::Publishers, cx);
+                              });
             })
             .suffix(render_section_search_suffix(
                 "publishers",
@@ -494,8 +494,9 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
     let collection_search_open = collection_search.open;
     let collection_search_input = collection_search.input.clone();
     let on_toggle: CollectionsToggleFn = Rc::new(move |_window, cx| {
-        UiState::load().save_collections_open(!collections_open);
-        entity_for_col.update(cx, |ctrl, cx| ctrl.notify_ui_change(cx));
+        entity_for_col.update(cx, |ctrl, cx| {
+                          ctrl.toggle_sidebar_section(SidebarSection::Collections, cx);
+                      });
     });
     let suffix: CollectionsSuffixFn = Rc::new({
         let input = collection_name_input.clone();
@@ -632,7 +633,11 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
         return sidebar_builder;
     }
     sidebar_builder.child(SidebarContent::Separator)
-                   .child(SidebarContent::Menu(Box::new(tags_menu(tags, &active, entity, tabs))))
+                   .child(SidebarContent::Menu(Box::new(tags_menu(tags,
+                                                                  sidebar_open.tags,
+                                                                  &active,
+                                                                  entity,
+                                                                  tabs))))
 }
 
 /// Renders the Collections header's sort control: an icon button whose

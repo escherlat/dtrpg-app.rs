@@ -7,27 +7,39 @@ impl LibraryController {
     /// Returns the filtered, sorted result set for the current state.
     #[must_use]
     pub fn visible_items(&self) -> Vec<LibraryItem> {
+        self.items_cache.as_deref().cloned().unwrap_or_default()
+    }
+
+    /// Returns the filtered, sorted result set without copying it.
+    ///
+    /// Prefer this to [`visible_items`](Self::visible_items) when the items are
+    /// only read, as every render pass does.
+    #[must_use]
+    pub fn visible_items_shared(&self) -> Arc<Vec<LibraryItem>> {
         self.items_cache.clone().unwrap_or_default()
     }
 
     /// Returns the number of items in the filtered, sorted result set.
     ///
-    /// Cheaper than cloning the full `Vec` when only the count is needed.
+    /// Cheap: it does not copy the result set. The list asks for it several
+    /// times a frame.
     #[must_use]
     pub fn visible_items_count(&self) -> usize {
-        self.visible_items().len()
+        self.items_cache.as_deref().map_or(0, Vec::len)
     }
 
     /// Returns a slice of the filtered, sorted result set.
     ///
     /// `range` is 0-based relative to the start of the full result set. Used
-    /// by `uniform_list` render closures.
+    /// by `uniform_list` render closures, and by the list once for every cell
+    /// it draws, so it copies only the items in `range`.
     #[must_use]
     pub fn visible_items_slice(&self, range: std::ops::Range<usize>) -> Vec<LibraryItem> {
-        let items = self.visible_items();
-        items.get(range)
-             .map(<[LibraryItem]>::to_vec)
-             .unwrap_or_default()
+        self.items_cache
+            .as_deref()
+            .and_then(|items| items.get(range))
+            .map(<[LibraryItem]>::to_vec)
+            .unwrap_or_default()
     }
 
     // ── Sidebar filter mutations

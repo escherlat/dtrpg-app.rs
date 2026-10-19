@@ -132,21 +132,16 @@ impl LibraryController {
             Outcome::Cancelled => None,
         };
 
-        let now = std::time::SystemTime::now();
-        if let Some(item) = self.catalog.iter_mut().find(|i| i.id == job.key) {
-            item.thumbnail_last_attempted = Some(now);
-        }
+        self.note_thumbnail_attempt(&job.key, std::time::SystemTime::now());
         match bytes {
             Some(bytes) => {
                 cx.global_mut::<CoverCache>()
                   .insert(Arc::clone(&job.key), bytes);
-                self.invalidate_cache();
                 self.record_refresh_result(&job.key, false, cx);
                 cx.emit(LibraryChanged);
             }
             None => {
                 cx.global_mut::<CoverCache>().in_flight.remove(&job.key);
-                self.invalidate_cache();
                 self.record_refresh_result(&job.key, true, cx);
             }
         }

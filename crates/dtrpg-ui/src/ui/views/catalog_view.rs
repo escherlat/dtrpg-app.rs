@@ -441,11 +441,14 @@ impl TableDelegate for CatalogListDelegate {
     }
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
-        let snap = self.controller.read(cx).snapshot();
-        let sorted_column = column_sorted_by(snap.sort).and_then(|c| self.cols.position_of(c));
+        // Only the sort is needed. `snapshot()` copies the whole catalog, and
+        // the table asks for a column once for every cell it draws.
+        let controller = self.controller.read(cx);
+        let (sort, sort_direction) = (controller.sort, controller.sort_direction);
+        let sorted_column = column_sorted_by(sort).and_then(|c| self.cols.position_of(c));
         let col = self.cols.column(col_ix);
         if sorted_column == Some(col_ix) {
-            let sort = match snap.sort_direction {
+            let sort = match sort_direction {
                 SortDirection::Ascending => ColumnSort::Ascending,
                 SortDirection::Descending => ColumnSort::Descending,
             };

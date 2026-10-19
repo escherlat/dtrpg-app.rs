@@ -170,37 +170,46 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
+    /// Expands `section` of the sidebar if it is collapsed, and collapses it if
+    /// it is expanded, and remembers which for the next launch.
+    pub fn toggle_sidebar_section(&mut self, section: SidebarSection, cx: &mut Context<Self>) {
+        let open = &mut self.sidebar_open;
+        let mut saved = dtrpg_core::data::ui_state::UiState::load();
+        match section {
+            SidebarSection::Publishers => {
+                open.publishers = !open.publishers;
+                saved.save_publishers_open(open.publishers);
+            }
+            SidebarSection::Collections => {
+                open.collections = !open.collections;
+                saved.save_collections_open(open.collections);
+            }
+            SidebarSection::Tags => {
+                open.tags = !open.tags;
+                saved.save_tags_open(open.tags);
+            }
+        }
+        cx.emit(LibraryChanged);
+    }
+
     // ── Snapshot
     // ──────────────────────────────────────────────────────────────
 
     /// Returns all data needed by the root view for one render pass.
     pub fn snapshot(&self) -> LibrarySnapshot {
-        let now_secs = now_secs();
-        let window_days = self.recently_updated_window_days;
-        let filter_count = self.catalog
-                               .iter()
-                               .filter(|i| {
-                                   item_matches_filter(i,
-                                                       &self.filter,
-                                                       &self.collection_members,
-                                                       now_secs,
-                                                       window_days)
-                               })
-                               .count();
-        let items = self.visible_items();
+        let items = self.visible_items_shared();
         let matched_count = items.len();
         let selected_item = self.selected_item().cloned();
-        let catalog_ids = self.catalog_ids();
         LibrarySnapshot { filter: self.filter.clone(),
                           counts: self.section_counts,
                           publishers: self.publishers.clone(),
                           collections: self.collections.clone(),
                           tags: self.tag_entries(),
                           collections_loaded: self.collections_loaded,
-                          catalog_ids,
+                          catalog_ids: Arc::clone(&self.catalog_ids_cache),
                           total_count: self.section_counts.all,
                           total_mb: self.total_size_mb(),
-                          filter_count,
+                          filter_count: self.filter_count_cache,
                           matched_count,
                           search_query: self.search_query.clone(),
                           sort: self.sort,
@@ -208,6 +217,7 @@ impl LibraryController {
                           collection_sort: self.collection_sort,
                           collection_sort_direction: self.collection_sort_direction,
                           group_by: self.group_by,
+                          sidebar_open: self.sidebar_open,
                           list_columns: self.list_columns.clone(),
                           presentation: self.presentation,
                           selected_item,
@@ -236,19 +246,37 @@ impl LibraryController {
     /// list items API returns `productId` (not `orderProductId`) in its
     /// response.
     pub(super) fn catalog_ids(&self) -> HashSet<u64> {
-        self.catalog
-            .iter()
-            .flat_map(|i| {
-                let mut ids = Vec::with_capacity(2);
-                if i.order_product_id > 0 {
-                    ids.push(i.order_product_id);
-                }
-                if i.product_id > 0 {
-                    ids.push(i.product_id);
-                }
-                ids
-            })
-            .collect()
+        let mut ids = HashSet::with_capacity(self.catalog.len() * 2);
+        for item in &self.catalog {
+            if item.order_product_id > 0 {
+                ids.insert(item.order_product_id);
+            }
+            if item.product_id > 0 {
+                ids.insert(item.product_id);
+            }
+        }
+        ids
+    }
+
+    /// Records that a thumbnail fetch for item `id` was attempted at `at`, in
+    /// the catalog and in the cached result set.
+    ///
+    /// Does not recompute the result set, as [`invalidate_cache`] would: the
+    /// time is in neither the filter nor the sort, and a cover arrives for
+    /// every item scrolled into view.
+    ///
+    /// [`invalidate_cache`]: Self::invalidate_cache
+    pub(super) fn note_thumbnail_attempt(&mut self, id: &Arc<str>, at: std::time::SystemTime) {
+        if let Some(item) = self.catalog.iter_mut().find(|item| item.id == *id) {
+            item.thumbnail_last_attempted = Some(at);
+        }
+        let Some(cached) = self.items_cache.as_mut()
+        else {
+            return;
+        };
+        if let Some(item) = Arc::make_mut(cached).iter_mut().find(|item| item.id == *id) {
+            item.thumbnail_last_attempted = Some(at);
+        }
     }
 
     // ── Filtered result set
@@ -263,19 +291,25 @@ impl LibraryController {
         let now_secs = now_secs();
         let window_days = self.recently_updated_window_days;
         let query = SearchQuery::parse(&self.search_query);
-        let mut items: Vec<LibraryItem> = self.catalog
-                                              .iter()
-                                              .filter(|i| {
-                                                  item_matches_filter(i,
-                                                                      &self.filter,
-                                                                      &self.collection_members,
-                                                                      now_secs,
-                                                                      window_days)
-                                                  && query.matches(i, self.tags.tag_names_of(&i.id))
-                                              })
-                                              .cloned()
-                                              .collect();
+        let mut filter_count = 0;
+        let mut items: Vec<LibraryItem> = Vec::new();
+        for item in &self.catalog {
+            if !item_matches_filter(item,
+                                    &self.filter,
+                                    &self.collection_members,
+                                    now_secs,
+                                    window_days)
+            {
+                continue;
+            }
+            filter_count += 1;
+            if query.matches(item, self.tags.tag_names_of(&item.id)) {
+                items.push(item.clone());
+            }
+        }
         sort_items(&mut items, self.sort, self.sort_direction);
-        self.items_cache = Some(items);
+        self.items_cache = Some(Arc::new(items));
+        self.filter_count_cache = filter_count;
+        self.catalog_ids_cache = Arc::new(self.catalog_ids());
     }
 }
