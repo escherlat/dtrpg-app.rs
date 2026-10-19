@@ -138,6 +138,8 @@ pub(super) struct ScriptedLibrary {
     checked:       Mutex<Vec<u64>>,
     /// A progress report every download makes as soon as it begins.
     progress:      Option<(u64, Option<u64>)>,
+    /// Whether every request for the catalog fails as if no one were signed in.
+    signed_out:    bool,
 }
 
 impl ScriptedLibrary {
@@ -163,7 +165,8 @@ impl ScriptedLibrary {
                         missing:       HashSet::new(),
                         erroring:      HashSet::new(),
                         checked:       Mutex::new(Vec::new()),
-                        progress:      None, })
+                        progress:      None,
+                        signed_out:    false, })
     }
 
     /// A service whose downloads each report `received` of `total` bytes as
@@ -178,7 +181,8 @@ impl ScriptedLibrary {
                         missing:       HashSet::new(),
                         erroring:      HashSet::new(),
                         checked:       Mutex::new(Vec::new()),
-                        progress:      Some((received, total)), })
+                        progress:      Some((received, total)),
+                        signed_out:    false, })
     }
 
     /// A service whose availability checks hold for a permit each. The
@@ -194,7 +198,24 @@ impl ScriptedLibrary {
                         missing:       missing.iter().copied().collect(),
                         erroring:      erroring.iter().copied().collect(),
                         checked:       Mutex::new(Vec::new()),
-                        progress:      None, })
+                        progress:      None,
+                        signed_out:    false, })
+    }
+
+    /// A service that fails every request for the catalog, as if no one were
+    /// signed in.
+    pub(super) fn signed_out() -> Arc<Self> {
+        Arc::new(Self { permits:       Permits::new(usize::MAX / 2),
+                        failing:       HashSet::new(),
+                        retrying:      HashSet::new(),
+                        started:       Mutex::new(Vec::new()),
+                        cancelled:     Mutex::new(Vec::new()),
+                        check_permits: Permits::new(usize::MAX / 2),
+                        missing:       HashSet::new(),
+                        erroring:      HashSet::new(),
+                        checked:       Mutex::new(Vec::new()),
+                        progress:      None,
+                        signed_out:    true, })
     }
 
     /// Lets one more availability check finish.
@@ -227,7 +248,16 @@ struct SharedLibrary(Arc<ScriptedLibrary>);
 
 impl LibraryService for SharedLibrary {
     fn list_items(&self) -> Result<Vec<LibraryItem>, LibraryServiceError> {
+        if self.0.signed_out {
+            return Err(LibraryServiceError::new(LibraryServiceErrorKind::Session, "signed out"));
+        }
         Ok(Vec::new())
+    }
+
+    fn count_items(&self) -> Option<Result<usize, LibraryServiceError>> {
+        self.0
+            .signed_out
+            .then(|| Err(LibraryServiceError::new(LibraryServiceErrorKind::Session, "signed out")))
     }
 
     fn get_item(&self, id: u64) -> Result<LibraryItem, LibraryServiceError> {

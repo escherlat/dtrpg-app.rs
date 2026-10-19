@@ -104,7 +104,7 @@ impl LibraryController {
                           cache_root: cache_dir(),
                           tags: Arc::new(TagLibrary::default()),
                           tag_generation: 0,
-                          reconcile_tags_after_verify: false,
+                          file_tag_sync_running: false,
                           file_tags_reconciled: false,
                           max_concurrent_downloads: storage.max_concurrent_downloads(),
                           recently_updated_window_days: storage.recently_updated_window_days(),
@@ -276,7 +276,6 @@ impl LibraryController {
                       }
                       ctrl.apply_verifications(&verifications);
                       cx.emit(LibraryChanged);
-                      ctrl.reconcile_file_tags_if_requested(cx);
                   })
                   .ok();
           })

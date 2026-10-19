@@ -15,7 +15,7 @@ use dtrpg_core::platform::Platform;
 use dtrpg_core::services::tag_editing::{TagEdit, TagEditOutcome, apply_tag_edit};
 use dtrpg_core::services::tag_projection::TaggedFile;
 
-use super::file_tags::{downloaded_files, sync_settings};
+use super::file_tags::{files_on_disk, sync_settings};
 use super::*;
 
 impl LibraryController {
@@ -158,7 +158,7 @@ impl LibraryController {
                   async_cx.background_executor()
                           .spawn(async move {
                               let files: Vec<TaggedFile> =
-                                  downloaded_files(&affected, &collections, &StorageConfig::load());
+                                  files_on_disk(&affected, &collections, &StorageConfig::load());
                               let settings = sync_settings(&NativePreferences::load());
                               apply_tag_edit(&Platform, &cache_root, &edit, &files, settings)
                           })

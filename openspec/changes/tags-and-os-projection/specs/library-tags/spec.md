@@ -62,8 +62,10 @@ files.
 
 ### Requirement: Tags are reconciled by which side changed
 
-On launch, the library SHALL compare each downloaded file's tags with the index on platforms that support
-reading them, and SHALL bring them in step by which side changed since the two last agreed (ADR 0008).
+On launch, and when the user reloads the library, the library SHALL compare the tags of each file on disk with
+the index on platforms that support reading them, and SHALL bring them in step by which side changed since the
+two last agreed (ADR 0008). It SHALL do so from the catalog saved on disk, without waiting for the network, so a
+launch that is signed out or offline still shows the library's tags and reads the file's.
 
 #### Scenario: A tag removed in Finder
 

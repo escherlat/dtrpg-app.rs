@@ -373,17 +373,16 @@ pub struct LibraryController {
     /// Where the catalog cache is saved after a download. A field so tests
     /// can point it somewhere other than the user's real cache.
     cache_root:                    PathBuf,
-    /// Set by a full catalog load, and cleared when the verification of
-    /// downloads that follows it reconciles the files' tags with the index.
-    reconcile_tags_after_verify:   bool,
+    /// Whether files' tags are being compared with the library's right now.
+    file_tag_sync_running:         bool,
     /// The library's tags, read from the index in the background, which the
     /// views read instead of reading the index themselves.
     tags:                          Arc<TagLibrary>,
     /// Counts the reads and edits of tags that have been started, so a result
     /// that arrives after a newer one is dropped.
     tag_generation:                u64,
-    /// Whether the files' tags have been reconciled with the index in this
-    /// launch. They are reconciled at most once.
+    /// Whether the files' tags have been compared with the library's in this
+    /// launch. A reload compares them again.
     file_tags_reconciled:          bool,
     /// Shared thumbnail/download concurrency limit. Initialized from
     /// [`dtrpg_core::data::storage::StorageConfig`] and kept in sync with the

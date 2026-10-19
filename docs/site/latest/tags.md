@@ -62,8 +62,10 @@ activity panel says how many files could not be written.
 ## Changes made outside Libri
 
 Libri keeps its own copy of your tags and treats it as the source of truth, but it
-does not overwrite what you do in Finder. Each time Libri starts, it compares every
-downloaded file's tags with its own and with what the two last agreed on:
+does not overwrite what you do in Finder. When Libri starts, and each time you reload
+your library, it compares the tags of every file it finds on disk with its own and
+with what the two last agreed on. A tag you change in Finder while Libri is open
+comes through at the next reload:
 
 - If you changed only the file's tags, for example by removing "To Read" in
   Finder while Libri was closed, Libri takes the change.
@@ -90,4 +92,4 @@ default. They are shown only on platforms where files keep tags.
 - **Read tags changed outside Libri back into Libri.** Turn it off and edits made
   in Finder are ignored.
 - **Reconcile on launch.** Turn it off and Libri does not compare files with its
-  tags when it starts.
+  tags when it starts or when you reload.
