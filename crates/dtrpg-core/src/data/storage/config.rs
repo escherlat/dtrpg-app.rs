@@ -184,6 +184,18 @@ impl StorageConfig {
                next_root_id:                 1, }
     }
 
+    /// Returns this configuration with the "Create collections" setting set to
+    /// `enabled` in memory only, without saving it.
+    ///
+    /// For tests only, for the reason [`for_test`](Self::for_test) gives:
+    /// [`set_create_collections`](Self::set_create_collections) saves to the
+    /// real, shared config file.
+    #[must_use]
+    pub fn with_create_collections(mut self, enabled: bool) -> Self {
+        self.create_collections = enabled;
+        self
+    }
+
     /// Returns the resolved download root (saved override, or platform
     /// default).
     pub fn root_path(&self) -> PathBuf {

@@ -105,6 +105,7 @@ impl LibraryController {
                           tags: Arc::new(TagLibrary::default()),
                           tag_generation: 0,
                           file_tag_sync_running: false,
+                          storage_override: None,
                           file_tags_reconciled: false,
                           max_concurrent_downloads: storage.max_concurrent_downloads(),
                           recently_updated_window_days: storage.recently_updated_window_days(),

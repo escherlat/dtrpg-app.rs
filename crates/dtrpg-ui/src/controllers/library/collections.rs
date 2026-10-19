@@ -1,5 +1,6 @@
 //! Collection CRUD, membership changes, and the collections service swap.
 
+use super::collection_links::link_item_into_collection;
 use super::*;
 
 impl LibraryController {
@@ -259,6 +260,40 @@ impl LibraryController {
           .detach();
     }
 
+    /// Puts the files of the item that are already on disk in the folder of the
+    /// collection it was just added to, as the download would have if the item
+    /// had been a member then, when "Create collections" is on.
+    ///
+    /// Does nothing for an item that is not in the catalog or not downloaded.
+    fn link_item_into_added_collection(&self, item_id: u64, product_id: u64, collection_id: u64,
+                                       cx: &mut Context<Self>) {
+        let Some(item) = self.catalog
+                             .iter()
+                             .find(|item| {
+                                 collection_member_id(item) == item_id
+                                 || (product_id > 0 && item.product_id == product_id)
+                             })
+                             .cloned()
+        else {
+            return;
+        };
+        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        else {
+            return;
+        };
+        let collection_name = Arc::clone(&collection.name);
+        let collections = self.collections.clone();
+        let storage = self.storage_override.clone();
+        cx.background_executor()
+          .spawn(async move {
+              let storage = storage.unwrap_or_else(|| Arc::new(StorageConfig::load()));
+              if storage.create_collections() {
+                  link_item_into_collection(&storage, &item, &collections, &collection_name);
+              }
+          })
+          .detach();
+    }
+
     /// Adds `item_id` (an item's `order_product_id`/`product_id`) as a member
     /// of the collection with `collection_id`.
     ///
@@ -300,6 +335,19 @@ impl LibraryController {
                                        collections_service.add_member(collection_id, product_id)
                                    })
                                    .await;
+              // Once the server agrees the item is in the collection, put an
+              // item that is already downloaded in the collection's folder too.
+              // A conflict means it was already a member, which is the same.
+              let is_member = match &result {
+                  Ok(()) => true,
+                  Err(e) => e.kind == CollectionsServiceErrorKind::Conflict,
+              };
+              if is_member {
+                  this.update(async_cx, |ctrl, cx| {
+                          ctrl.link_item_into_added_collection(item_id, product_id, collection_id, cx);
+                      })
+                      .ok();
+              }
               if let Err(e) = result {
                   // A conflict means the item is already a member server-side: the
                   // optimistic local update already matches reality, so it is left

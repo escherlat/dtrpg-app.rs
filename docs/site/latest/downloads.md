@@ -37,7 +37,9 @@ Settings > Downloads also has a "Create collections" toggle. When it's on,
 downloading an item that belongs to one or more collections also creates a
 symlink for it under a `collections/` subfolder, organized by collection,
 so the same downloaded file is reachable there without duplicating the
-data on disk. On Windows this needs Developer Mode (or an elevated
+data on disk. If you add an item you have already downloaded to another
+collection, the symlink for that collection is created then. (Removing an item
+from a collection does not remove its symlink yet.) On Windows this needs Developer Mode (or an elevated
 process) - if symlink creation fails, the toggle has no effect rather than
 erroring.
 
