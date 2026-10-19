@@ -246,7 +246,7 @@ pub fn render_generative_cover(item: &LibraryItem, width: f32, height: f32, rend
 #[cfg(test)]
 mod tests {
     use dtrpg_core::data::enums::ItemStatus;
-    use dtrpg_core::util::stubs::*;
+    use dtrpg_core::services::stub_catalog::stub_catalog;
 
     use super::*;
 

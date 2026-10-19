@@ -42,6 +42,7 @@ plist = { workspace = true }
 tempfile.workspace = true
 
 [features]
+test-fixtures = []
 # Enables Sentry crash/error reporting. Compiled in only for CI-built release
 # artifacts; source builds (`cargo build`/`cargo test`/`cargo run` with no
 # explicit feature flags) never pull in the Sentry dependency.

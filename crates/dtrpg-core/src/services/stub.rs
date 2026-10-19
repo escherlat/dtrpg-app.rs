@@ -1,10 +1,10 @@
 //! Test stubs for the library service.
 
 use crate::data::library::LibraryItem;
+use crate::services::stub_catalog::stub_catalog;
 use crate::services::{
     DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind,
 };
-use crate::util::stubs::stub_catalog;
 
 /// Controls which canned behavior a [`StubLibraryService`] exhibits.
 #[derive(Clone, Copy, Debug)]

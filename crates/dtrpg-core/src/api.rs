@@ -322,7 +322,7 @@ mod tests {
     use crate::data::enums::ItemStatus;
     use crate::services::collections::stub::{CollectionsStubMode, CollectionsStubService};
     use crate::services::stub::{StubLibraryService, StubMode};
-    use crate::util::stubs::stub_catalog;
+    use crate::services::stub_catalog::stub_catalog;
 
     fn test_dir(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!("dtrpg_library_api_test_{name}"))
