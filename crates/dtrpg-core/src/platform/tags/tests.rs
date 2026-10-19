@@ -14,7 +14,7 @@ fn macos_names(tags: &[MacosTag]) -> Vec<&str> {
 
 #[test]
 fn macos_tags_round_trip() {
-    let bytes = encode_macos(&names(&["solo", "to run"]), &[]).unwrap();
+    let bytes = encode_macos(&names(&["solo", "to run"])).unwrap();
 
     let decoded = decode_macos(&bytes).unwrap();
 
@@ -24,14 +24,14 @@ fn macos_tags_round_trip() {
 
 #[test]
 fn macos_tags_are_written_as_a_binary_property_list() {
-    let bytes = encode_macos(&names(&["solo"]), &[]).unwrap();
+    let bytes = encode_macos(&names(&["solo"])).unwrap();
 
     assert!(bytes.starts_with(b"bplist00"));
 }
 
 #[test]
 fn a_macos_color_suffix_is_read_apart_from_the_name() {
-    let existing = encode_macos(&names(&["Red\n6", "solo"]), &[]).unwrap();
+    let existing = encode_macos(&names(&["Red\n6", "solo"])).unwrap();
 
     let decoded = decode_macos(&existing).unwrap();
 
@@ -44,27 +44,8 @@ fn a_macos_color_suffix_is_read_apart_from_the_name() {
 }
 
 #[test]
-fn rewriting_macos_tags_keeps_the_color_of_a_tag_that_stays() {
-    let existing = [MacosTag { name:   "Red".to_owned(),
-                               suffix: Some("6".to_owned()), },
-                    MacosTag { name:   "old".to_owned(),
-                               suffix: Some("2".to_owned()), }];
-
-    // The user's spelling is "red"; the color Finder gave "Red" stays.
-    let bytes = encode_macos(&names(&["red", "new"]), &existing).unwrap();
-    let decoded = decode_macos(&bytes).unwrap();
-
-    assert_eq!(decoded[0],
-               MacosTag { name:   "red".to_owned(),
-                          suffix: Some("6".to_owned()), });
-    assert_eq!(decoded[1],
-               MacosTag { name:   "new".to_owned(),
-                          suffix: None, });
-}
-
-#[test]
 fn a_tags_color_is_written_as_its_finder_number() {
-    let bytes = encode_macos(&[FileTag::colored("Red", TagColor::Red)], &[]).unwrap();
+    let bytes = encode_macos(&[FileTag::colored("Red", TagColor::Red)]).unwrap();
 
     let decoded = decode_macos(&bytes).unwrap();
 
@@ -73,20 +54,19 @@ fn a_tags_color_is_written_as_its_finder_number() {
 }
 
 #[test]
-fn a_tags_own_color_wins_over_the_one_the_file_had() {
-    let existing = [MacosTag { name:   "solo".to_owned(),
-                               suffix: Some("6".to_owned()), }];
+fn a_tag_with_no_color_is_written_with_its_name_alone() {
+    let bytes = encode_macos(&names(&["solo"])).unwrap();
 
-    let bytes = encode_macos(&[FileTag::colored("solo", TagColor::Blue)], &existing).unwrap();
+    let decoded = decode_macos(&bytes).unwrap();
 
-    assert_eq!(macos_color(&decode_macos(&bytes).unwrap()[0]),
-               Some(TagColor::Blue));
+    assert_eq!(decoded[0].suffix, None);
+    assert_eq!(macos_color(&decoded[0]), None);
 }
 
 #[test]
 fn every_color_survives_being_written_and_read() {
     for color in TagColor::ALL {
-        let bytes = encode_macos(&[FileTag::colored("solo", color)], &[]).unwrap();
+        let bytes = encode_macos(&[FileTag::colored("solo", color)]).unwrap();
 
         assert_eq!(macos_color(&decode_macos(&bytes).unwrap()[0]), Some(color));
     }

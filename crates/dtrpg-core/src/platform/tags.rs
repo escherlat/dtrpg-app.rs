@@ -67,27 +67,20 @@ pub(super) fn decode_macos(bytes: &[u8]) -> io::Result<Vec<MacosTag>> {
 
 /// Writes `tags` as the bytes of a macOS tag attribute.
 ///
-/// A tag with a color is written with that color. A tag with none keeps the
-/// suffix `existing` has for it, ignoring case, so rewriting a file's tags does
-/// not lose a color Finder gave a tag the library knows no color for.
+/// A tag with a color is written with that color's Finder number after its
+/// name, and a tag with none is written with its name alone.
 ///
 /// # Errors
 ///
 /// Returns [`io::ErrorKind::InvalidData`] if the property list cannot be
 /// written.
 #[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
-pub(super) fn encode_macos(tags: &[FileTag], existing: &[MacosTag]) -> io::Result<Vec<u8>> {
+pub(super) fn encode_macos(tags: &[FileTag]) -> io::Result<Vec<u8>> {
     let entries =
         tags.iter()
             .map(|tag| {
-                let kept = existing.iter()
-                                   .find(|old| old.name.to_lowercase() == tag.name.to_lowercase())
-                                   .and_then(|old| old.suffix.clone());
-                let suffix = tag.color
-                                .map(|color| color.finder_number().to_string())
-                                .or(kept);
-                Value::String(match suffix {
-                                  Some(suffix) => format!("{}\n{suffix}", tag.name),
+                Value::String(match tag.color {
+                                  Some(color) => format!("{}\n{}", tag.name, color.finder_number()),
                                   None => tag.name.clone(),
                               })
             })
@@ -161,14 +154,7 @@ pub(super) fn read(path: &Path) -> io::Result<Vec<FileTag>> {
 /// attribute. An empty list removes the attribute.
 pub(super) fn write(path: &Path, tags: &[FileTag]) -> io::Result<()> {
     #[cfg(target_os = "macos")]
-    let (attribute, bytes) = {
-        let existing = match xattr::get(path, MACOS_ATTRIBUTE)? {
-            // A tag attribute that cannot be read is replaced, not kept.
-            Some(bytes) => decode_macos(&bytes).unwrap_or_default(),
-            None => Vec::new(),
-        };
-        (MACOS_ATTRIBUTE, encode_macos(tags, &existing)?)
-    };
+    let (attribute, bytes) = (MACOS_ATTRIBUTE, encode_macos(tags)?);
     #[cfg(not(target_os = "macos"))]
     let (attribute, bytes) = (LINUX_ATTRIBUTE, encode_linux(tags));
 

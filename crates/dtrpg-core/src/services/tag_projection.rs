@@ -93,6 +93,19 @@ fn index_file_tags(index: &LibraryIndex, item_id: &str) -> Result<Vec<FileTag>, 
             .collect())
 }
 
+/// Whether a file's tags are the index's: the same names, and for each tag the
+/// same color, none included. A platform that keeps no colors never has the
+/// color of a tag the index colored, so such a tag is written again.
+fn has_the_tags(on_file: &[FileTag], in_index: &[FileTag]) -> bool {
+    comparable(&names(on_file)) == comparable(&names(in_index))
+    && in_index.iter().all(|wanted| {
+                          on_file.iter().any(|tag| {
+                                            tag.name.to_lowercase() == wanted.name.to_lowercase()
+                                            && tag.color == wanted.color
+                                        })
+                      })
+}
+
 /// Records that `path` and the index now agree on `tags`.
 fn record(index: &LibraryIndex, file: &TaggedFile, tags: &[String]) -> Result<(), IndexError> {
     index.record_file_tag_sync(&file.path.to_string_lossy(),
@@ -211,6 +224,21 @@ pub fn project_indexed_tags<P>(platform: &P, index_root: &Path, item_id: &str,
         return Ok(Vec::new());
     }
     let index = LibraryIndex::open_and_migrate(index_root)?;
+    project_files(platform, &index, item_id, paths, settings)
+}
+
+/// [`project_indexed_tags`] on an index that is already open.
+///
+/// # Errors
+///
+/// Returns [`IndexError`] if the index cannot be read.
+pub(crate) fn project_files<P>(platform: &P, index: &LibraryIndex, item_id: &str,
+                               paths: &[PathBuf], settings: SyncSettings)
+                               -> Result<Vec<ProjectionFailure>, IndexError>
+    where P: PlatformIntegration + ?Sized {
+    if !platform.capabilities().filesystem_tags {
+        return Ok(Vec::new());
+    }
     // A file at a path the library has seen before may be a new file, so what
     // the old one agreed on says nothing about it, whether or not it is
     // written.
@@ -220,24 +248,21 @@ pub fn project_indexed_tags<P>(platform: &P, index_root: &Path, item_id: &str,
     if !settings.write_to_files {
         return Ok(Vec::new());
     }
-    let in_index = index_file_tags(&index, item_id)?;
+    let in_index = index_file_tags(index, item_id)?;
     let mut failures = Vec::new();
     for path in paths {
         let file = TaggedFile { item_id: item_id.to_owned(),
                                 path:    path.clone(), };
         let result = platform.read_tags(path).and_then(|on_file| {
-                                                 if comparable(&names(&on_file))
-                                                    == comparable(&names(&in_index))
-                                                 {
+                                                 if has_the_tags(&on_file, &in_index) {
                                                      Ok(())
                                                  }
                                                  else {
                                                      platform.write_tags(path, &in_index)
                                                  }
                                              });
-        let result =
-            result.map_err(SyncError::from)
-                  .and_then(|()| Ok(record(&index, &file, &names(&in_index))?));
+        let result = result.map_err(SyncError::from)
+                           .and_then(|()| Ok(record(index, &file, &names(&in_index))?));
         if let Err(error) = result {
             failures.push(ProjectionFailure { path:  path.clone(),
                                               error: error.to_string(), });
@@ -246,6 +271,8 @@ pub fn project_indexed_tags<P>(platform: &P, index_root: &Path, item_id: &str,
     Ok(failures)
 }
 
+#[cfg(test)]
+pub(crate) mod test_platform;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

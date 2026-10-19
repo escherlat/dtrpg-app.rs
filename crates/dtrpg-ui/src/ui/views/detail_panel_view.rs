@@ -39,6 +39,7 @@ use crate::data::theme::{ColorTokens, LibriTheme};
 use crate::ui::library::cover::{cover_style, render_generative_cover};
 use crate::ui::views::catalog_view::render_checking_indicator;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
+use crate::ui::views::tags_section_view::render_tags_section;
 use crate::ui::widgets::{selectable_text, small_caps_text};
 use crate::util::datetime::{format_absolute, format_relative};
 use crate::util::file_presence::resolved_item_dir;
@@ -92,6 +93,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
     let entity_refresh_thumbnail = entity.clone();
     let entity_other_details = entity.clone();
     let entity_collections = entity.clone();
+    let entity_tags = entity.clone();
     let entity_tabs = entity.clone();
     let inspector_entry_id = Arc::clone(&item.id);
     let entity_item_tier = entity;
@@ -352,6 +354,7 @@ pub fn render_detail_tab_content(item: &LibraryItem, storage_root_path: PathBuf,
                                                     entity_item_tier.clone(), tabs, colors, window,
                                                     cx))
                     })
+                    .child(render_tags_section(&item, entity_tags, colors, cx))
                     .child(render_collections_section(&item, entity_collections, colors, cx))
                     .child(render_other_details(&item, entity_other_details, colors, cx)),
             ),

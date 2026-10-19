@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use dtrpg_core::data::collection::CollectionEntry;
 use dtrpg_core::data::library::SectionCounts;
+use dtrpg_core::data::tag_library::TagEntry;
 use dtrpg_core::data::ui_state::UiState;
 use dtrpg_core::util::filter::SidebarFilter;
 use dtrpg_core::util::matching::name_matches_query;
@@ -34,6 +35,7 @@ use rust_i18n::t;
 use crate::controllers::library::LibraryController;
 use crate::controllers::tabs::{TabTarget, TabsController};
 use crate::ui::library::drag::DraggedLibraryItem;
+use crate::ui::views::sidebar_tags::tags_menu;
 use crate::util::publisher::PublisherEntry;
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or
@@ -351,7 +353,7 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                       entity: Entity<LibraryController>, tabs: Entity<TabsController>,
                       collection_name_input: Entity<InputState>,
                       publisher_search: SidebarSectionSearch,
-                      collection_search: SidebarSectionSearch)
+                      collection_search: SidebarSectionSearch, tags: Vec<TagEntry>)
                       -> impl IntoElement + 'static {
     let active = filter.clone();
     let prefs = UiState::load();
@@ -619,11 +621,18 @@ pub fn render_sidebar(filter: SidebarFilter, counts: SectionCounts,
                                                    rows: col_rows,
                                                    loading: !collections_loaded,
                                                    entity: entity.clone(),
-                                                   tabs };
+                                                   tabs: tabs.clone() };
 
-    sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)))
-                   .child(SidebarContent::Separator)
-                   .child(SidebarContent::Menu(Box::new(pub_menu)))
+    let sidebar_builder =
+        sidebar_builder.child(SidebarContent::Collections(Box::new(collections_section)))
+                       .child(SidebarContent::Separator)
+                       .child(SidebarContent::Menu(Box::new(pub_menu)));
+    // Nothing to list until something has been tagged.
+    if tags.is_empty() {
+        return sidebar_builder;
+    }
+    sidebar_builder.child(SidebarContent::Separator)
+                   .child(SidebarContent::Menu(Box::new(tags_menu(tags, &active, entity, tabs))))
 }
 
 /// Renders the Collections header's sort control: an icon button whose

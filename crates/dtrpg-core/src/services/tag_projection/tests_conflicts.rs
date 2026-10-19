@@ -4,7 +4,8 @@
 
 #![allow(clippy::unwrap_used)]
 
-use super::tests::{InMemory, file, index_with, plain, reconcile};
+use super::test_platform::{InMemory, file, index_with, plain};
+use super::tests::reconcile;
 use super::*;
 use crate::data::index::LibraryIndex;
 
