@@ -99,4 +99,6 @@ written in.
 - [x] 5.3 Reconciliation tests against a temporary directory on Linux, with `user.xdg.tags`
 - [ ] 5.4 Manual check on a real Mac: tag in Libri with a color, see both in Finder; remove the tag in Finder,
       relaunch, see it gone from Libri and the activity panel say so; click through the new views
+      (2026-10-19: the View menu being enabled and scrolling speed are confirmed on a Mac. Still to check: the
+      Finder round trip, the column heading menu and Tags column, and Group by Tag in all three layouts.)
 - [x] 5.5 Documentation page (`docs/site/latest/tags.md`), including how edits made outside Libri are read back and when the later change wins
