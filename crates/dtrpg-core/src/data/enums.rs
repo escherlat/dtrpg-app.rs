@@ -129,6 +129,128 @@ impl FromStr for GroupBy {
     }
 }
 
+/// A column of the catalog's list layout.
+///
+/// [`Title`](Self::Title), [`Status`](Self::Status) and [`Open`](Self::Open)
+/// are always shown. The user chooses which of [`CHOOSABLE`](Self::CHOOSABLE)
+/// are.
+///
+/// # Examples
+///
+/// ```
+/// use dtrpg_core::data::enums::ListColumn;
+///
+/// assert_eq!(ListColumn::from_key("tags"), Some(ListColumn::Tags));
+/// assert_eq!(ListColumn::Pages.key(), "pages");
+/// assert!(ListColumn::Size.is_sortable());
+/// assert!(!ListColumn::Tags.is_sortable());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ListColumn {
+    Title,
+    Publisher,
+    System,
+    Pages,
+    Size,
+    Added,
+    Tags,
+    /// The download-status glyph.
+    Status,
+    /// The button that opens a downloaded item.
+    Open,
+}
+
+impl ListColumn {
+    /// The columns the user can show or hide, in the order they appear.
+    pub const CHOOSABLE: [Self; 6] = [Self::Publisher,
+                                      Self::System,
+                                      Self::Pages,
+                                      Self::Size,
+                                      Self::Added,
+                                      Self::Tags];
+
+    /// The choosable columns that are shown until the user chooses otherwise.
+    pub const DEFAULT_CHOSEN: [Self; 5] = [Self::Publisher,
+                                           Self::System,
+                                           Self::Pages,
+                                           Self::Size,
+                                           Self::Added];
+
+    /// The column's stable name, used to save it and as its sort key.
+    #[must_use]
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Title => "title",
+            Self::Publisher => "publisher",
+            Self::System => "system",
+            Self::Pages => "pages",
+            Self::Size => "size",
+            Self::Added => "added",
+            Self::Tags => "tags",
+            Self::Status => "status",
+            Self::Open => "open",
+        }
+    }
+
+    /// The column called `key`, if there is one.
+    #[must_use]
+    pub fn from_key(key: &str) -> Option<Self> {
+        [Self::Title, Self::Status, Self::Open].into_iter()
+                                               .chain(Self::CHOOSABLE)
+                                               .find(|column| column.key() == key)
+    }
+
+    /// Whether clicking the column's heading sorts the list by it.
+    #[must_use]
+    pub fn is_sortable(self) -> bool {
+        !matches!(self, Self::Tags | Self::Status | Self::Open)
+    }
+
+    /// The columns chosen after `column` is shown if it was hidden, or hidden
+    /// if it was shown, in their usual order. A column that cannot be
+    /// chosen changes nothing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::data::enums::ListColumn;
+    ///
+    /// let chosen = ListColumn::toggled(&[ListColumn::Size], ListColumn::Tags);
+    /// assert_eq!(chosen, [ListColumn::Size, ListColumn::Tags]);
+    /// assert_eq!(ListColumn::toggled(&chosen, ListColumn::Size),
+    ///            [ListColumn::Tags]);
+    /// assert_eq!(ListColumn::toggled(&chosen, ListColumn::Title), chosen);
+    /// ```
+    #[must_use]
+    pub fn toggled(chosen: &[Self], column: Self) -> Vec<Self> {
+        if !Self::CHOOSABLE.contains(&column) {
+            return chosen.to_vec();
+        }
+        let mut next = chosen.to_vec();
+        if let Some(at) = next.iter().position(|shown| *shown == column) {
+            next.remove(at);
+        }
+        else {
+            next.push(column);
+        }
+        Self::CHOOSABLE.into_iter()
+                       .filter(|candidate| next.contains(candidate))
+                       .collect()
+    }
+
+    /// Every column in the order they appear when `chosen` are shown: the
+    /// title, then `chosen` in their usual order whatever order they are
+    /// given in, then the status and open columns.
+    #[must_use]
+    pub fn shown(chosen: &[Self]) -> Vec<Self> {
+        let mut columns = vec![Self::Title];
+        columns.extend(Self::CHOOSABLE.into_iter()
+                                      .filter(|column| chosen.contains(column)));
+        columns.extend([Self::Status, Self::Open]);
+        columns
+    }
+}
+
 /// Which `LibraryItem` field a bulk-selection pattern match is applied
 /// against (see `LibraryController::select_by_pattern`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

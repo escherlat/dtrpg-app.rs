@@ -25,6 +25,15 @@ instead (shown as "custom" sort in the toolbar). The sort dropdown and the
 View menu also group the catalog by publisher or by [tag]({{ '/latest/tags/' | relative_url }}#grouping-by-tag),
 one at a time.
 
+## Choosing the list columns
+
+In List layout, right-click any column heading to show or hide columns. The choices are
+Publisher, System, Pages, Size, Added and Tags; the title, the download status and the open
+button are always there. Libri remembers which columns you chose. A width you drag a column to
+lasts until you quit, and survives showing and hiding other columns. The Tags column lists an item's tags separated by commas.
+It does not sort, because a list of tags has no order to sort by. Publisher, System,
+Pages, Size and Added are shown until you choose otherwise.
+
 ## Navigation and filtering
 
 The sidebar has three sections:

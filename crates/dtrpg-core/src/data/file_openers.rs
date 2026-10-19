@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::data::enums::{CatalogPresentation, GroupBy};
+use crate::data::enums::{CatalogPresentation, GroupBy, ListColumn};
 use crate::util::filter::SidebarFilter;
 use crate::util::sort::SortMethod;
 
@@ -50,6 +50,9 @@ pub struct CatalogViewPrefs {
     /// What the catalog is grouped by, as [`GroupBy`] names it.
     #[serde(default)]
     group_by:         Option<String>,
+    /// The optional list columns that are shown, by [`ListColumn::key`].
+    #[serde(default)]
+    list_columns:     Option<Vec<String>>,
     /// Whether the catalog was grouped by publisher, as saved before
     /// `group_by` existed. Read when `group_by` is absent; never written.
     #[serde(default)]
@@ -80,7 +83,7 @@ impl CatalogViewPrefs {
 
     /// Builds preferences from the controller's current view state.
     pub fn from_state(filter: &SidebarFilter, sort: SortMethod, group_by: GroupBy,
-                      presentation: CatalogPresentation)
+                      presentation: CatalogPresentation, list_columns: &[ListColumn])
                       -> Self {
         let (filter_name, filter_publisher) = match filter {
             SidebarFilter::AllTitles => (Some("AllTitles"), None),
@@ -104,6 +107,7 @@ impl CatalogViewPrefs {
                               SortMethod::Custom { .. } => "Custom",
                           }.to_string()),
                group_by: Some(group_by.to_string()),
+               list_columns: Some(list_columns.iter().map(|c| c.key().to_owned()).collect()),
                grouped: None,
                presentation: Some(match presentation {
                                       CatalogPresentation::List => "List",
@@ -145,6 +149,19 @@ impl CatalogViewPrefs {
                                           GroupBy::default()
                                       }),
         }
+    }
+
+    /// Resolves the optional list columns that are shown, in their usual order.
+    /// Absent values mean the defaults; a name that is not a choosable column
+    /// is ignored.
+    pub fn to_list_columns(&self) -> Vec<ListColumn> {
+        let Some(keys) = &self.list_columns
+        else {
+            return ListColumn::DEFAULT_CHOSEN.to_vec();
+        };
+        ListColumn::CHOOSABLE.into_iter()
+                             .filter(|column| keys.iter().any(|key| key == column.key()))
+                             .collect()
     }
 
     /// Resolves the persisted presentation mode, defaulting (with a `WARN`
@@ -333,147 +350,5 @@ pub(crate) fn config_path() -> Option<PathBuf> {
     Some(base.join("dtrpg").join("app_config.toml"))
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn entry(ext: &str, path: &str) -> FileOpenerEntry {
-        FileOpenerEntry { extension: ext.to_owned(),
-                          app_path:  PathBuf::from(path), }
-    }
-
-    fn config_with(entries: Vec<FileOpenerEntry>) -> FileOpenerConfig {
-        FileOpenerConfig { entries }
-    }
-
-    // ── find_override
-    // ─────────────────────────────────────────────────────────
-
-    #[test]
-    fn find_override_exact_match() {
-        let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(cfg.find_override("pdf"),
-                   Some(Path::new("/Applications/Preview.app")));
-    }
-
-    #[test]
-    fn find_override_case_insensitive() {
-        let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(cfg.find_override("PDF"),
-                   Some(Path::new("/Applications/Preview.app")));
-        assert_eq!(cfg.find_override("Pdf"),
-                   Some(Path::new("/Applications/Preview.app")));
-    }
-
-    #[test]
-    fn find_override_dot_prefixed_input() {
-        let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(cfg.find_override(".pdf"),
-                   Some(Path::new("/Applications/Preview.app")));
-        assert_eq!(cfg.find_override(".PDF"),
-                   Some(Path::new("/Applications/Preview.app")));
-    }
-
-    #[test]
-    fn find_override_no_match() {
-        let cfg = config_with(vec![entry("pdf", "/Applications/Preview.app")]);
-        assert_eq!(cfg.find_override("epub"), None);
-        assert_eq!(cfg.find_override(""), None);
-    }
-
-    // ── add ───────────────────────────────────────────────────────────────────
-
-    #[test]
-    fn add_new_entry() {
-        let mut cfg = FileOpenerConfig::default();
-        let result = cfg.add(entry("pdf", "/Applications/Preview.app"));
-        assert_eq!(result, AddOutcome::Added);
-        assert_eq!(cfg.entries().len(), 1);
-        assert_eq!(cfg.entries()[0].extension, "pdf");
-    }
-
-    #[test]
-    fn add_normalizes_extension() {
-        let mut cfg = FileOpenerConfig::default();
-        cfg.add(entry(".PDF", "/Applications/Preview.app"));
-        assert_eq!(cfg.entries()[0].extension, "pdf");
-    }
-
-    #[test]
-    fn add_trims_whitespace_in_extension() {
-        let mut cfg = FileOpenerConfig::default();
-        cfg.add(entry("  pdf  ", "/Applications/Preview.app"));
-        assert_eq!(cfg.entries()[0].extension, "pdf");
-    }
-
-    #[test]
-    fn add_duplicate_replaces() {
-        let mut cfg = FileOpenerConfig::default();
-        cfg.add(entry("pdf", "/Applications/Preview.app"));
-        let result = cfg.add(entry("pdf", "/Applications/Acrobat.app"));
-        assert_eq!(result, AddOutcome::Replaced);
-        assert_eq!(cfg.entries().len(), 1);
-        assert_eq!(cfg.entries()[0].app_path,
-                   PathBuf::from("/Applications/Acrobat.app"));
-    }
-
-    // ── validate_all
-    // ──────────────────────────────────────────────────────────
-
-    #[test]
-    fn validate_all_flags_missing_paths() {
-        let cfg = config_with(vec![entry("pdf", "/nonexistent/Preview.app"),
-                                   entry("epub", "/nonexistent/Calibre.app"),]);
-        let stale = cfg.validate_all();
-        assert_eq!(stale.len(), 2);
-    }
-
-    #[test]
-    fn validate_all_accepts_existing_paths() {
-        let tmp = std::env::temp_dir();
-        let cfg = config_with(vec![entry("pdf", tmp.to_str().unwrap_or("/tmp"))]);
-        let stale = cfg.validate_all();
-        assert_eq!(stale.len(), 0);
-    }
-
-    // ── Grouping
-    // ─────────────────────────────────────────────────────────────
-
-    // A test that cannot read its own fixture should fail loudly.
-    #[allow(clippy::expect_used)]
-    fn prefs_from(toml_text: &str) -> CatalogViewPrefs {
-        toml::from_str(toml_text).expect("valid catalog view preferences")
-    }
-
-    #[test]
-    #[allow(clippy::expect_used)] // A fixture that cannot be written should fail loudly.
-    fn every_grouping_survives_being_saved_and_loaded() {
-        for group_by in [GroupBy::None, GroupBy::Publisher, GroupBy::Tag] {
-            let saved = CatalogViewPrefs::from_state(&SidebarFilter::AllTitles,
-                                                     SortMethod::Title,
-                                                     group_by,
-                                                     CatalogPresentation::Grid);
-            let text = toml::to_string(&saved).expect("preferences serialize");
-
-            assert_eq!(prefs_from(&text).to_group_by(), group_by);
-        }
-    }
-
-    #[test]
-    fn a_catalog_saved_as_grouped_before_there_was_a_choice_is_grouped_by_publisher() {
-        assert_eq!(prefs_from("grouped = true").to_group_by(),
-                   GroupBy::Publisher);
-        assert_eq!(prefs_from("grouped = false").to_group_by(), GroupBy::None);
-        assert_eq!(prefs_from("").to_group_by(), GroupBy::None);
-    }
-
-    #[test]
-    fn the_grouping_wins_over_the_old_setting_and_an_unknown_one_means_none() {
-        assert_eq!(prefs_from("group_by = \"Tag\"\ngrouped = true").to_group_by(),
-                   GroupBy::Tag);
-        assert_eq!(prefs_from("group_by = \"Planet\"").to_group_by(),
-                   GroupBy::None);
-    }
-}
+mod tests;

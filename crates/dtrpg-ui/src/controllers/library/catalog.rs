@@ -208,6 +208,7 @@ impl LibraryController {
                           collection_sort: self.collection_sort,
                           collection_sort_direction: self.collection_sort_direction,
                           group_by: self.group_by,
+                          list_columns: self.list_columns.clone(),
                           presentation: self.presentation,
                           selected_item,
                           items,

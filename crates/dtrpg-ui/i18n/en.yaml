@@ -92,6 +92,7 @@ catalog:
   col_pages: "Pages"
   col_size: "Size"
   col_added: "Added"
+  col_tags: "Tags"
   action_download: "Download"
   publisher_download_all: "Download All"
   untagged: "Untagged"
