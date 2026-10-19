@@ -20,8 +20,10 @@ use crate::data::tag_color::TagColor;
 use crate::data::tag_library::TagLibrary;
 use crate::services::collections::{CollectionsService, CollectionsServiceError};
 use crate::services::{LibraryService, LibraryServiceError};
-use crate::util::container::{ContainerEntry, ContainerError};
 use crate::util::datetime::now_secs;
+
+#[path = "api_archive.rs"]
+mod api_archive;
 
 /// Command/query facade over the library and collections services, and over
 /// the local library index (search, counts, and reads that don't need a
@@ -61,18 +63,6 @@ impl LibraryApi {
     #[must_use]
     pub fn index_root(&self) -> &Path {
         &self.index_root
-    }
-
-    /// Lists entries in a local archive without requiring callers to know its
-    /// concrete format.
-    pub fn list_archive_entries(&self, path: &Path) -> Result<Vec<ContainerEntry>, ContainerError> {
-        crate::util::container::list_entries(path)
-    }
-
-    /// Extracts selected archive entries below `destination`.
-    pub fn extract_archive_entries(&self, path: &Path, names: &[&str], destination: &Path)
-                                   -> Result<(), ContainerError> {
-        crate::util::container::open(path)?.extract_entries(names, destination)
     }
 
     /// Returns every item in the local library index.
