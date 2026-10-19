@@ -9,6 +9,7 @@ versions:
       - catalog
       - collections
       - tags
+      - mcp
       - downloads
       - settings
       - themes
@@ -24,6 +25,8 @@ versions:
         path: collections/
       - title: Tags
         path: tags/
+      - title: Using Libri from an AI agent
+        path: mcp/
       - title: Downloads
         path: downloads/
       - title: Settings
