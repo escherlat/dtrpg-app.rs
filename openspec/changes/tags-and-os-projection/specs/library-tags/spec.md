@@ -115,6 +115,11 @@ A tag SHALL have an optional color, one of the seven colors Finder uses.
 - **WHEN** a tag with a color is written to a file on macOS
 - **THEN** Finder SHALL show the tag in that color
 
+#### Scenario: Choosing a color
+
+- **WHEN** the user right-clicks a tag, in the sidebar or on an item, and chooses a color
+- **THEN** the tag SHALL have that color everywhere it is shown, and on every file of every item that has it
+
 #### Scenario: A color on a platform that keeps none
 
 - **WHEN** the platform keeps no colors for file tags

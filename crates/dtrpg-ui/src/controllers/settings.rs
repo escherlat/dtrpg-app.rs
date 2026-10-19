@@ -8,6 +8,7 @@ use dtrpg_core::data::avatar::{avatar_cached, fetch_avatar_bytes};
 use dtrpg_core::data::catalog_cache::load_cache_metadata;
 use dtrpg_core::data::constants::{KEYRING_API_KEY, KEYRING_SERVICE};
 use dtrpg_core::data::file_openers::{AddOutcome, FileOpenerConfig, FileOpenerEntry};
+use dtrpg_core::data::native_preferences::{NativePreferences, NativePreferencesFile};
 use dtrpg_core::data::paths::{app_cache_dir, cache_dir, covers_dir};
 use dtrpg_core::data::profile::ProfileConfig;
 use dtrpg_core::data::storage::placement::PlacementCondition;
@@ -159,6 +160,9 @@ pub struct SettingsSnapshot {
     /// `{root}/collections/{collection name}/` for each collection it
     /// belongs to.
     pub create_collections:             bool,
+    /// The Native Integration switches: whether tags move between the library
+    /// and files' tags, and whether that is checked at launch.
+    pub native:                         NativePreferencesFile,
     /// User-configured "Recently Updated" sidebar window, in days.
     pub recently_updated_window_days:   u32,
     /// Shared input state for the "Recently Updated window" number field in
@@ -182,6 +186,7 @@ pub struct SettingsController {
     is_authenticated:               bool,
     auth_state:                     AuthState,
     storage:                        StorageConfig,
+    native:                         NativePreferences,
     storage_unavailable:            bool,
     storage_path_exists:            bool,
     login_service:                  Arc<dyn LoginService>,
@@ -312,6 +317,7 @@ impl SettingsController {
                               auth_state: AuthState::LoggedOut,
                               storage_path_exists: true,
                               storage,
+                              native: NativePreferences::load(),
                               storage_unavailable,
                               login_service: Arc::from(login_service),
                               email_draft,
@@ -363,6 +369,7 @@ impl SettingsController {
                auth_state: AuthState::LoggedOut,
                storage_path_exists: true,
                storage: StorageConfig::for_test(std::env::temp_dir()),
+               native: NativePreferences::in_memory(),
                storage_unavailable: false,
                login_service,
                email_draft: String::new(),
@@ -1052,6 +1059,7 @@ impl SettingsController {
                            max_concurrent_downloads_input: self.max_concurrent_downloads_input
                                                                .clone(),
                            create_collections: self.storage.create_collections(),
+                           native: self.native.snapshot(),
                            recently_updated_window_days: self.storage
                                                              .recently_updated_window_days(),
                            recently_updated_window_input: self.recently_updated_window_input
@@ -1103,6 +1111,8 @@ fn mask_api_key(key: &str) -> String {
     }
 }
 
+mod native;
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1129,7 +1139,7 @@ mod tests {
 
     /// Never invoked by the tests below — `request_email_focus_on_account_tab`
     /// and `take_focus_email_pending` don't touch the login flow.
-    struct UnusedLoginService;
+    pub(super) struct UnusedLoginService;
 
     impl LoginService for UnusedLoginService {
         fn login_with_credentials(&self, _email: &str, _password: &str)

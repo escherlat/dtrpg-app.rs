@@ -22,7 +22,7 @@ use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
-use dtrpg_core::data::tag_library::TagLibrary;
+use dtrpg_core::data::tag_library::{TagEntry, TagLibrary};
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use dtrpg_core::services::covers::{CoverFetcher, HttpCoverTransport};
 use dtrpg_core::services::network_monitor::NetworkMonitor;
@@ -113,6 +113,8 @@ pub struct LibrarySnapshot {
     pub counts:                    SectionCounts,
     pub publishers:                Vec<PublisherEntry>,
     pub collections:               Vec<CollectionEntry>,
+    /// Every tag, for the sidebar's Tags section.
+    pub tags:                      Vec<TagEntry>,
     /// True once the initial collections fetch for the current session has
     /// completed; the sidebar shows "?" for the collection count until then.
     pub collections_loaded:        bool,

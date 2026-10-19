@@ -64,19 +64,37 @@ files written and files read back separately.
 - [x] 3b.6 `NativePreferences`: write to files, read from files, reconcile on launch; the launch pass and a
       finished download honor them
 - [x] 3b.7 ADR 0008, and the spec
-- [ ] 3b.8 `LibraryApi` methods for tag colors (with the UI slice, which is their caller)
-- [ ] 3b.9 The Native Integration settings page with the three switches (with the UI slice)
+- [ ] 3b.8 `LibraryApi` methods for tag colors (with the MCP `set_tags` tool, which is their caller; the app
+      uses `services::tag_editing` directly)
+- [x] 3b.9 The Native Integration settings page with the three switches
 
 ## 4. UI
 
-- [ ] 4.1 Tag editor in the detail panel
-- [ ] 4.2 Catalog filter by tag
-- [ ] 4.3 Text describing the file-system projection only where `filesystem_tags` is true
+The controller keeps a `TagLibrary` read from the index in the background (the views never read the index), and
+edits go through `services::tag_editing::apply_tag_edit`, which changes the index and writes the files of the items
+it affected. When an edit finishes, the tags are read again from the index rather than taken from the edit, because
+two edits made quickly would otherwise each show the other out of date. A tag filter (`SidebarFilter::Tag`) carries
+the ids of the items that have the tag, so filter matching needs no change at its callers.
+
+Following the accepted Libri v2 design (`claude-2` in `dtrpg-design`): chips with a color dot in the detail panel,
+a Tags section in the sidebar, a Native Integration settings page. A tag's color is set by right-clicking it. The
+views are checked by compiling and by controller tests only: the app cannot be run in the environment this was
+written in.
+
+- [x] 4.1 Tag editor in the detail panel: chips, a remove button, and a dialog to tick existing tags or make one
+- [x] 4.2 Catalog filter by tag: a Tags section in the sidebar with counts
+- [x] 4.3 Text describing the file-system projection only where `filesystem_tags` is true
+- [x] 4.4 Right-click a tag to set its color
+- [x] 4.5 The Native Integration settings page with the three switches
+- [ ] 4.6 The optional Tags column, and group by tag
+- [ ] 4.7 `tag:` and `-tag:` in the search box, and the saved-search rule editor
+- [ ] 4.8 The `set_tags` MCP tool, and the `LibraryApi` methods it needs (3b.8)
 
 ## 5. Tests and docs
 
-- [ ] 5.1 Index tests: add, remove, case-insensitive uniqueness, rename, delete, search by tag
-- [ ] 5.2 Projection encode and decode tests for both formats, on every platform
-- [ ] 5.3 Reconciliation tests against a temporary directory on Linux, with `user.xdg.tags`
-- [ ] 5.4 Manual check on a real Mac: tag in Libri, see it in Finder; remove it in Finder, relaunch, see it return
-- [ ] 5.5 Documentation page, including how edits made outside Libri are read back and when the later change wins
+- [x] 5.1 Index tests: add, remove, case-insensitive uniqueness, rename, delete, search by tag
+- [x] 5.2 Projection encode and decode tests for both formats, on every platform
+- [x] 5.3 Reconciliation tests against a temporary directory on Linux, with `user.xdg.tags`
+- [ ] 5.4 Manual check on a real Mac: tag in Libri with a color, see both in Finder; remove the tag in Finder,
+      relaunch, see it gone from Libri and the activity panel say so; click through the new views
+- [x] 5.5 Documentation page (`docs/site/latest/tags.md`), including how edits made outside Libri are read back and when the later change wins

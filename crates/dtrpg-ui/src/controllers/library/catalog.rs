@@ -195,6 +195,7 @@ impl LibraryController {
                           counts: self.section_counts,
                           publishers: self.publishers.clone(),
                           collections: self.collections.clone(),
+                          tags: self.tag_entries(),
                           collections_loaded: self.collections_loaded,
                           catalog_ids,
                           total_count: self.section_counts.all,

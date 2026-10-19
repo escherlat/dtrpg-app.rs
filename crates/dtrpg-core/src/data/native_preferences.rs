@@ -13,7 +13,7 @@ use crate::data::paths::app_preferences_dir;
 
 /// The preferences as stored. A missing field is on, so a file written by an
 /// older version, or by hand, keeps working.
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default)]
 pub struct NativePreferencesFile {
     /// Whether the library's tags are written to files' tags.
@@ -35,7 +35,8 @@ impl Default for NativePreferencesFile {
 
 /// Persists and restores the native-integration preferences.
 pub struct NativePreferences {
-    path: PathBuf,
+    /// Where the preferences are saved, or `None` if they are never written.
+    path: Option<PathBuf>,
     data: NativePreferencesFile,
 }
 
@@ -62,8 +63,21 @@ impl NativePreferences {
                                              toml::from_str::<NativePreferencesFile>(&text).ok()
                                          })
                                          .unwrap_or_default();
-        Self { path: path.to_owned(),
+        Self { path: Some(path.to_owned()),
                data }
+    }
+
+    /// The defaults, never written to disk, for tests and previews.
+    #[must_use]
+    pub fn in_memory() -> Self {
+        Self { path: None,
+               data: NativePreferencesFile::default(), }
+    }
+
+    /// The preferences as they are now.
+    #[must_use]
+    pub fn snapshot(&self) -> NativePreferencesFile {
+        self.data
     }
 
     /// Whether the library's tags are written to files' tags.
@@ -106,17 +120,21 @@ impl NativePreferences {
     /// failure is logged and otherwise ignored, as a preference is not worth
     /// failing for.
     fn flush(&self) {
+        let Some(path) = &self.path
+        else {
+            return;
+        };
         let result = toml::to_string_pretty(&self.data).map_err(|error| error.to_string())
                                                        .and_then(|text| {
-                                                           if let Some(dir) = self.path.parent() {
+                                                           if let Some(dir) = path.parent() {
                                                                std::fs::create_dir_all(dir)
                                                                    .map_err(|e| e.to_string())?;
                                                            }
-                                                           std::fs::write(&self.path, text)
+                                                           std::fs::write(path, text)
                                                                .map_err(|e| e.to_string())
                                                        });
         if let Err(error) = result {
-            tracing::warn!(%error, path = %self.path.display(), "could not save native preferences");
+            tracing::warn!(%error, path = %path.display(), "could not save native preferences");
         }
     }
 }
@@ -183,5 +201,16 @@ mod tests {
         assert!(preferences.write_tags_to_files());
         assert_eq!(std::fs::read_to_string(&path).unwrap(),
                    "this is = not [ valid");
+    }
+
+    #[test]
+    fn preferences_that_are_in_memory_are_never_written() {
+        let mut preferences = NativePreferences::in_memory();
+
+        preferences.save_write_tags_to_files(false);
+
+        assert!(!preferences.write_tags_to_files());
+        assert!(!preferences.snapshot().write_tags_to_files);
+        assert!(preferences.snapshot().read_tags_from_files);
     }
 }

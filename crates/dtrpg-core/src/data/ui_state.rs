@@ -30,6 +30,9 @@ pub struct UiStateFile {
     /// Whether the Publishers sidebar section is open (`true`) or collapsed
     /// (`false`).
     pub publishers_open:       Option<bool>,
+    /// Whether the Tags sidebar section is open (`true`) or collapsed
+    /// (`false`).
+    pub tags_open:             Option<bool>,
     /// Index of the last-active settings page (Account/Storage/File
     /// Openers/Advanced/About), so the settings window reopens on the same
     /// tab it was closed on.
@@ -101,6 +104,11 @@ impl UiState {
         self.data.publishers_open.unwrap_or(true)
     }
 
+    /// Whether the Tags sidebar section is open. Defaults to open.
+    pub fn tags_open(&self) -> bool {
+        self.data.tags_open.unwrap_or(true)
+    }
+
     /// Persist the Collections section open state.
     pub fn save_collections_open(&mut self, open: bool) {
         self.data.collections_open = Some(open);
@@ -110,6 +118,12 @@ impl UiState {
     /// Persist the Publishers section open state.
     pub fn save_publishers_open(&mut self, open: bool) {
         self.data.publishers_open = Some(open);
+        self.flush();
+    }
+
+    /// Persist whether the Tags sidebar section is open.
+    pub fn save_tags_open(&mut self, open: bool) {
+        self.data.tags_open = Some(open);
         self.flush();
     }
 

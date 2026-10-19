@@ -2,3 +2,4 @@
 
 pub mod cover;
 pub mod drag;
+pub mod tag;

@@ -117,7 +117,8 @@ impl Render for SettingsWindowView {
                                           snap.create_collections,
                                           snap.recently_updated_window_days,
                                           snap.recently_updated_window_input,
-                                          font_selects);
+                                          font_selects,
+                                          snap.native);
 
         div().size_full().child(panel)
     }
