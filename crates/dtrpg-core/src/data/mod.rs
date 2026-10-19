@@ -17,6 +17,7 @@ pub mod profile;
 pub mod selection;
 pub mod storage;
 pub mod tag_color;
+pub mod tag_library;
 pub mod token_status;
 pub mod ui_preferences;
 pub mod ui_state;

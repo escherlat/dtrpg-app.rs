@@ -17,7 +17,7 @@ use dtrpg_core::services::tag_projection::{
 use super::*;
 
 /// Which way tags may move, as the Native Integration settings say.
-fn sync_settings(preferences: &NativePreferences) -> SyncSettings {
+pub(super) fn sync_settings(preferences: &NativePreferences) -> SyncSettings {
     SyncSettings { write_to_files:  preferences.write_tags_to_files(),
                    read_from_files: preferences.read_tags_from_files(), }
 }
@@ -156,6 +156,8 @@ impl LibraryController {
         if !report.imported.is_empty() {
             let label = t!("activity.tags_imported", count = report.imported.len()).to_string();
             self.finish_note(&label, cx);
+            // Tags read from files changed the index, so show them.
+            self.load_tags(cx);
         }
         if !report.failed.is_empty() {
             let label = t!("activity.tags_restore_failed", count = report.failed.len()).to_string();

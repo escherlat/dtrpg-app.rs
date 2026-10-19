@@ -22,6 +22,7 @@ use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
+use dtrpg_core::data::tag_library::TagLibrary;
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use dtrpg_core::services::covers::{CoverFetcher, HttpCoverTransport};
 use dtrpg_core::services::network_monitor::NetworkMonitor;
@@ -73,6 +74,7 @@ mod helpers;
 mod lifecycle;
 mod preferences;
 mod selection;
+mod tags;
 mod thumbnail_jobs;
 mod thumbnails;
 
@@ -88,6 +90,8 @@ mod tests_downloads;
 mod tests_file_tags;
 #[cfg(test)]
 mod tests_support;
+#[cfg(test)]
+mod tests_tags;
 #[cfg(test)]
 mod tests_thumbnails;
 #[cfg(test)]
@@ -369,6 +373,12 @@ pub struct LibraryController {
     /// Set by a full catalog load, and cleared when the verification of
     /// downloads that follows it reconciles the files' tags with the index.
     reconcile_tags_after_verify:   bool,
+    /// The library's tags, read from the index in the background, which the
+    /// views read instead of reading the index themselves.
+    tags:                          Arc<TagLibrary>,
+    /// Counts the reads and edits of tags that have been started, so a result
+    /// that arrives after a newer one is dropped.
+    tag_generation:                u64,
     /// Whether the files' tags have been reconciled with the index in this
     /// launch. They are reconciled at most once.
     file_tags_reconciled:          bool,

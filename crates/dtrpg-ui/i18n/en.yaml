@@ -36,6 +36,7 @@ toolbar:
   tooltip_account: "Account"
   filter_title_publisher: "Publisher: %{name}"
   filter_title_collection: "Collection: %{name}"
+  filter_title_tag: "Tag: %{name}"
   filtered_suffix: " (%{n} filtered)"
   select_items: "Select items"
   select_matches_placeholder: "Match pattern…"
@@ -296,6 +297,7 @@ activity:
   downloading_file_entry: "Downloading %{title} — %{file_name}…"
   tags_restored: "Tags restored from your library (files: %{count})"
   tags_imported: "Tags read from files into your library (files: %{count})"
+  tag_edit_failed: "Tag could not be changed"
   tags_restore_failed: "Tags could not be written (files: %{count})"
   session_setup_failed: "Session setup failed after sign-in"
 

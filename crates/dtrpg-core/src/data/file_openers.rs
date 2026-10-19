@@ -86,8 +86,10 @@ impl CatalogViewPrefs {
             // Collection filters carry a numeric id with no stable name to
             // validate against the library on next launch (unlike
             // Publisher); out of scope for this persistence layer, so they
-            // simply aren't remembered.
-            SidebarFilter::Collection(..) => (None, None),
+            // simply aren't remembered. A tag filter matches by a set of item
+            // ids that is not known until the tags have loaded, so it isn't
+            // remembered either.
+            SidebarFilter::Collection(..) | SidebarFilter::Tag { .. } => (None, None),
         };
         Self { sort: Some(match sort {
                               SortMethod::Title => "Title",

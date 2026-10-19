@@ -36,6 +36,7 @@ toolbar:
   tooltip_account: "Konto"
   filter_title_publisher: "Verlag: %{name}"
   filter_title_collection: "Sammlung: %{name}"
+  filter_title_tag: "Tag: %{name}"
   filtered_suffix: " (%{n} gefiltert)"
 
 count:
@@ -278,6 +279,7 @@ activity:
   downloading_file_entry: "%{title} — %{file_name} wird heruntergeladen…"
   tags_restored: "Tags aus der Bibliothek wiederhergestellt (Dateien: %{count})"
   tags_imported: "Tags aus Dateien in die Bibliothek übernommen (Dateien: %{count})"
+  tag_edit_failed: "Tag konnte nicht geändert werden"
   tags_restore_failed: "Tags konnten nicht geschrieben werden (Dateien: %{count})"
   session_setup_failed: "Sitzungseinrichtung nach der Anmeldung fehlgeschlagen"
 

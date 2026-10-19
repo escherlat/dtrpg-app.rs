@@ -102,6 +102,8 @@ impl LibraryController {
                           check_jobs: CheckJobs::default(),
                           download_jobs: DownloadJobs::default(),
                           cache_root: cache_dir(),
+                          tags: Arc::new(TagLibrary::default()),
+                          tag_generation: 0,
                           reconcile_tags_after_verify: false,
                           file_tags_reconciled: false,
                           max_concurrent_downloads: storage.max_concurrent_downloads(),

@@ -33,6 +33,7 @@ pub(crate) fn section_title_for(filter: &SidebarFilter) -> String {
         SidebarFilter::Collection(_, name) => {
             t!("toolbar.filter_title_collection", name = name).to_string()
         }
+        SidebarFilter::Tag { name, .. } => t!("toolbar.filter_title_tag", name = name).to_string(),
     }
 }
 

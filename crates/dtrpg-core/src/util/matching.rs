@@ -35,6 +35,9 @@ pub fn item_recently_updated(item: &LibraryItem, now_secs: i64, window_days: u32
 /// `order_product_id` or `product_id` matches, since the API returns
 /// `productId` while catalog items carry both IDs.
 ///
+/// A `Tag` filter carries the ids of the items that have the tag, so it needs
+/// nothing from the caller.
+///
 /// `window_days` is the user-configured "Recently Updated window" applied
 /// when `filter` is [`SidebarFilter::RecentlyUpdated`]; ignored otherwise.
 #[must_use]
@@ -51,6 +54,7 @@ pub fn item_matches_filter(item: &LibraryItem, filter: &SidebarFilter,
             (item.order_product_id > 0 && collection_members.contains(&item.order_product_id))
             || (item.product_id > 0 && collection_members.contains(&item.product_id))
         }
+        SidebarFilter::Tag { items, .. } => items.contains(&item.id),
     }
 }
 
@@ -203,5 +207,39 @@ mod tests {
         let members = HashSet::new();
         assert!(item_matches_filter(&recent, &SidebarFilter::RecentlyUpdated, &members, now, 30));
         assert!(!item_matches_filter(&stale, &SidebarFilter::RecentlyUpdated, &members, now, 30));
+    }
+
+    fn tag_filter(name: &str, ids: &[&str]) -> SidebarFilter {
+        SidebarFilter::Tag { name:  name.into(),
+                             items: std::sync::Arc::new(ids.iter()
+                                                           .map(|id| (*id).into())
+                                                           .collect()), }
+    }
+
+    #[test]
+    fn a_tag_filter_matches_the_items_it_carries() {
+        let tagged = item(None, None);
+        let members = HashSet::new();
+        let id: &str = &tagged.id;
+        let with = tag_filter("solo", &[id]);
+        let without = tag_filter("solo", &["someone else"]);
+
+        assert!(item_matches_filter(&tagged, &with, &members, 0, 30));
+        assert!(!item_matches_filter(&tagged, &without, &members, 0, 30));
+    }
+
+    #[test]
+    fn a_tag_filter_with_no_items_matches_nothing() {
+        let members = HashSet::new();
+
+        assert!(!item_matches_filter(&item(None, None), &tag_filter("solo", &[]), &members, 0, 30));
+    }
+
+    #[test]
+    fn two_tag_filters_are_equal_when_the_tags_are_the_same_ignoring_case() {
+        assert_eq!(tag_filter("Solo", &["a"]), tag_filter("solo", &["b"]));
+        assert_ne!(tag_filter("solo", &["a"]), tag_filter("co-op", &["a"]));
+        assert_ne!(tag_filter("solo", &["a"]),
+                   SidebarFilter::Publisher("solo".into()));
     }
 }
