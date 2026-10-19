@@ -1,5 +1,6 @@
 //! Download queue management and request entry points.
 
+use super::collection_links::{link_into_collection, root_of};
 use super::*;
 
 impl LibraryController {
@@ -344,29 +345,10 @@ pub(crate) fn create_collections_symlinks(dest: &Path, order_product_id: u64, pr
     if !storage.create_collections() {
         return;
     }
-    let Some(file_name) = dest.file_name()
-    else {
-        return;
-    };
-    let root = dest.parent()
-                   .and_then(Path::parent)
-                   .and_then(Path::parent)
-                   .map(Path::to_path_buf)
-                   .unwrap_or_else(|| storage.root_path());
+    let root = root_of(dest).unwrap_or_else(|| storage.root_path());
     for collection in collections {
-        if !member_ids_contain(&collection.member_ids, order_product_id, product_id) {
-            continue;
-        }
-        let link_dir = dtrpg_core::data::storage::collection_dir(&root, &collection.name);
-        if let Err(e) = std::fs::create_dir_all(&link_dir) {
-            tracing::warn!(dir = %link_dir.display(), error = %e,
-                           "failed to create collections symlink directory");
-            continue;
-        }
-        let link = link_dir.join(file_name);
-        if let Err(e) = crate::util::symlink::ensure_symlink(dest, &link) {
-            tracing::warn!(target = %dest.display(), link = %link.display(), error = %e,
-                           "failed to create collections symlink");
+        if member_ids_contain(&collection.member_ids, order_product_id, product_id) {
+            link_into_collection(dest, &root, &collection.name);
         }
     }
 }

@@ -8,7 +8,6 @@ use dtrpg_core::services::tag_projection::{ProjectionFailure, ReconcileReport};
 use gpui::TestAppContext;
 
 use super::{file_tags::files_on_disk, tests_support::*, *};
-use crate::util::file_presence::resolved_file_path;
 
 fn report(written: &[&str], imported: &[&str], failed: &[&str]) -> ReconcileReport {
     ReconcileReport { checked:  written.len() + imported.len() + failed.len(),
@@ -27,14 +26,6 @@ fn fixture_with_items(cx: &mut TestAppContext) -> Fixture {
                  ScriptedLibrary::open(),
                  3,
                  vec![item_with_files("a", 1, 2)])
-}
-
-/// Puts the file of `item` at `index` on disk where the app would have put it.
-fn put_on_disk(storage: &StorageConfig, item: &LibraryItem, index: usize) -> PathBuf {
-    let path = resolved_file_path(storage, item, &item.files[index]);
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, b"data").unwrap();
-    path
 }
 
 #[test]

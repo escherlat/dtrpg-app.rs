@@ -22,6 +22,7 @@ use dtrpg_core::{
 use gpui::TestAppContext;
 
 use super::*;
+use crate::util::file_presence::resolved_file_path;
 
 pub(super) const WAIT: Duration = Duration::from_secs(5);
 
@@ -466,4 +467,12 @@ pub(super) fn activity_counts(fixture: &Fixture, cx: &mut TestAppContext) -> (us
                         let snapshot = activity.snapshot();
                         (snapshot.in_progress_count, snapshot.recent_count)
                     })
+}
+
+/// Puts the file of `item` at `index` on disk where the app would have put it.
+pub(super) fn put_on_disk(storage: &StorageConfig, item: &LibraryItem, index: usize) -> PathBuf {
+    let path = resolved_file_path(storage, item, &item.files[index]);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, b"data").unwrap();
+    path
 }

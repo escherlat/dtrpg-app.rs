@@ -61,6 +61,7 @@ mod catalog;
 mod catalog_sync;
 mod check_jobs;
 mod checks;
+mod collection_links;
 mod collections;
 mod concurrency;
 mod detail;
@@ -85,6 +86,8 @@ mod tests_availability;
 mod tests_catalog;
 #[cfg(test)]
 mod tests_checks;
+#[cfg(test)]
+mod tests_collection_links;
 #[cfg(test)]
 mod tests_downloads;
 #[cfg(test)]
@@ -375,6 +378,9 @@ pub struct LibraryController {
     cache_root:                    PathBuf,
     /// Whether files' tags are being compared with the library's right now.
     file_tag_sync_running:         bool,
+    /// The storage settings to use instead of the ones on disk. Only tests set
+    /// it, so that they do not read or depend on the developer's own settings.
+    storage_override:              Option<Arc<StorageConfig>>,
     /// The library's tags, read from the index in the background, which the
     /// views read instead of reading the index themselves.
     tags:                          Arc<TagLibrary>,
