@@ -32,6 +32,7 @@ notify = "8.2.0"
 futures = "0.3"
 
 [dev-dependencies]
+dtrpg-core = { workspace = true, features = ["test-fixtures"] }
 pretty_assertions = "1"
 tempfile = "3.27.0"
 gpui = { workspace = true, features = ["test-support"] }

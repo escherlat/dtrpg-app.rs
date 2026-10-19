@@ -8,6 +8,10 @@ pub mod login;
 pub mod network_monitor;
 pub mod retry;
 pub mod sdk;
+// Not `#[cfg(test)]`-gated: UI and service tests use the same deterministic
+// catalog.
+#[cfg(any(test, feature = "test-fixtures"))]
+pub mod stub_catalog;
 pub mod tag_editing;
 pub mod tag_projection;
 
@@ -338,4 +342,5 @@ pub trait LoginService: Send + Sync + 'static {
 // Not `#[cfg(test)]`-gated: dtrpg-ui's own tests construct a
 // `StubLibraryService` across the crate boundary, and `cfg(test)` only
 // applies when the crate it's written in is itself under test.
+#[cfg(any(test, feature = "test-fixtures"))]
 pub mod stub;

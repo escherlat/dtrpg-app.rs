@@ -6,5 +6,3 @@ pub mod image_format;
 pub mod matching;
 pub mod search;
 pub mod sort;
-// Not `#[cfg(test)]`-gated: see the matching comment on `services::stub`.
-pub mod stubs;
