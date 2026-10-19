@@ -10,9 +10,16 @@ mod collections;
 mod items;
 mod migrate;
 mod schema;
+mod summaries;
 mod tag_methods;
 mod tag_sync;
 mod tags;
+
+#[cfg(test)]
+// Index fixtures use unwrap for known-good in-memory database operations.
+#[allow(clippy::unwrap_used)]
+#[path = "summary_tests.rs"]
+mod summary_tests;
 
 use std::path::Path;
 
@@ -22,6 +29,7 @@ use thiserror::Error;
 use crate::data::collection::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
+use crate::data::summary::ContentSummary;
 
 /// Errors from opening or querying the library index.
 #[derive(Debug, Error)]
@@ -176,6 +184,17 @@ impl LibraryIndex {
     /// Returns [`IndexError::Sqlite`] if the query fails.
     pub fn list_collections(&self) -> Result<Vec<CollectionEntry>, IndexError> {
         collections::list_collections(&self.conn)
+    }
+
+    /// Stores or replaces an item's content summary and refreshes its FTS row.
+    pub fn save_summary(&mut self, summary: &ContentSummary) -> Result<(), IndexError> {
+        summaries::save(&mut self.conn, summary)?;
+        Ok(())
+    }
+
+    /// Returns an item's persisted content summary, if one exists.
+    pub fn get_summary(&self, item_id: &str) -> Result<Option<ContentSummary>, IndexError> {
+        Ok(summaries::get(&self.conn, item_id)?)
     }
 }
 
