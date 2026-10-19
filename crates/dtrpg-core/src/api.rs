@@ -15,6 +15,7 @@ use crate::data::collection::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;
+use crate::data::summary::ContentSummary;
 use crate::data::tag_color::TagColor;
 use crate::data::tag_library::TagLibrary;
 use crate::services::collections::{CollectionsService, CollectionsServiceError};
@@ -136,6 +137,16 @@ impl LibraryApi {
                                         -> Result<usize, IndexError> {
         self.open_index()?
             .count_recently_updated(now_secs, window_days)
+    }
+
+    /// Returns the persisted summary for a stable catalog item id.
+    pub fn index_get_summary(&self, item_id: &str) -> Result<Option<ContentSummary>, IndexError> {
+        self.open_index()?.get_summary(item_id)
+    }
+
+    /// Stores a generated summary for a stable catalog item id.
+    pub fn index_save_summary(&self, summary: &ContentSummary) -> Result<(), IndexError> {
+        self.open_index()?.save_summary(summary)
     }
 
     /// Returns every tag that some item in the local index has, ordered
