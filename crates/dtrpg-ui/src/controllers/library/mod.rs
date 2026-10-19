@@ -75,6 +75,7 @@ mod lifecycle;
 mod preferences;
 mod selection;
 mod tags;
+mod theme_files;
 mod thumbnail_jobs;
 mod thumbnails;
 

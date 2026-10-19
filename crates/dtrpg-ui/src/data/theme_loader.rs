@@ -5,7 +5,9 @@
 //! via `include_str!` for built-in themes and provides a simple loader for
 //! user themes. Behavior is backwards-compatible with compiled defaults.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::RwLock;
 
 use gpui::Hsla;
 use serde::Deserialize;
@@ -65,30 +67,85 @@ struct PaletteToml {
 /// (parchment), so a stale persisted selection never fails to produce a usable
 /// palette.
 pub fn load(id: &ThemeId) -> ColorTokens {
-    let toml = match id.as_str() {
-        "parchment" => include_str!("../../../../assets/themes/parchment.toml"),
-        "slate" => include_str!("../../../../assets/themes/slate.toml"),
-        "sage" => include_str!("../../../../assets/themes/sage.toml"),
-        "ink" => include_str!("../../../../assets/themes/ink.toml"),
-        "moss" => include_str!("../../../../assets/themes/moss.toml"),
-        "rosewood" => include_str!("../../../../assets/themes/rosewood.toml"),
-        other => return load_user_theme(other).unwrap_or_else(|| compiled_default(id)),
-    };
-    parse_theme_toml(toml).unwrap_or_else(|_| compiled_default(id))
+    match builtin_toml(id.as_str()) {
+        Some(toml) => parse_theme_toml(toml).unwrap_or_else(|_| compiled_default(id)),
+        None => load_user_theme(id.as_str()).unwrap_or_else(|| compiled_default(id)),
+    }
+}
+
+/// The embedded TOML source for a built-in theme, or `None` for any other id.
+fn builtin_toml(id: &str) -> Option<&'static str> {
+    match id {
+        "parchment" => Some(include_str!("../../../../assets/themes/parchment.toml")),
+        "slate" => Some(include_str!("../../../../assets/themes/slate.toml")),
+        "sage" => Some(include_str!("../../../../assets/themes/sage.toml")),
+        "ink" => Some(include_str!("../../../../assets/themes/ink.toml")),
+        "moss" => Some(include_str!("../../../../assets/themes/moss.toml")),
+        "rosewood" => Some(include_str!("../../../../assets/themes/rosewood.toml")),
+        _ => None,
+    }
+}
+
+/// The raw TOML source for a theme: the embedded text of a built-in, or the
+/// themes-directory file of a user theme (ADR-0005).
+///
+/// Backs the Settings gallery's "Duplicate & edit" action, which copies a
+/// theme file verbatim. `None` for an unknown or unreadable id.
+pub fn theme_source(id: &ThemeId) -> Option<String> {
+    if let Some(toml) = builtin_toml(id.as_str()) {
+        return Some(toml.to_string());
+    }
+    std::fs::read_to_string(user_theme_path(id.as_str())?).ok()
+}
+
+/// Resolves a user theme id to its file in the themes directory.
+///
+/// Returns `None` for an id containing path separators or `..` (a persisted
+/// id is never trusted as a filesystem path).
+fn user_theme_path(id: &str) -> Option<PathBuf> {
+    if id.contains(['/', '\\']) || id.is_empty() || id.contains("..") {
+        return None;
+    }
+    Some(dtrpg_core::data::paths::themes_dir().join(format!("{id}.toml")))
 }
 
 /// Reads a user theme file by id from the themes directory.
 ///
-/// Returns `None` for an id containing path separators or `..` (a persisted
-/// id is never trusted as a filesystem path) or for an unreadable/invalid
-/// file.
+/// Returns `None` for a rejected id or an unreadable/invalid file.
 fn load_user_theme(id: &str) -> Option<ColorTokens> {
-    if id.contains(['/', '\\']) || id.is_empty() || id.contains("..") {
-        return None;
-    }
-    let path = dtrpg_core::data::paths::themes_dir().join(format!("{id}.toml"));
-    let content = std::fs::read_to_string(path).ok()?;
+    let content = std::fs::read_to_string(user_theme_path(id)?).ok()?;
     parse_theme_toml(&content).ok()
+}
+
+/// Preview palettes keyed by theme id, rebuilt by [`rebuild_previews`] so the
+/// Settings gallery draws card previews without parsing theme files (no I/O on
+/// the render path). `BTreeMap` because, unlike `HashMap`, `new` is const.
+static PREVIEWS: RwLock<BTreeMap<String, ColorTokens>> = RwLock::new(BTreeMap::new());
+
+/// Reloads the preview cache for every theme in `ids`.
+///
+/// Runs only off the render path, wherever
+/// [`crate::data::theme_catalog::ThemeCatalog::refresh`] runs: startup, the
+/// themes-directory watcher, and the gallery's Reload button.
+pub fn rebuild_previews(ids: impl IntoIterator<Item = ThemeId>) {
+    let mut previews = BTreeMap::new();
+    for id in ids {
+        previews.insert(id.as_str().to_string(), load(&id));
+    }
+    *PREVIEWS.write().unwrap_or_else(|e| e.into_inner()) = previews;
+}
+
+/// The cached preview palette for `id`.
+///
+/// A miss (an id the cache was never built for) falls back to the compiled
+/// palette rather than reading files, keeping the render path filesystem-free;
+/// a miss is transient because any catalog refresh repopulates the cache.
+pub fn preview(id: &ThemeId) -> ColorTokens {
+    PREVIEWS.read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(id.as_str())
+            .cloned()
+            .unwrap_or_else(|| compiled_default(id))
 }
 
 /// Loads a theme from an arbitrary TOML file.
@@ -279,6 +336,40 @@ mod tests {
             assert!(super::load_user_theme(id).is_none(),
                     "id {id:?} must be rejected");
         }
+    }
+
+    #[test]
+    fn theme_source_returns_embedded_toml_for_builtins() {
+        for id in ["parchment", "ink"] {
+            let source = super::theme_source(&ThemeId::from(id))
+                .unwrap_or_else(|| panic!("builtin {id} must have a source"));
+            assert!(source.contains("name ="),
+                    "embedded source for {id} must declare a name");
+        }
+    }
+
+    #[test]
+    fn theme_source_rejects_traversal_ids() {
+        for id in ["../secrets", "..", "a/b", "a\\b", ""] {
+            assert!(super::theme_source(&ThemeId::from(id)).is_none(),
+                    "id {id:?} must be rejected");
+        }
+    }
+
+    #[test]
+    fn rebuilt_previews_serve_cached_colors() {
+        let id = ThemeId::from("ink");
+        super::rebuild_previews([ThemeId::from("ink")]);
+        assert_eq!(super::preview(&id).surface, super::load(&id).surface);
+    }
+
+    #[test]
+    fn preview_miss_falls_back_without_io() {
+        // An id no preview was built for resolves to the compiled default
+        // (parchment) instead of touching the filesystem.
+        let preview = super::preview(&ThemeId::from("no-such-theme"));
+        assert_eq!(preview.surface,
+                   crate::data::theme::parchment_colors().surface);
     }
 
     #[test]
