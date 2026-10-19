@@ -70,6 +70,8 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
+        # A hung test otherwise holds a runner for hours.
+        timeout-minutes: 15
         run: cargo test --workspace
 
       - name: Build
