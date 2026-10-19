@@ -38,10 +38,14 @@ downloading an item that belongs to one or more collections also creates a
 symlink for it under a `collections/` subfolder, organized by collection,
 so the same downloaded file is reachable there without duplicating the
 data on disk. If you add an item you have already downloaded to another
-collection, the symlink for that collection is created then. (Removing an item
-from a collection does not remove its symlink yet.) On Windows this needs Developer Mode (or an elevated
-process) - if symlink creation fails, the toggle has no effect rather than
-erroring.
+collection, the symlink for that collection is created then. Removing an item
+from a collection removes its symlink from that collection's folder. Only a
+symlink that points at the item's downloaded file is removed: a file or a link
+to somewhere else with the same name is left alone. A link you made yourself
+that points at the same file looks just the same, and is removed too. The
+collection's folder stays, even when it is empty. On Windows this needs
+Developer Mode (or an elevated process) - if symlink creation fails, the toggle
+has no effect rather than erroring.
 
 ## Concurrency
 

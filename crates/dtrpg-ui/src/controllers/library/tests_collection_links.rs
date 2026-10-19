@@ -10,9 +10,9 @@ use dtrpg_core::data::storage::collection_dir;
 use dtrpg_core::services::collections::CollectionsServiceError;
 use gpui::TestAppContext;
 
-#[cfg(unix)]
-use super::collection_links::link_into_collection;
 use super::collection_links::root_of;
+#[cfg(unix)]
+use super::collection_links::{link_into_collection, unlink_from_collection};
 use super::{tests_support::*, *};
 
 /// What the service says when asked to add a member.
@@ -61,7 +61,12 @@ impl CollectionsService for Scripted {
 
     fn remove_member(&self, _collection_id: u64, _item_id: u64)
                      -> Result<(), CollectionsServiceError> {
-        Ok(())
+        match self.answer {
+            Answer::Rejects => {
+                Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Network, "no"))
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -233,4 +238,81 @@ fn an_items_files_on_disk_are_linked_into_the_collection_it_is_in() {
     assert_eq!(looked_at, 1);
     let link = collection_dir(root.path(), COLLECTION_NAME).join("File_1.pdf");
     assert_eq!(std::fs::read_link(link).unwrap(), on_disk);
+}
+
+// ── Removing the link ────────────────────────────────────────────────────────
+
+#[cfg(unix)]
+impl Setup {
+    /// Removes the item from the collection.
+    fn remove_item(&self, cx: &mut TestAppContext) {
+        self.fixture.controller.update(cx, |ctrl, cx| {
+                                   ctrl.remove_item_from_collection(COLLECTION_ID, 1, 0, cx)
+                               });
+    }
+}
+
+#[cfg(unix)]
+#[gpui::test]
+fn removing_an_item_from_a_collection_removes_its_link(cx: &mut TestAppContext) {
+    let setup = setup(cx, true, Answer::Accepts);
+    setup.add_downloaded_item(cx);
+    wait_for(cx, |_| setup.link().symlink_metadata().is_ok());
+
+    setup.remove_item(cx);
+
+    wait_for(cx, |_| setup.link().symlink_metadata().is_err());
+}
+
+#[cfg(unix)]
+#[gpui::test]
+fn the_link_stays_when_the_server_refuses_the_removal(cx: &mut TestAppContext) {
+    let setup = setup(cx, true, Answer::Rejects);
+    let dest = put_on_disk(&setup.storage, &setup.item, 0);
+    link_into_collection(&dest, &setup.storage.root_path(), COLLECTION_NAME);
+    setup.fixture.controller.update(cx, |ctrl, _| {
+                                ctrl.collections[0].member_ids = Arc::from([1]);
+                            });
+
+    setup.remove_item(cx);
+    cx.executor().allow_parking();
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    cx.run_until_parked();
+
+    assert!(setup.link().symlink_metadata().is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn only_a_link_to_the_file_is_removed() {
+    let root = tempfile::tempdir().unwrap();
+    let dest = root.path().join("items").join("Publisher").join("Book.pdf");
+    std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
+    std::fs::write(&dest, b"data").unwrap();
+    let folder = collection_dir(root.path(), COLLECTION_NAME);
+    std::fs::create_dir_all(&folder).unwrap();
+    let link = folder.join("Book.pdf");
+
+    // Nothing there yet.
+    assert!(!unlink_from_collection(&dest, root.path(), COLLECTION_NAME));
+
+    // A file with the same name is not a link.
+    std::fs::write(&link, b"mine").unwrap();
+    assert!(!unlink_from_collection(&dest, root.path(), COLLECTION_NAME));
+    assert_eq!(std::fs::read(&link).unwrap(), b"mine");
+    std::fs::remove_file(&link).unwrap();
+
+    // A link to somewhere else is not Libri's.
+    let elsewhere = root.path().join("Other.pdf");
+    std::fs::write(&elsewhere, b"other").unwrap();
+    std::os::unix::fs::symlink(&elsewhere, &link).unwrap();
+    assert!(!unlink_from_collection(&dest, root.path(), COLLECTION_NAME));
+    assert!(link.symlink_metadata().is_ok());
+    std::fs::remove_file(&link).unwrap();
+
+    // A link to the file goes, and the file stays.
+    link_into_collection(&dest, root.path(), COLLECTION_NAME);
+    assert!(unlink_from_collection(&dest, root.path(), COLLECTION_NAME));
+    assert!(link.symlink_metadata().is_err());
+    assert!(dest.is_file());
 }
