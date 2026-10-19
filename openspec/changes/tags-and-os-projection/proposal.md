@@ -50,6 +50,8 @@ Settled with the project owner on 2026-10-18.
   library") and a line in the log naming each file. No dialog, and never silent.
 - **Tag colors.** (Revised 2026-10-18, after the Libri v2 design was accepted.) Tags have a color, one of
   Finder's seven, which Libri manages and writes on macOS.
+- **Colors are not read from files.** (2026-10-19, ADR 0009.) The color number in a file is the color the tag had
+  when it was applied, not the color Finder shows now, so a tag read from a file has no color.
 - **Reading Finder's tags back.** (2026-10-18.) Yes. If both sides changed, the later change wins, and the index
   wins when that cannot be told. Each direction and the launch check have a switch in settings.
 - **Dependency.** The `xattr` crate, for macOS and Linux builds only, so Windows builds do not pull it in.

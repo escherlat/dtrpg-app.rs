@@ -34,9 +34,12 @@ orange. Right-click a tag, either a chip in the detail tab or a row in the
 sidebar, and choose a color, or **No color**. The color applies to the tag
 wherever it appears.
 
-These are the colors Finder gives tags, so on macOS the color you choose is the
-color Finder shows. Linux keeps no color for a file's tags, so the color stays in
-Libri.
+These are the colors Finder uses for its tags. Libri writes the color to the file on
+macOS, but colors are Libri's: Finder keeps its own color for each tag name and
+shows that, so a tag can look different in Finder than in Libri. A tag you create in
+Finder comes into Libri with no color until you choose one, because the color Finder
+stores in a file is only the color the tag had when it was applied. Linux keeps no
+color for a file's tags, so the color stays in Libri.
 
 ## Browsing by tag
 

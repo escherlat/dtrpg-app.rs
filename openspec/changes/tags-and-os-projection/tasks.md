@@ -60,7 +60,8 @@ files written and files read back separately.
       or was downloaded again
 - [x] 3b.3 `FileTag` with a color; macOS reads and writes Finder's color number; Linux keeps none
 - [x] 3b.4 Decide which side wins from the snapshot; later change wins, the index wins on a tie or an unknown time
-- [x] 3b.5 Read a file's tags back into the index, taking a color from the file only where the index has none
+- [x] 3b.5 Read a file's tags back into the index. Not their colors: the number in a file is not the color Finder
+      shows (ADR 0009)
 - [x] 3b.6 `NativePreferences`: write to files, read from files, reconcile on launch; the launch pass and a
       finished download honor them
 - [x] 3b.7 ADR 0008, and the spec
