@@ -233,3 +233,136 @@ The platform contract is ready for the dependent tags-and-OS-projection
 feature. That feature will implement filesystem tag projection while honoring
 the SQLite index as the source of truth; it is intentionally not folded into
 this architectural boundary change.
+
+---
+
+# Tags and OS projection (issue #326) and the follow-up fixes: status at 2026-10-19
+
+Everything below is merged to `develop` (last merge: PR #347, `7cb8e17`). No
+feature branch holds unmerged work and no PR is open. Read this section first;
+the older ones above are the ADR 0002/0003/0004 history.
+
+## What exists now
+
+Tags, end to end, following the accepted Libri v2 design (`claude-2` in the
+`dtrpg-design` submodule, which the owner calls authoritative). The OpenSpec
+change is `openspec/changes/tags-and-os-projection/` (proposal, tasks, spec).
+User docs are `docs/site/latest/tags.md`, `catalog.md`, `mcp.md`,
+`downloads.md`. ADRs 0008 and 0009 hold the two decisions that surprise people.
+
+| Piece | Where | PR |
+|---|---|---|
+| Index tables, tag colors, `LibraryApi` tag methods | `dtrpg-core` `data/index`, `api.rs` | #332, #333 |
+| Detail-panel chips, sidebar Tags section, color menu, Native Integration settings | `dtrpg-ui` `ui/library/tag.rs`, `ui/views/{tags_section_view,sidebar_tags,manage_tags_dialog,settings_native_view}.rs` | #335 |
+| Reconcile files' tags with the index (launch and reload) | `dtrpg-core` `services/tag_projection`, `dtrpg-ui` `controllers/library/file_tags.rs` | #333, #337 |
+| Collection alias made on add, removed on remove | `controllers/library/collection_links.rs`, `collections.rs` | #338, #344 |
+| Tag colors are not read from files | `platform/tags.rs`, ADR 0009 | #339 |
+| MCP tools `list_tags`, `get_item_tags`, `set_tags`, `set_tag_color` | `dtrpg-mcp/src/main.rs` | #340 |
+| `tag:` / `-tag:` search | `dtrpg-core` `util/search.rs` | #341 |
+| Group by tag (`GroupBy` enum) | `data/enums.rs`, `util/publisher.rs`, `catalog_view.rs` | #345 |
+| List column chooser and Tags column (`ListColumn` enum) | `data/enums.rs`, `ui/views/list_columns.rs` | #346 |
+| View menu fallbacks; render-path performance | `ui/app/mod.rs`, `controllers/library/{catalog,filtering,thumbnails}.rs` | #347 |
+
+Decisions that were made with the owner and should not be reopened without
+asking: the later change wins when file and index both changed, else the index
+wins (ADR 0008); a tag read from a file has no color (ADR 0009); alias removal
+only removes a symlink that points at the item's downloaded file; group by tag
+repeats an item under each of its tags and sits beside group by publisher.
+
+## Open
+
+- **Task 5.4, the manual check on a real Mac, is the only unchecked task.**
+  The owner has confirmed the View menu is enabled and that scrolling is fast
+  again. Still unchecked: tag in Libri with a color and see both in Finder;
+  remove the tag in Finder, relaunch, and see it gone from Libri with the
+  activity panel saying so; the right-click menu on a list column heading
+  (the only way to open the column chooser) and showing and hiding Tags; Group
+  by Tag in List, Thumbs and Grid, in particular whether an item that appears
+  in several groups can be selected from each copy. Tick 5.4 in `tasks.md`
+  when the owner says it is done, and fix what they report.
+- **The views were never rendered by the agent.** There is no display in the
+  cloud environment, so every view change was checked by compiling and by
+  controller or pure-function tests. The macOS extended-attribute code is
+  verified only by the macOS CI job.
+- **German and French strings added in this work are unreviewed.** They are
+  `menu.toggle_group_by_tag`, `toolbar.group_by_tag`, `catalog.untagged` and
+  `catalog.col_tags` in `crates/dtrpg-ui/i18n/{de,fr}.yaml`.
+- **Known performance costs not fixed** (PR #347 fixed the large ones):
+  `invalidate_cache` is still a full filter, copy and sort of the library
+  (about 12 ms at 10,000 items in a debug build) and still runs when a
+  download or availability check finishes; the multi-item detail view reads the
+  storage config and stats files while it renders (`detail_panel_view.rs`,
+  `render_item_tier`, and `on_disk_file_size` callers). Do these only if the
+  owner reports slowness there.
+- **Not built from the mockups:** the saved-search rule editor, and the
+  permission model on the Agent and MCP page (so MCP writes are opt-in with
+  `--allow-write`). The Tags column is plain text, with no color dots.
+- **The "Reconcile on launch" switch also governs the reload pass.** That is
+  intended, but it is not obvious from the setting's name.
+- **Coverage lost on purpose:** `tags_show_on_a_launch_that_cannot_reach_the_network`
+  replaced a signed-out version of the same test, because the live fetch can
+  deadlock the test scheduler (see below). The signed-out exit path of the
+  catalog load is therefore not covered by a controller test.
+- **Housekeeping:** the remote still has the merged branches from this work
+  (`tags-mcp-and-api`, `tags-column-group-search`, `group-by-tag`,
+  `tags-column`, `remove-collection-alias`, `fix-menus-and-scrolling`,
+  `fix-windows-unused-test-items`, `collection-alias-on-add`,
+  `tag-colors-not-from-files`) and the throwaway `diag-windows-test-hang`
+  (closed PR #343). All are safe to delete. `make size-check` already reports
+  a backlog of files over 500 lines (for example `catalog_view.rs`,
+  `root_view.rs`, `detail_panel_view.rs`, `settings.rs`); it is not part of
+  CI's failing gates, so new files should stay under the limit but the backlog
+  is not this work's to clear.
+
+## Things that cost time, so they do not cost it again
+
+- **Test scheduler seeds.** `gpui::test` runs tasks in an order set by the
+  `SEED` environment variable, and a bad order can deadlock. The catalog
+  load's page receiver blocks one background task while the fetch that fills it
+  is another; with `SEED=2` a test that runs the whole load hangs forever, and
+  the Windows runner's default order hits it. Tests of the launch path must not
+  reach the live fetch (use `NetworkMonitor::fixed(false)`, which the tests
+  fixture sets to `true` by default so tests never touch the real network).
+  Check the UI suite under a few seeds before pushing:
+  `for s in 1 2 7 13; do SEED=$s cargo test -p dtrpg-ui; done`.
+- **Windows lint.** `cargo clippy -D warnings` runs on Windows in CI. A helper,
+  import or enum variant used only by `#[cfg(unix)]` tests is unused there and
+  fails the job. Gate it with `#[cfg(unix)]` too. A CI test step now has a
+  15-minute timeout, so a hang fails instead of holding a runner.
+- **Do not call the view-preference setters from a test.** `set_sort`,
+  `set_group_by`, `toggle_list_column` and the like save to the real user config
+  file. Keep the rule in a pure function (`GroupBy::toggled`,
+  `ListColumn::toggled`) and test that.
+- **Menu enablement.** A native menu item is enabled only if something in the
+  focused window's chain handles the action or an app-level `cx.on_action`
+  handler exists. A new menu action needs a fallback in
+  `ui/app/mod.rs` (see `update_library`), or it will be disabled whenever focus
+  is outside the library view.
+- **No I/O and no whole-library copies on the render path.** `snapshot()` is
+  called on every draw; `visible_items_slice` and `column()` are called per
+  table cell. The result set is an `Arc<Vec<LibraryItem>>`, and the filter count
+  and product-id set are cached with it by `invalidate_cache`. A change that
+  edits one catalog item in place should patch the cached copy (see
+  `note_thumbnail_attempt`) instead of calling `invalidate_cache`.
+- **The stop hook can report unpushed commits that are pushed.** The local
+  remote-tracking ref goes stale after a push from this environment. Refresh it
+  with `git fetch origin +refs/heads/<branch>:refs/remotes/origin/<branch>`
+  before deciding anything is unpushed.
+- **Formatting.** `make fmt-check` runs the pinned nightly `rustfmt` and is the
+  only formatter to use; `cargo +nightly fmt --all` also works here. Do not run
+  stable `rustfmt`.
+
+## Verify before continuing
+
+```sh
+make fmt-check
+make lint
+make test
+```
+
+All three were clean at `7cb8e17` (481 `dtrpg-core` tests, 6 `dtrpg-mcp`, 339
+`dtrpg-ui`, plus doctests).
+
+Process: `develop` is the source of truth. Work on a branch from it, open a
+ready-for-review PR, subscribe to it, and fix CI. The owner enables auto-merge
+and merges. Commit messages are Conventional Commits.
