@@ -140,7 +140,7 @@ pub struct LibrarySnapshot {
     pub collection_sort:           CollectionSortMethod,
     /// Current sidebar Collections sort direction.
     pub collection_sort_direction: SortDirection,
-    pub grouped:                   bool,
+    pub group_by:                  GroupBy,
     pub presentation:              CatalogPresentation,
     pub selected_item:             Option<LibraryItem>,
     pub items:                     Vec<LibraryItem>,
@@ -190,8 +190,8 @@ pub struct LibraryController {
     /// Current sidebar Collections sort direction, persisted via
     /// `UiPreferences`.
     pub collection_sort_direction: SortDirection,
-    /// Whether the catalog is grouped by publisher.
-    pub grouped:                   bool,
+    /// What the catalog is grouped by.
+    pub group_by:                  GroupBy,
     /// Active catalog presentation mode.
     pub presentation:              CatalogPresentation,
     /// The currently selected item id (for the detail panel).

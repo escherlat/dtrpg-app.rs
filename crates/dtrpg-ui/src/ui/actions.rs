@@ -55,6 +55,7 @@ actions!(libri,
           SortAscending,
           SortDescending,
           ToggleGroupByPublisher,
+          ToggleGroupByTag,
           FocusSearch,]);
 
 // Window menu tab-selection actions

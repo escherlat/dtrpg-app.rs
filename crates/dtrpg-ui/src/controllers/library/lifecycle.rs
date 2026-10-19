@@ -54,7 +54,7 @@ impl LibraryController {
                           sort_direction: SortDirection::default(),
                           collection_sort: prefs.collection_sort(),
                           collection_sort_direction: prefs.collection_sort_direction(),
-                          grouped: view_prefs.grouped.unwrap_or(false),
+                          group_by: view_prefs.to_group_by(),
                           presentation: view_prefs.to_presentation(),
                           selection: Selection::default(),
                           section_counts: SectionCounts::default(),

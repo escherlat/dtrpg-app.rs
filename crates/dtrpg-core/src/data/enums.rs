@@ -1,5 +1,8 @@
 //! Catalog enumerations: item status and presentation modes.
 
+use std::fmt;
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 
 // ── Enumerations ─────────────────────────────────────────────────────────────
@@ -49,6 +52,81 @@ pub enum CatalogPresentation {
     Thumbs,
     #[default]
     Grid,
+}
+
+/// What the catalog is grouped by.
+///
+/// # Examples
+///
+/// ```
+/// use dtrpg_core::data::enums::GroupBy;
+///
+/// assert_eq!("Tag".parse::<GroupBy>(), Ok(GroupBy::Tag));
+/// assert_eq!(GroupBy::Publisher.to_string(), "Publisher");
+/// assert!(!GroupBy::None.is_grouped());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GroupBy {
+    /// One list, with no groups.
+    #[default]
+    None,
+    /// One group per publisher.
+    Publisher,
+    /// One group per tag, with an item in the group of each tag it has.
+    Tag,
+}
+
+impl GroupBy {
+    /// Whether the catalog is split into groups.
+    #[must_use]
+    pub fn is_grouped(self) -> bool {
+        self != Self::None
+    }
+
+    /// The grouping after a menu item for `wanted` is chosen: `wanted`, or no
+    /// grouping if that is what the catalog is grouped by already.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::data::enums::GroupBy;
+    ///
+    /// assert_eq!(GroupBy::None.toggled(GroupBy::Tag), GroupBy::Tag);
+    /// assert_eq!(GroupBy::Tag.toggled(GroupBy::Tag), GroupBy::None);
+    /// assert_eq!(GroupBy::Publisher.toggled(GroupBy::Tag), GroupBy::Tag);
+    /// ```
+    #[must_use]
+    pub fn toggled(self, wanted: Self) -> Self {
+        if self == wanted { Self::None } else { wanted }
+    }
+}
+
+impl fmt::Display for GroupBy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+                        Self::None => "None",
+                        Self::Publisher => "Publisher",
+                        Self::Tag => "Tag",
+                    })
+    }
+}
+
+/// A string that is not the name of a grouping.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{0:?} is not a grouping")]
+pub struct UnknownGroupBy(pub String);
+
+impl FromStr for GroupBy {
+    type Err = UnknownGroupBy;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match text {
+            "None" => Ok(Self::None),
+            "Publisher" => Ok(Self::Publisher),
+            "Tag" => Ok(Self::Tag),
+            other => Err(UnknownGroupBy(other.to_owned())),
+        }
+    }
 }
 
 /// Which `LibraryItem` field a bulk-selection pattern match is applied

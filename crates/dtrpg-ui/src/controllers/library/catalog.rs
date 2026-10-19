@@ -207,7 +207,7 @@ impl LibraryController {
                           sort_direction: self.sort_direction,
                           collection_sort: self.collection_sort,
                           collection_sort_direction: self.collection_sort_direction,
-                          grouped: self.grouped,
+                          group_by: self.group_by,
                           presentation: self.presentation,
                           selected_item,
                           items,

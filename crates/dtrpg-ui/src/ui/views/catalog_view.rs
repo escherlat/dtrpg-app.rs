@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dtrpg_core::data::constants::{ITEM_POPOVER_MARGIN, ITEM_POPOVER_WIDTH};
-use dtrpg_core::data::enums::CatalogPresentation;
 use dtrpg_core::data::enums::*;
+use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
 use dtrpg_core::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::util::matching::collection_member_id;
@@ -41,7 +41,7 @@ use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::item_popover_view::render_item_popover;
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::util::publisher::{PublisherGroup, group_by_publisher};
+use crate::util::publisher::{ItemGroup, group_by_publisher, group_by_tag};
 use crate::util::reveal::reveal_in_file_manager;
 
 #[derive(Clone, Copy)]
@@ -680,8 +680,11 @@ impl TableDelegate for CatalogListDelegate {
 /// (and fully materializing) its own rows — see `CatalogView::grouped_items`.
 enum GroupedRow {
     Header {
-        publisher: Arc<str>,
-        count:     usize,
+        /// The publisher or tag the items below are grouped under.
+        title: Arc<str>,
+        count: usize,
+        /// What the group is a group of.
+        kind:  GroupBy,
     },
     Item(Box<LibraryItem>),
 }
@@ -732,8 +735,9 @@ impl TableDelegate for GroupedCatalogListDelegate {
                     cx: &mut Context<TableState<Self>>)
                     -> PopupMenu {
         let item = match self.row_at(row_ix) {
-            Some(GroupedRow::Header { publisher, .. }) => {
-                let publisher = publisher.to_string();
+            Some(GroupedRow::Header { kind, .. }) if *kind != GroupBy::Publisher => return menu,
+            Some(GroupedRow::Header { title, .. }) => {
+                let publisher = title.to_string();
                 let entity = self.controller.clone();
                 return menu.item(
                     PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
@@ -848,7 +852,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                  -> impl IntoElement {
         let colors = cx.global::<LibriTheme>().colors.clone();
         match self.row_at(row_ix) {
-            Some(GroupedRow::Header { publisher, count }) if col_ix == 0 => {
+            Some(GroupedRow::Header { title, count, .. }) if col_ix == 0 => {
                 div().h_full()
                      .flex()
                      .items_center()
@@ -856,7 +860,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
                      .child(div().text_sm()
                                  .font_weight(FontWeight::SEMIBOLD)
                                  .text_color(colors.text_primary)
-                                 .child(publisher.to_string()))
+                                 .child(title.to_string()))
                      .child(div().text_xs()
                                  .text_color(colors.text_tertiary)
                                  .child(count.to_string()))
@@ -924,7 +928,7 @@ pub struct CatalogView {
     /// during `render()` so grouped presentation modes avoid re-grouping on
     /// every hover-triggered re-render. Also drives the flattened rows
     /// pushed into `catalog_grouped_list_table`.
-    grouped_cache:              Option<Vec<PublisherGroup>>,
+    grouped_cache:              Option<Vec<ItemGroup>>,
     /// Cursor position captured at the mouse-down that opened the single-click
     /// item popover (see `render_item_popover`). Frozen for the lifetime of
     /// the popover — never updated by subsequent mouse movement — so the
@@ -1103,16 +1107,24 @@ impl CatalogView {
     /// `catalog_grouped_list_table` whenever the grouping is recomputed, so
     /// the grouped `DataTable` stays in sync without re-flattening on every
     /// render.
-    fn grouped_items(&mut self, cx: &mut Context<Self>) -> Vec<PublisherGroup> {
+    fn grouped_items(&mut self, cx: &mut Context<Self>) -> Vec<ItemGroup> {
         if self.grouped_cache.is_none() {
-            let items = self.controller.read(cx).visible_items();
-            let groups = group_by_publisher(items);
+            let controller = self.controller.read(cx);
+            let items = controller.visible_items();
+            let groups = match controller.group_by {
+                GroupBy::Tag => {
+                    group_by_tag(items, &controller.tag_library(), &t!("catalog.untagged"))
+                }
+                GroupBy::Publisher | GroupBy::None => group_by_publisher(items),
+            };
             self.grouped_cache = Some(groups.clone());
 
+            let group_kind = controller.group_by;
             let mut rows = Vec::new();
             for group in groups {
-                rows.push(GroupedRow::Header { publisher: Arc::clone(&group.publisher),
-                                               count:     group.items.len(), });
+                rows.push(GroupedRow::Header { title: Arc::clone(&group.title),
+                                               count: group.items.len(),
+                                               kind:  group_kind, });
                 rows.extend(group.items
                                  .into_iter()
                                  .map(|item| GroupedRow::Item(Box::new(item))));
@@ -1227,7 +1239,8 @@ impl Render for CatalogView {
             return outer.child(root.child(empty_state)).into_any_element();
         }
 
-        let content: AnyElement = match (snap.presentation, snap.grouped) {
+        let group_by = snap.group_by;
+        let content: AnyElement = match (snap.presentation, group_by.is_grouped()) {
             // ── List, ungrouped — DataTable (handles header/row alignment) ──
             (CatalogPresentation::List, false) => {
                 use gpui_kit::component::Size;
@@ -1341,7 +1354,8 @@ impl Render for CatalogView {
                         let window: &Window = &*window;
                         div()
                             .child(render_group_header(
-                                &g.publisher,
+                                &g.title,
+                                group_by,
                                 g.items.len(),
                                 &c,
                                 e.clone(),
@@ -1475,7 +1489,8 @@ impl Render for CatalogView {
                                                     let ci = checking_items.clone();
                                                     let vd = item_activity.clone();
                                                     let sel = selected_ids.clone();
-                                                    div().child(render_group_header(&g.publisher,
+                                                    div().child(render_group_header(&g.title,
+                                                                                    group_by,
                                                                                     g.items.len(),
                                                                                     &c,
                                                                                     e.clone()))
@@ -1570,38 +1585,42 @@ fn render_library_empty_state(text_color: Hsla) -> impl IntoElement + 'static {
 // ── Group header
 // ──────────────────────────────────────────────────────────────
 
-fn render_group_header(publisher: &str, count: usize, colors: &ColorTokens,
+fn render_group_header(title: &str, kind: GroupBy, count: usize, colors: &ColorTokens,
                        entity: Entity<LibraryController>)
-                       -> impl IntoElement + 'static + use<> {
+                       -> AnyElement {
     let text_primary = colors.text_primary;
     let text_tertiary = colors.text_tertiary;
-    let publisher = publisher.to_string();
-    let menu_publisher = publisher.clone();
-    div().id(SharedString::from(format!("group-header-{publisher}")))
-         .flex()
-         .items_center()
-         .gap(px(8.0))
-         .py(px(10.0))
-         .child(div().text_sm()
-                     .font_weight(FontWeight::SEMIBOLD)
-                     .text_color(text_primary)
-                     .child(publisher))
-         .child(div().text_xs()
-                     .text_color(text_tertiary)
-                     .child(count.to_string()))
-         .context_menu(move |menu, _, _| {
-             let entity = entity.clone();
-             let publisher = menu_publisher.clone();
-             menu.item(
-                PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
-                    move |_, _, cx| {
-                        entity.update(cx, |ctrl, cx| {
-                            ctrl.request_download_all_for_publisher(&publisher, cx)
-                        });
-                    },
-                ),
-            )
-         })
+    let title = title.to_string();
+    let publisher = title.clone();
+    let header = div().id(SharedString::from(format!("group-header-{title}")))
+                      .flex()
+                      .items_center()
+                      .gap(px(8.0))
+                      .py(px(10.0))
+                      .child(div().text_sm()
+                                  .font_weight(FontWeight::SEMIBOLD)
+                                  .text_color(text_primary)
+                                  .child(title))
+                      .child(div().text_xs()
+                                  .text_color(text_tertiary)
+                                  .child(count.to_string()));
+    // "Download all" is for a publisher. A tag has nothing to offer here yet,
+    // so its header has no menu rather than an empty one.
+    if kind != GroupBy::Publisher {
+        return header.into_any_element();
+    }
+    header.context_menu(move |menu, _, _| {
+              let entity = entity.clone();
+              let publisher = publisher.clone();
+              menu.item(PopupMenuItem::new(t!("catalog.publisher_download_all")).on_click(
+                  move |_, _, cx| {
+                      entity.update(cx, |ctrl, cx| {
+                                ctrl.request_download_all_for_publisher(&publisher, cx)
+                            });
+                  },
+              ))
+          })
+          .into_any_element()
 }
 
 // ── Status glyph

@@ -61,6 +61,17 @@ A tag term matches the whole tag name, ignoring case, so `tag:sol` does not find
 item tagged "solo". Ordinary words in the search box also match an item's tag names,
 alongside its title, publisher and game line.
 
+## Grouping by tag
+
+Choose Group by Tag from the toolbar's sort dropdown, or from the View menu, to split
+the catalog into one group for each tag, in alphabetical order. An item with several
+tags is in the group of each of them, so it appears more than once. Items with no tag
+are together in an Untagged group at the end. Choosing it again ends the grouping.
+
+You can group by publisher or by tag, not both at once. Libri remembers which you chose.
+The right-click "Download All" on a group heading is for publisher groups only; a tag
+group's heading has no menu.
+
 ## Tags and your files
 
 Where the platform keeps tags on files, Libri writes an item's tags to each of its

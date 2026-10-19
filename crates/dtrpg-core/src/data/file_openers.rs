@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::data::enums::CatalogPresentation;
+use crate::data::enums::{CatalogPresentation, GroupBy};
 use crate::util::filter::SidebarFilter;
 use crate::util::sort::SortMethod;
 
@@ -47,8 +47,13 @@ pub struct FileOpenerConfig {
 pub struct CatalogViewPrefs {
     #[serde(default)]
     sort:             Option<String>,
+    /// What the catalog is grouped by, as [`GroupBy`] names it.
     #[serde(default)]
-    pub grouped:      Option<bool>,
+    group_by:         Option<String>,
+    /// Whether the catalog was grouped by publisher, as saved before
+    /// `group_by` existed. Read when `group_by` is absent; never written.
+    #[serde(default)]
+    grouped:          Option<bool>,
     #[serde(default)]
     presentation:     Option<String>,
     #[serde(default)]
@@ -74,7 +79,7 @@ impl CatalogViewPrefs {
     }
 
     /// Builds preferences from the controller's current view state.
-    pub fn from_state(filter: &SidebarFilter, sort: SortMethod, grouped: bool,
+    pub fn from_state(filter: &SidebarFilter, sort: SortMethod, group_by: GroupBy,
                       presentation: CatalogPresentation)
                       -> Self {
         let (filter_name, filter_publisher) = match filter {
@@ -98,7 +103,8 @@ impl CatalogViewPrefs {
                               SortMethod::PageCount => "PageCount",
                               SortMethod::Custom { .. } => "Custom",
                           }.to_string()),
-               grouped: Some(grouped),
+               group_by: Some(group_by.to_string()),
+               grouped: None,
                presentation: Some(match presentation {
                                       CatalogPresentation::List => "List",
                                       CatalogPresentation::Thumbs => "Thumbs",
@@ -122,6 +128,22 @@ impl CatalogViewPrefs {
                                "unrecognized catalog sort preference; using default");
                 SortMethod::default()
             }
+        }
+    }
+
+    /// Resolves the persisted grouping, defaulting (with a `WARN` log) for
+    /// unrecognized values. Absent values silently default, except that a
+    /// catalog saved as grouped before there was a choice is grouped by
+    /// publisher.
+    pub fn to_group_by(&self) -> GroupBy {
+        match self.group_by.as_deref() {
+            None if self.grouped == Some(true) => GroupBy::Publisher,
+            None => GroupBy::default(),
+            Some(name) => name.parse().unwrap_or_else(|_| {
+                                          tracing::warn!(value = name,
+                                                         "unrecognized catalog grouping preference; using default");
+                                          GroupBy::default()
+                                      }),
         }
     }
 
@@ -414,5 +436,44 @@ mod tests {
         let cfg = config_with(vec![entry("pdf", tmp.to_str().unwrap_or("/tmp"))]);
         let stale = cfg.validate_all();
         assert_eq!(stale.len(), 0);
+    }
+
+    // ── Grouping
+    // ─────────────────────────────────────────────────────────────
+
+    // A test that cannot read its own fixture should fail loudly.
+    #[allow(clippy::expect_used)]
+    fn prefs_from(toml_text: &str) -> CatalogViewPrefs {
+        toml::from_str(toml_text).expect("valid catalog view preferences")
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)] // A fixture that cannot be written should fail loudly.
+    fn every_grouping_survives_being_saved_and_loaded() {
+        for group_by in [GroupBy::None, GroupBy::Publisher, GroupBy::Tag] {
+            let saved = CatalogViewPrefs::from_state(&SidebarFilter::AllTitles,
+                                                     SortMethod::Title,
+                                                     group_by,
+                                                     CatalogPresentation::Grid);
+            let text = toml::to_string(&saved).expect("preferences serialize");
+
+            assert_eq!(prefs_from(&text).to_group_by(), group_by);
+        }
+    }
+
+    #[test]
+    fn a_catalog_saved_as_grouped_before_there_was_a_choice_is_grouped_by_publisher() {
+        assert_eq!(prefs_from("grouped = true").to_group_by(),
+                   GroupBy::Publisher);
+        assert_eq!(prefs_from("grouped = false").to_group_by(), GroupBy::None);
+        assert_eq!(prefs_from("").to_group_by(), GroupBy::None);
+    }
+
+    #[test]
+    fn the_grouping_wins_over_the_old_setting_and_an_unknown_one_means_none() {
+        assert_eq!(prefs_from("group_by = \"Tag\"\ngrouped = true").to_group_by(),
+                   GroupBy::Tag);
+        assert_eq!(prefs_from("group_by = \"Planet\"").to_group_by(),
+                   GroupBy::None);
     }
 }

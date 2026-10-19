@@ -162,11 +162,23 @@ impl LibraryController {
 
     // ── Grouping / presentation mutations ────────────────────────────────────
 
-    /// Toggles publisher grouping on or off.
-    pub fn set_grouped(&mut self, grouped: bool, cx: &mut Context<Self>) {
-        self.grouped = grouped;
+    /// Groups the catalog by `group_by`, or stops grouping it.
+    pub fn set_group_by(&mut self, group_by: GroupBy, cx: &mut Context<Self>) {
+        self.group_by = group_by;
         self.save_view_prefs();
         cx.emit(LibraryChanged);
+    }
+
+    /// Groups the catalog by `group_by`, or stops grouping it if it is already
+    /// grouped that way. This is what a menu item that shows a check does.
+    pub fn toggle_group_by(&mut self, group_by: GroupBy, cx: &mut Context<Self>) {
+        let next = if self.group_by == group_by {
+            GroupBy::None
+        }
+        else {
+            group_by
+        };
+        self.set_group_by(next, cx);
     }
 
     /// Switches the catalog presentation mode.
@@ -176,13 +188,13 @@ impl LibraryController {
         cx.emit(LibraryChanged);
     }
 
-    /// Persists the current sidebar filter, sort, grouped, and presentation
+    /// Persists the current sidebar filter, sort, grouping, and presentation
     /// state to disk. Best-effort — I/O failures are logged and ignored (see
     /// [`dtrpg_core::data::file_openers::CatalogViewPrefs::save`]).
     pub(super) fn save_view_prefs(&self) {
         dtrpg_core::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
                                                                      self.sort,
-                                                                     self.grouped,
+                                                                     self.group_by,
                                                                      self.presentation).save();
     }
 }
