@@ -76,7 +76,8 @@ launch that is signed out or offline still shows the library's tags and reads th
 #### Scenario: A tag added in Finder
 
 - **WHEN** the user added a tag to a file in Finder while Libri was closed
-- **THEN** Libri SHALL add the tag to the item, taking its color from Finder if the library has none for it
+- **THEN** Libri SHALL add the tag to the item with no color, because the color stored in a file is not the color
+  Finder shows (ADR 0009)
 
 #### Scenario: A tag changed in Libri
 

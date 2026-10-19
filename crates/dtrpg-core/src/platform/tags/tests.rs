@@ -3,23 +3,38 @@
 #![allow(clippy::unwrap_used)]
 
 use super::*;
+use crate::data::tag_color::TagColor;
 
 fn names(tags: &[&str]) -> Vec<FileTag> {
     tags.iter().map(|tag| FileTag::plain(*tag)).collect()
 }
 
-fn macos_names(tags: &[MacosTag]) -> Vec<&str> {
-    tags.iter().map(|tag| tag.name.as_str()).collect()
+/// The strings in a macOS tag attribute, as written, with any color number.
+fn raw_entries(bytes: &[u8]) -> Vec<String> {
+    let Value::Array(entries) = Value::from_reader(Cursor::new(bytes)).unwrap()
+    else {
+        panic!("not an array");
+    };
+    entries.into_iter()
+           .map(|entry| entry.into_string().unwrap())
+           .collect()
+}
+
+/// The bytes of a macOS tag attribute holding `entries` as they are.
+fn attribute_of(entries: &[&str]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    Value::Array(entries.iter()
+                        .map(|e| Value::String((*e).to_owned()))
+                        .collect()).to_writer_binary(&mut bytes)
+                                   .unwrap();
+    bytes
 }
 
 #[test]
 fn macos_tags_round_trip() {
     let bytes = encode_macos(&names(&["solo", "to run"])).unwrap();
 
-    let decoded = decode_macos(&bytes).unwrap();
-
-    assert_eq!(macos_names(&decoded), ["solo", "to run"]);
-    assert!(decoded.iter().all(|tag| tag.suffix.is_none()));
+    assert_eq!(decode_macos(&bytes).unwrap(), ["solo", "to run"]);
 }
 
 #[test]
@@ -30,57 +45,43 @@ fn macos_tags_are_written_as_a_binary_property_list() {
 }
 
 #[test]
-fn a_macos_color_suffix_is_read_apart_from_the_name() {
-    let existing = encode_macos(&names(&["Red\n6", "solo"])).unwrap();
+fn a_color_number_is_dropped_when_a_macos_tag_is_read() {
+    let bytes = attribute_of(&["Red\n6", "solo"]);
 
-    let decoded = decode_macos(&existing).unwrap();
+    assert_eq!(decode_macos(&bytes).unwrap(), ["Red", "solo"]);
+}
 
-    assert_eq!(decoded[0],
-               MacosTag { name:   "Red".to_owned(),
-                          suffix: Some("6".to_owned()), });
-    assert_eq!(decoded[1],
-               MacosTag { name:   "solo".to_owned(),
-                          suffix: None, });
+#[test]
+fn tags_as_finder_wrote_them_are_read_by_name() {
+    // From a real file: Finder wrote the number 1 (gray) after each tag, and
+    // showed one of them, "New", in green.
+    let bytes = attribute_of(&["map\n1", "test\n1", "New\n1"]);
+
+    assert_eq!(decode_macos(&bytes).unwrap(), ["map", "test", "New"]);
 }
 
 #[test]
 fn a_tags_color_is_written_as_its_finder_number() {
     let bytes = encode_macos(&[FileTag::colored("Red", TagColor::Red)]).unwrap();
 
-    let decoded = decode_macos(&bytes).unwrap();
-
-    assert_eq!(decoded[0].suffix.as_deref(), Some("6"));
-    assert_eq!(macos_color(&decoded[0]), Some(TagColor::Red));
+    assert_eq!(raw_entries(&bytes), ["Red\n6"]);
 }
 
 #[test]
 fn a_tag_with_no_color_is_written_with_its_name_alone() {
     let bytes = encode_macos(&names(&["solo"])).unwrap();
 
-    let decoded = decode_macos(&bytes).unwrap();
-
-    assert_eq!(decoded[0].suffix, None);
-    assert_eq!(macos_color(&decoded[0]), None);
+    assert_eq!(raw_entries(&bytes), ["solo"]);
 }
 
 #[test]
-fn every_color_survives_being_written_and_read() {
+fn every_color_is_written_as_its_own_number() {
     for color in TagColor::ALL {
         let bytes = encode_macos(&[FileTag::colored("solo", color)]).unwrap();
 
-        assert_eq!(macos_color(&decode_macos(&bytes).unwrap()[0]), Some(color));
+        assert_eq!(raw_entries(&bytes),
+                   [format!("solo\n{}", color.finder_number())]);
     }
-}
-
-#[test]
-fn a_suffix_that_is_not_a_color_is_no_color() {
-    let tag = |suffix: Option<&str>| MacosTag { name:   "solo".to_owned(),
-                                                suffix: suffix.map(str::to_owned), };
-
-    assert_eq!(macos_color(&tag(None)), None);
-    assert_eq!(macos_color(&tag(Some("0"))), None);
-    assert_eq!(macos_color(&tag(Some("9"))), None);
-    assert_eq!(macos_color(&tag(Some("red"))), None);
 }
 
 #[test]
@@ -218,7 +219,7 @@ fn a_files_change_time_is_when_its_metadata_last_changed() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn a_color_is_kept_on_a_real_file_on_macos() {
+fn a_files_color_is_written_but_not_read_back_on_macos() {
     let dir = tempfile::tempdir().unwrap();
     let path = file_in(&dir);
 
@@ -226,7 +227,7 @@ fn a_color_is_kept_on_a_real_file_on_macos() {
           &[FileTag::colored("solo", TagColor::Orange),
             FileTag::plain("to run")]).unwrap();
 
-    assert_eq!(read(&path).unwrap(),
-               [FileTag::colored("solo", TagColor::Orange),
-                FileTag::plain("to run")]);
+    assert_eq!(read(&path).unwrap(), names(&["solo", "to run"]));
+    let bytes = xattr::get(&path, MACOS_ATTRIBUTE).unwrap().unwrap();
+    assert_eq!(raw_entries(&bytes), ["solo\n7", "to run"]);
 }

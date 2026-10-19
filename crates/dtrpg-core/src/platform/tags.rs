@@ -15,7 +15,6 @@ use std::path::Path;
 use plist::Value;
 
 use super::FileTag;
-use crate::data::tag_color::TagColor;
 
 /// The attribute macOS keeps a file's tags in.
 #[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
@@ -25,28 +24,25 @@ pub(super) const MACOS_ATTRIBUTE: &str = "com.apple.metadata:_kMDItemUserTags";
 #[cfg_attr(target_os = "macos", allow(dead_code))] // Compiled on macOS so its tests run there.
 pub(super) const LINUX_ATTRIBUTE: &str = "user.xdg.tags";
 
-/// A tag read from a macOS file: its name, and the color suffix it carried.
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
-pub(super) struct MacosTag {
-    /// The tag's name.
-    pub(super) name:   String,
-    /// The text after the newline ("6" in "Red\n6"), if there was any.
-    pub(super) suffix: Option<String>,
-}
-
 fn invalid_data(error: impl std::error::Error + Send + Sync + 'static) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, error)
 }
 
-/// Reads the tags out of the bytes of a macOS tag attribute.
+/// Reads the tag names out of the bytes of a macOS tag attribute.
+///
+/// An entry is a name, optionally followed by a newline and a color number
+/// ("Red\n6"). The number is dropped. It is the color the tag had when it was
+/// put on the file, not the color Finder shows now: Finder keeps a color for
+/// each tag name and shows that, and does not rewrite the files when the color
+/// changes. A tag recolored in Finder after it was applied would be read with
+/// its old color.
 ///
 /// # Errors
 ///
 /// Returns [`io::ErrorKind::InvalidData`] if the bytes are not a property list
 /// holding an array of strings.
 #[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
-pub(super) fn decode_macos(bytes: &[u8]) -> io::Result<Vec<MacosTag>> {
+pub(super) fn decode_macos(bytes: &[u8]) -> io::Result<Vec<String>> {
     let value = Value::from_reader(Cursor::new(bytes)).map_err(invalid_data)?;
     let Value::Array(entries) = value
     else {
@@ -54,12 +50,8 @@ pub(super) fn decode_macos(bytes: &[u8]) -> io::Result<Vec<MacosTag>> {
     };
     entries.into_iter()
            .map(|entry| match entry {
-               Value::String(text) => Ok(match text.split_once('\n') {
-                   Some((name, suffix)) => MacosTag { name:   name.to_owned(),
-                                                      suffix: Some(suffix.to_owned()), },
-                   None => MacosTag { name:   text,
-                                      suffix: None, },
-               }),
+               Value::String(text) => Ok(text.split_once('\n')
+                                             .map_or(text.clone(), |(name, _)| name.to_owned())),
                _ => Err(io::Error::new(io::ErrorKind::InvalidData, "a tag is not a string")),
            })
            .collect()
@@ -91,17 +83,6 @@ pub(super) fn encode_macos(tags: &[FileTag]) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// The color a macOS tag's suffix names, if it names one.
-#[cfg_attr(target_os = "linux", allow(dead_code))] // Compiled on Linux so its tests run there.
-fn macos_color(tag: &MacosTag) -> Option<TagColor> {
-    tag.suffix
-       .as_deref()?
-       .trim()
-       .parse::<u8>()
-       .ok()
-       .and_then(TagColor::from_finder_number)
-}
-
 /// Reads the tags out of the bytes of a Linux tag attribute.
 ///
 /// # Errors
@@ -127,7 +108,8 @@ pub(super) fn encode_linux(tags: &[FileTag]) -> Vec<u8> {
         .into_bytes()
 }
 
-/// Reads the tags of the file at `path` from the platform's attribute.
+/// Reads the tags of the file at `path` from the platform's attribute, with no
+/// colors: see [`decode_macos`] for why a file's color is not read.
 ///
 /// A file with no tag attribute has no tags.
 pub(super) fn read(path: &Path) -> io::Result<Vec<FileTag>> {
@@ -135,8 +117,7 @@ pub(super) fn read(path: &Path) -> io::Result<Vec<FileTag>> {
     {
         match xattr::get(path, MACOS_ATTRIBUTE)? {
             Some(bytes) => Ok(decode_macos(&bytes)?.into_iter()
-                                                   .map(|tag| FileTag { color: macos_color(&tag),
-                                                                        name:  tag.name, })
+                                                   .map(FileTag::plain)
                                                    .collect()),
             None => Ok(Vec::new()),
         }

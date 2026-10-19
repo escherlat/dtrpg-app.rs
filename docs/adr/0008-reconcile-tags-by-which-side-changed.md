@@ -1,6 +1,6 @@
 ## Status
 
-Accepted. Supersedes the reconciliation rule in 0004 ("the index wins when the two disagree"); the rest of 0004
+Accepted. The sentence about reading a tag's color from a file is superseded by 0009. Supersedes the reconciliation rule in 0004 ("the index wins when the two disagree"); the rest of 0004
 stands.
 
 ## Context
