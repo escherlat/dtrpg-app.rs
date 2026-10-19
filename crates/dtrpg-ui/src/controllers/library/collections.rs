@@ -1,6 +1,6 @@
 //! Collection CRUD, membership changes, and the collections service swap.
 
-use super::collection_links::link_item_into_collection;
+use super::collection_links::{link_item_into_collection, unlink_item_from_collection};
 use super::*;
 
 impl LibraryController {
@@ -260,6 +260,42 @@ impl LibraryController {
           .detach();
     }
 
+    /// Returns the catalog item that `item_id` or `product_id` identify, if it
+    /// is in the catalog.
+    fn catalog_item_for_member(&self, item_id: u64, product_id: u64) -> Option<LibraryItem> {
+        self.catalog
+            .iter()
+            .find(|item| {
+                collection_member_id(item) == item_id
+                || (product_id > 0 && item.product_id == product_id)
+            })
+            .cloned()
+    }
+
+    /// Removes the links to a downloaded item from the folder of the collection
+    /// it has just left, so the folder shows only what is in the collection.
+    ///
+    /// `collections_before` is what the item belonged to before it left, which
+    /// decides where its files are expected to be. Only links that point at the
+    /// item's files are removed. Does nothing for an item that is not in the
+    /// catalog or not downloaded.
+    fn unlink_item_from_removed_collection(&self, item_id: u64, product_id: u64,
+                                           collection_name: Arc<str>,
+                                           collections_before: Vec<CollectionEntry>,
+                                           cx: &mut Context<Self>) {
+        let Some(item) = self.catalog_item_for_member(item_id, product_id)
+        else {
+            return;
+        };
+        let storage = self.storage_override.clone();
+        cx.background_executor()
+          .spawn(async move {
+              let storage = storage.unwrap_or_else(|| Arc::new(StorageConfig::load()));
+              unlink_item_from_collection(&storage, &item, &collections_before, &collection_name);
+          })
+          .detach();
+    }
+
     /// Puts the files of the item that are already on disk in the folder of the
     /// collection it was just added to, as the download would have if the item
     /// had been a member then, when "Create collections" is on.
@@ -267,13 +303,7 @@ impl LibraryController {
     /// Does nothing for an item that is not in the catalog or not downloaded.
     fn link_item_into_added_collection(&self, item_id: u64, product_id: u64, collection_id: u64,
                                        cx: &mut Context<Self>) {
-        let Some(item) = self.catalog
-                             .iter()
-                             .find(|item| {
-                                 collection_member_id(item) == item_id
-                                 || (product_id > 0 && item.product_id == product_id)
-                             })
-                             .cloned()
+        let Some(item) = self.catalog_item_for_member(item_id, product_id)
         else {
             return;
         };
@@ -410,6 +440,7 @@ impl LibraryController {
     /// error notification.
     pub fn remove_item_from_collection(&mut self, collection_id: u64, item_id: u64,
                                        product_id: u64, cx: &mut Context<Self>) {
+        let collections_before = self.collections.clone();
         let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
         else {
             return;
@@ -446,7 +477,18 @@ impl LibraryController {
                                        collections_service.remove_member(collection_id, product_id)
                                    })
                                    .await;
-              if let Err(e) = result {
+              match result {
+                  Ok(()) => {
+                      this.update(async_cx, |ctrl, cx| {
+                              ctrl.unlink_item_from_removed_collection(item_id,
+                                                                       product_id,
+                                                                       collection_name,
+                                                                       collections_before,
+                                                                       cx);
+                          })
+                          .ok();
+                  }
+                  Err(e) => {
                   this.update(async_cx, |ctrl, cx| {
                           if let Some(collection) =
                               ctrl.collections.iter_mut().find(|c| c.id == collection_id)
@@ -473,6 +515,7 @@ impl LibraryController {
                           cx.emit(CollectionMemberRemoveFailed { message: e.message.clone(), });
                       })
                       .ok();
+                  }
               }
           })
           .detach();
