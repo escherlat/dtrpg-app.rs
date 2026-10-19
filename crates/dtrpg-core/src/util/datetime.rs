@@ -1,7 +1,7 @@
 //! Timestamp conversion helpers shared by the SDK mapping layer and the UI's
 //! own relative/absolute display formatting (`dtrpg_ui::util::datetime`).
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
 
 /// Converts a Unix timestamp (seconds) to a UTC `DateTime`, falling back to
 /// the earliest representable instant if `ts` is out of chrono's supported
@@ -15,6 +15,18 @@ pub fn from_epoch(ts: i64) -> DateTime<Utc> {
 #[must_use]
 pub fn now_secs() -> i64 {
     Utc::now().timestamp()
+}
+
+/// Returns the Unix timestamp of midnight on the first day of the calendar
+/// month containing `now`, in `now`'s own time zone.
+///
+/// Falls back to `now` itself in the unlikely case that local midnight does
+/// not exist (a daylight-saving gap at the start of the month).
+#[must_use]
+pub fn start_of_month_secs(now: DateTime<Local>) -> i64 {
+    Local.with_ymd_and_hms(now.year(), now.month(), 1, 0, 0, 0)
+         .earliest()
+         .map_or_else(|| now.timestamp(), |start| start.timestamp())
 }
 
 /// Parses an RFC 3339 / ISO 8601 timestamp (e.g. `2024-07-16T10:45:52-05:00`
@@ -50,7 +62,20 @@ pub fn epoch_to_rfc3339(epoch: i64) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
+
+    #[test]
+    fn start_of_month_is_midnight_on_the_first_in_local_time() {
+        let now = Local.with_ymd_and_hms(2026, 10, 19, 15, 30, 0).unwrap();
+
+        let start = DateTime::from_timestamp(start_of_month_secs(now), 0).unwrap()
+                                                                         .with_timezone(&Local);
+
+        assert_eq!((start.year(), start.month(), start.day()), (2026, 10, 1));
+        assert_eq!(start.format("%H:%M:%S").to_string(), "00:00:00");
+    }
 
     #[test]
     fn parses_rfc3339_with_negative_offset() {

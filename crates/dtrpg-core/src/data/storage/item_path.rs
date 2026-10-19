@@ -21,13 +21,24 @@ pub fn resolved_file_path(storage: &StorageConfig, item: &LibraryItem, file: &Li
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use super::*;
     use crate::data::enums::ItemStatus;
 
-    use super::*;
-
     fn make_item(publisher: &str) -> LibraryItem {
-        LibraryItem::new("item-1", "Test Title", publisher, "", "Core", "PDF", 100, 10.0, 2024, 1,
-                         ItemStatus::Cloud, "#1C2A44", "Desc.", None)
+        LibraryItem::new("item-1",
+                         "Test Title",
+                         publisher,
+                         "",
+                         "Core",
+                         "PDF",
+                         100,
+                         10.0,
+                         2024,
+                         1,
+                         ItemStatus::Cloud,
+                         "#1C2A44",
+                         "Desc.",
+                         None)
     }
 
     #[test]
@@ -45,6 +56,7 @@ mod tests {
 
         let resolved = resolved_file_path(&storage, &item, &file);
 
-        assert_eq!(resolved, storage.path_for_publisher("Paizo").join("Book.pdf"));
+        assert_eq!(resolved,
+                   storage.path_for_publisher("Paizo").join("Book.pdf"));
     }
 }

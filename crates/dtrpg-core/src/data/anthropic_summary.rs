@@ -68,7 +68,8 @@ impl AnthropicSummary {
     /// `model` for each summary.
     #[must_use]
     pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
-        Self { api_key: api_key.into(), model: model.into() }
+        Self { api_key: api_key.into(),
+               model:   model.into(), }
     }
 }
 
@@ -81,9 +82,7 @@ impl SummaryProvider for AnthropicSummary {
         let body = MessagesRequest { model:      &self.model,
                                      max_tokens: MAX_RESPONSE_TOKENS,
                                      messages:   vec![MessageIn { role:    "user",
-                                                                  content: summary_prompt(
-                                                                      content,
-                                                                  ), }], };
+                                                                  content: summary_prompt(content), }], };
 
         let client = reqwest::blocking::Client::new();
         let response = client.post(API_URL)
@@ -102,8 +101,8 @@ impl SummaryProvider for AnthropicSummary {
                                                        {message}")));
         }
 
-        let parsed: MessagesResponse =
-            response.json().map_err(|e| SummaryError::Provider(e.to_string()))?;
+        let parsed: MessagesResponse = response.json()
+                                               .map_err(|e| SummaryError::Provider(e.to_string()))?;
         let text = parsed.content
                          .into_iter()
                          .map(|block| block.text)

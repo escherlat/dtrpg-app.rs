@@ -24,6 +24,10 @@ use crate::util::datetime::now_secs;
 
 #[path = "api_archive.rs"]
 mod api_archive;
+#[path = "api_summary.rs"]
+mod api_summary;
+
+pub use api_summary::{SummarizeError, provider_for};
 
 /// Command/query facade over the library and collections services, and over
 /// the local library index (search, counts, and reads that don't need a

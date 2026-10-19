@@ -20,8 +20,10 @@
 //! store.delete().expect("failed to delete credential");
 //! ```
 
+mod anthropic;
 mod model;
 mod store;
 
+pub use anthropic::{delete_anthropic_api_key, load_anthropic_api_key, save_anthropic_api_key};
 pub use model::{Credential, CredentialError};
 pub use store::{CredentialStore, KeyringCredentialStore};
