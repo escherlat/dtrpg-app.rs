@@ -44,6 +44,11 @@ impl LibraryController {
             .collect()
     }
 
+    /// The library's tags as they are now, for grouping the catalog by them.
+    pub fn tag_library(&self) -> Arc<TagLibrary> {
+        Arc::clone(&self.tags)
+    }
+
     /// Reads the tags from the library index in the background and shows them.
     pub(super) fn load_tags(&mut self, cx: &mut Context<Self>) {
         self.tag_generation += 1;

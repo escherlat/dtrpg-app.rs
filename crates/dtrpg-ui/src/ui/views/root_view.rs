@@ -8,7 +8,7 @@ use dtrpg_core::{
     data::{
         auth_state::AuthState,
         constants::{KEYRING_API_KEY, KEYRING_SERVICE},
-        enums::{CatalogPresentation, SelectionField},
+        enums::{CatalogPresentation, GroupBy, SelectionField},
         ui_state::UiState,
     },
     services::{LibraryService, collections::CollectionsService},
@@ -39,7 +39,7 @@ use crate::ui::actions::{
     ReportFeatureBug, SelectTab0, SelectTab1, SelectTab2, SelectTab3, SelectTab4, SelectTab5,
     SelectTab6, SelectTab7, SelectTab8, SelectTab9, ShowActivity, ShowAlertHistory, ShowSettings,
     SortAscending, SortByDateAdded, SortByPages, SortByPublisher, SortByTitle, SortDescending,
-    ToggleGroupByPublisher, ViewAsGrid, ViewAsList, ViewAsThumbs,
+    ToggleGroupByPublisher, ToggleGroupByTag, ViewAsGrid, ViewAsList, ViewAsThumbs,
 };
 use crate::ui::app::{
     CollectionsServiceFactory, LoginServiceFactory, ServiceFactory, ViewMenuState, build_menus,
@@ -672,7 +672,7 @@ impl LibraryRootView {
               let menu_state = ViewMenuState { presentation:   ctrl.presentation,
                                                sort:           ctrl.sort,
                                                sort_direction: ctrl.sort_direction,
-                                               grouped:        ctrl.grouped, };
+                                               group_by:       ctrl.group_by, };
               if this.last_menu_state != Some(menu_state) {
                   cx.set_menus(build_menus(&menu_state, &this.tabs.read(cx).snapshot()));
                   this.last_menu_state = Some(menu_state);
@@ -1069,7 +1069,7 @@ impl Render for LibraryRootView {
              sort_direction,
              collection_sort,
              collection_sort_direction,
-             grouped,
+             group_by,
              presentation,
              bulk_selection_mode,
              bulk_selected_ids,
@@ -1088,7 +1088,7 @@ impl Render for LibraryRootView {
                             snap.sort_direction,
                             snap.collection_sort,
                             snap.collection_sort_direction,
-                            snap.grouped,
+                            snap.group_by,
                             snap.presentation,
                             snap.bulk_selection_mode,
                             snap.bulk_selected_ids,
@@ -1158,7 +1158,7 @@ impl Render for LibraryRootView {
                                      self.search_input.clone(),
                                      sort,
                                      sort_direction,
-                                     grouped,
+                                     group_by,
                                      presentation,
                                      bulk_selection_mode,
                                      lib_entity.clone(),
@@ -1263,6 +1263,7 @@ impl Render for LibraryRootView {
         let controller_for_sort_asc = self.controller.clone();
         let controller_for_sort_desc = self.controller.clone();
         let controller_for_group_toggle = self.controller.clone();
+        let controller_for_group_by_tag = self.controller.clone();
         let search_input_for_focus = self.search_input.clone();
         let tabs_for_select_0 = self.tabs.clone();
         let tabs_for_select_1 = self.tabs.clone();
@@ -1345,8 +1346,12 @@ impl Render for LibraryRootView {
             })
             .on_action(move |_: &ToggleGroupByPublisher, _, cx| {
                 controller_for_group_toggle.update(cx, |ctrl, cx| {
-                    let grouped = ctrl.snapshot().grouped;
-                    ctrl.set_grouped(!grouped, cx);
+                    ctrl.toggle_group_by(GroupBy::Publisher, cx);
+                });
+            })
+            .on_action(move |_: &ToggleGroupByTag, _, cx| {
+                controller_for_group_by_tag.update(cx, |ctrl, cx| {
+                    ctrl.toggle_group_by(GroupBy::Tag, cx);
                 });
             })
             .on_action(move |_: &FocusSearch, window, cx| {

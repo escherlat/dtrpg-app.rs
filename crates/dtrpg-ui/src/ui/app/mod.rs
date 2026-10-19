@@ -1,6 +1,6 @@
 use dtrpg_core::credentials::{CredentialStore, KeyringCredentialStore};
 use dtrpg_core::data::constants::{DETAIL_TAB_TITLE_MAX_CHARS, KEYRING_API_KEY, KEYRING_SERVICE};
-use dtrpg_core::data::enums::CatalogPresentation;
+use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
 use dtrpg_core::data::ui_state::{UiState, WindowBoundsPref};
 use dtrpg_core::services::{
     LibraryService, LoginService, LoginTokens, collections::CollectionsService,
@@ -33,7 +33,7 @@ pub struct ViewMenuState {
     pub presentation:   CatalogPresentation,
     pub sort:           SortMethod,
     pub sort_direction: SortDirection,
-    pub grouped:        bool,
+    pub group_by:       GroupBy,
 }
 
 /// Holds the factory closure used to create a [`LibraryService`] on demand.
@@ -543,7 +543,12 @@ pub fn build_menus(state: &ViewMenuState, tabs: &TabsSnapshot) -> Vec<Menu> {
                         t!("menu.toggle_group_by_publisher").to_string(),
                         ToggleGroupByPublisher,
                     )
-                    .checked(state.grouped),
+                    .checked(state.group_by == GroupBy::Publisher),
+                    MenuItem::action(
+                        t!("menu.toggle_group_by_tag").to_string(),
+                        ToggleGroupByTag,
+                    )
+                    .checked(state.group_by == GroupBy::Tag),
                 ]),
             ),
             MenuItem::separator(),

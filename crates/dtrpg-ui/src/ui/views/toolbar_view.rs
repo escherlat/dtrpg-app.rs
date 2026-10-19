@@ -1,7 +1,7 @@
 //! Toolbar view: section title, search, sort dropdown, group toggle, layout
 //! switcher.
 
-use dtrpg_core::data::enums::CatalogPresentation;
+use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::sort::*;
 use gpui::prelude::*;
@@ -82,7 +82,7 @@ fn count_label_for(filter: &SidebarFilter, filter_count: usize, matched_count: u
 #[allow(clippy::too_many_arguments)]
 pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count: usize,
                       total_count: usize, search_query: &str, search_input: Entity<InputState>,
-                      sort: SortMethod, sort_direction: SortDirection, grouped: bool,
+                      sort: SortMethod, sort_direction: SortDirection, group_by: GroupBy,
                       presentation: CatalogPresentation, selection_mode: bool,
                       entity: Entity<LibraryController>, colors: &ColorTokens)
                       -> impl IntoElement + 'static + use<> {
@@ -131,7 +131,7 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
                      .items_center()
                      .gap(px(10.0))
                      .child(Input::new(&search_input).w(px(188.0)).cleanable(true))
-                     .child(render_sort_selector(sort, sort_direction, grouped, entity.clone()))
+                     .child(render_sort_selector(sort, sort_direction, group_by, entity.clone()))
                      .child(render_layout_switcher(presentation, entity.clone()))
                      .child(render_selection_mode_toggle(selection_mode, entity)))
 }
@@ -139,7 +139,7 @@ pub fn render_toolbar(filter: &SidebarFilter, filter_count: usize, matched_count
 // ── Sort selector
 // ─────────────────────────────────────────────────────────────
 
-fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: bool,
+fn render_sort_selector(current: SortMethod, direction: SortDirection, group_by: GroupBy,
                         entity: Entity<LibraryController>)
                         -> impl IntoElement + 'static {
     let label = match current {
@@ -165,6 +165,7 @@ fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: 
                                     let e5 = entity.clone();
                                     let e6 = entity.clone();
                                     let e7 = entity.clone();
+                                    let e8 = entity.clone();
                                     let mut m = menu
                 .item(
                     PopupMenuItem::new(t!("toolbar.sort_title"))
@@ -223,9 +224,18 @@ fn render_sort_selector(current: SortMethod, direction: SortDirection, grouped: 
                 .separator()
                 .item(
                     PopupMenuItem::new(t!("toolbar.group_by_publisher"))
-                        .checked(grouped)
+                        .checked(group_by == GroupBy::Publisher)
                         .on_click(move |_, _, cx| {
-                            e7.update(cx, |ctrl, cx| ctrl.set_grouped(!grouped, cx));
+                            e7.update(cx, |ctrl, cx| {
+                                ctrl.toggle_group_by(GroupBy::Publisher, cx);
+                            });
+                        }),
+                )
+                .item(
+                    PopupMenuItem::new(t!("toolbar.group_by_tag"))
+                        .checked(group_by == GroupBy::Tag)
+                        .on_click(move |_, _, cx| {
+                            e8.update(cx, |ctrl, cx| ctrl.toggle_group_by(GroupBy::Tag, cx));
                         }),
                 )
                                 })

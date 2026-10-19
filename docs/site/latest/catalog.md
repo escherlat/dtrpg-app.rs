@@ -21,8 +21,9 @@ Switch between three presentations from the toolbar's layout switcher:
 
 The toolbar's sort dropdown sorts by title (default), publisher, date added,
 or page count. In List layout, clicking a column header sorts by that column
-instead (shown as "custom" sort in the toolbar). A group toggle in the
-toolbar groups the catalog by publisher.
+instead (shown as "custom" sort in the toolbar). The sort dropdown and the
+View menu also group the catalog by publisher or by [tag]({{ '/latest/tags/' | relative_url }}#grouping-by-tag),
+one at a time.
 
 ## Navigation and filtering
 
