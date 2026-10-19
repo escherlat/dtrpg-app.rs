@@ -103,3 +103,13 @@ fn the_library_is_read_from_the_index() {
     assert_eq!(library.entry("solo").unwrap().count, 2);
     assert_eq!(library.color_of("solo"), Some(TagColor::Blue));
 }
+
+#[test]
+fn an_items_tag_names_are_borrowed_in_order() {
+    let library = library();
+
+    let names: Vec<&str> = library.tag_names_of("a").iter().map(|n| &**n).collect();
+    assert_eq!(names, ["Beta", "solo"]);
+    assert!(library.tag_names_of("c").is_empty());
+    assert!(library.tag_names_of("missing").is_empty());
+}

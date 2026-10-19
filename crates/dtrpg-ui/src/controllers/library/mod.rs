@@ -32,6 +32,7 @@ use dtrpg_core::services::{
 use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
+use dtrpg_core::util::search::SearchQuery;
 use dtrpg_core::util::sort::*;
 use dtrpg_core::work::{
     JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot, WorkQueue,

@@ -261,6 +261,7 @@ impl LibraryController {
     pub(super) fn invalidate_cache(&mut self) {
         let now_secs = now_secs();
         let window_days = self.recently_updated_window_days;
+        let query = SearchQuery::parse(&self.search_query);
         let mut items: Vec<LibraryItem> = self.catalog
                                               .iter()
                                               .filter(|i| {
@@ -269,7 +270,7 @@ impl LibraryController {
                                                                       &self.collection_members,
                                                                       now_secs,
                                                                       window_days)
-                                                  && item_matches_query(i, &self.search_query)
+                                                  && query.matches(i, self.tags.tag_names_of(&i.id))
                                               })
                                               .cloned()
                                               .collect();

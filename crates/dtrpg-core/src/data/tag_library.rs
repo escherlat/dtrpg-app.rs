@@ -95,6 +95,13 @@ impl TagLibrary {
             .unwrap_or_default()
     }
 
+    /// The names of the tags of the item `item_id`, ordered ignoring case,
+    /// without copying them.
+    #[must_use]
+    pub fn tag_names_of(&self, item_id: &str) -> &[Arc<str>] {
+        self.by_item.get(item_id).map_or(&[], Vec::as_slice)
+    }
+
     /// The tag called `name`, ignoring case, if any item has it.
     #[must_use]
     pub fn entry(&self, name: &str) -> Option<&TagEntry> {

@@ -35,7 +35,8 @@ The sidebar has three sections:
 - **Collections** - your custom collections (see
   [Collections]({{ '/latest/collections/' | relative_url }})).
 
-The toolbar's search box filters the current section's titles as you type.
+The toolbar's search box filters the current section's titles as you type. It also finds items by tag: see
+[Tags]({{ '/latest/tags/' | relative_url }}).
 
 ## Viewing an item
 
