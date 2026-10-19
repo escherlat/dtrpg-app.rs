@@ -64,8 +64,7 @@ files written and files read back separately.
 - [x] 3b.6 `NativePreferences`: write to files, read from files, reconcile on launch; the launch pass and a
       finished download honor them
 - [x] 3b.7 ADR 0008, and the spec
-- [ ] 3b.8 `LibraryApi` methods for tag colors (with the MCP `set_tags` tool, which is their caller; the app
-      uses `services::tag_editing` directly)
+- [x] 3b.8 `LibraryApi` methods for the tag library, a tag's color, and replacing an item's tags
 - [x] 3b.9 The Native Integration settings page with the three switches
 
 ## 4. UI
@@ -88,7 +87,9 @@ written in.
 - [x] 4.5 The Native Integration settings page with the three switches
 - [ ] 4.6 The optional Tags column, and group by tag
 - [ ] 4.7 `tag:` and `-tag:` in the search box, and the saved-search rule editor
-- [ ] 4.8 The `set_tags` MCP tool, and the `LibraryApi` methods it needs (3b.8)
+- [x] 4.8 MCP tools `list_tags`, `get_item_tags`, `set_tags` and `set_tag_color`. The two that change the library
+      refuse unless the server is started with `--allow-write`, because the permission model in the mockup's Agent &
+      MCP page is not built
 
 ## 5. Tests and docs
 

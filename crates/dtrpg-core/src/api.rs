@@ -15,9 +15,12 @@ use crate::data::collection::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::index::{IndexError, LibraryIndex};
 use crate::data::library::LibraryItem;
+use crate::data::tag_color::TagColor;
+use crate::data::tag_library::TagLibrary;
 use crate::services::collections::{CollectionsService, CollectionsServiceError};
 use crate::services::{LibraryService, LibraryServiceError};
 use crate::util::container::{ContainerEntry, ContainerError};
+use crate::util::datetime::now_secs;
 
 /// Command/query facade over the library and collections services, and over
 /// the local library index (search, counts, and reads that don't need a
@@ -165,6 +168,43 @@ impl LibraryApi {
         &self)
         -> Result<std::collections::HashMap<String, Vec<String>>, IndexError> {
         self.open_index()?.all_item_tags()
+    }
+
+    /// Returns every tag with its color and how many items have it, and which
+    /// items have which.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or queried.
+    pub fn index_tag_library(&self) -> Result<TagLibrary, IndexError> {
+        TagLibrary::load(&self.open_index()?)
+    }
+
+    /// Sets the color of the tag `tag`, or clears it with `None`; returns
+    /// `false` if no item has such a tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError`] if the index cannot be opened or written.
+    pub fn index_set_tag_color(&self, tag: &str, color: Option<TagColor>)
+                               -> Result<bool, IndexError> {
+        self.open_index()?.set_tag_color(tag, color)
+    }
+
+    /// Makes `tags` exactly the tags of the item `item_id`. A tag the index
+    /// already has keeps its spelling and its color; a new one has no color.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::InvalidTag`] if a tag cannot be stored,
+    /// [`IndexError::NoSuchItem`] if the item is not in the library index, and
+    /// [`IndexError`] if the index cannot be opened or written. Nothing is
+    /// changed on error.
+    pub fn index_set_item_tags(&self, item_id: &str, tags: &[String]) -> Result<(), IndexError> {
+        let wanted: Vec<(String, Option<TagColor>)> =
+            tags.iter().map(|tag| (tag.clone(), None)).collect();
+        self.open_index()?
+            .set_item_tags(item_id, &wanted, now_secs())
     }
 
     /// Tags the item `item_id` with `tag`; returns `false` if it already had
@@ -393,6 +433,61 @@ mod tests {
         assert_eq!(api.index_rename_tag("solo", "duet").unwrap(), 1);
         assert_eq!(api.index_delete_tag("duet").unwrap(), 1);
         assert!(api.index_list_tags().unwrap().is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_tag_library_and_tag_colors_are_read_and_set_through_the_api() {
+        let dir = test_dir("tag_library");
+        let _ = std::fs::remove_dir_all(&dir);
+        let api = api_at(&dir);
+        let catalog = stub_catalog();
+        api.open_index()
+           .unwrap()
+           .replace_all_items(&catalog)
+           .unwrap();
+        let id = catalog[0].id.to_string();
+        api.index_add_tag(&id, "solo").unwrap();
+
+        assert!(api.index_set_tag_color("Solo", Some(TagColor::Red))
+                   .unwrap());
+        assert!(!api.index_set_tag_color("missing", Some(TagColor::Red))
+                    .unwrap());
+
+        let library = api.index_tag_library().unwrap();
+        assert_eq!(library.entry("solo").unwrap().count, 1);
+        assert_eq!(library.color_of("solo"), Some(TagColor::Red));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_items_tags_are_replaced_keeping_the_color_of_a_tag_that_stays() {
+        let dir = test_dir("set_item_tags");
+        let _ = std::fs::remove_dir_all(&dir);
+        let api = api_at(&dir);
+        let catalog = stub_catalog();
+        api.open_index()
+           .unwrap()
+           .replace_all_items(&catalog)
+           .unwrap();
+        let id = catalog[0].id.to_string();
+        api.index_add_tag(&id, "solo").unwrap();
+        api.index_add_tag(&id, "old").unwrap();
+        api.index_set_tag_color("solo", Some(TagColor::Blue))
+           .unwrap();
+
+        api.index_set_item_tags(&id, &["Solo".to_owned(), "new".to_owned()])
+           .unwrap();
+
+        assert_eq!(api.index_item_tags(&id).unwrap(), ["new", "solo"]);
+        assert_eq!(api.index_tag_library().unwrap().color_of("solo"),
+                   Some(TagColor::Blue));
+        assert!(api.index_set_item_tags("missing", &[]).is_err());
+        assert!(api.index_set_item_tags(&id, &["no, comma".to_owned()])
+                   .is_err());
+        assert_eq!(api.index_item_tags(&id).unwrap(), ["new", "solo"]);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

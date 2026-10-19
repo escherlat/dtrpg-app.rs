@@ -26,6 +26,8 @@ purchases, on macOS, Linux, and Windows. This is the latest documentation.
   items into custom collections.
 - [Tags]({{ '/latest/tags/' | relative_url }}) - label items, give tags colors,
   and keep them in step with Finder and your file manager.
+- [Using Libri from an AI agent]({{ '/latest/mcp/' | relative_url }}) - the MCP
+  server: read your library and tags, and change tags if you allow it.
 - [Downloads]({{ '/latest/downloads/' | relative_url }}) - where files go,
   concurrency, retries, and the collections-symlink option.
 - [Storage roots]({{ '/latest/storage/' | relative_url }}) - configure
