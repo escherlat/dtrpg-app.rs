@@ -75,6 +75,7 @@ catalog:
   col_pages: "Seiten"
   col_size: "Größe"
   col_added: "Hinzugefügt"
+  col_tags: "Tags"
   action_download: "Herunterladen"
   publisher_download_all: "Alle herunterladen"
   untagged: "Ohne Tag"

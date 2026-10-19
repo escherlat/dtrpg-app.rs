@@ -181,6 +181,14 @@ impl LibraryController {
         self.set_group_by(next, cx);
     }
 
+    /// Shows the list column `column` if it is hidden, and hides it if it is
+    /// shown. Only the choosable columns can be changed.
+    pub fn toggle_list_column(&mut self, column: ListColumn, cx: &mut Context<Self>) {
+        self.list_columns = ListColumn::toggled(&self.list_columns, column);
+        self.save_view_prefs();
+        cx.emit(LibraryChanged);
+    }
+
     /// Switches the catalog presentation mode.
     pub fn set_presentation(&mut self, mode: CatalogPresentation, cx: &mut Context<Self>) {
         self.presentation = mode;
@@ -195,6 +203,7 @@ impl LibraryController {
         dtrpg_core::data::file_openers::CatalogViewPrefs::from_state(&self.filter,
                                                                      self.sort,
                                                                      self.group_by,
-                                                                     self.presentation).save();
+                                                                     self.presentation,
+                                                                     &self.list_columns).save();
     }
 }

@@ -40,6 +40,9 @@ use crate::data::theme::{ColorTokens, DensityConstants, LibriTheme};
 use crate::ui::library::cover::{CoverCache, render_generative_cover};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::item_popover_view::render_item_popover;
+use crate::ui::views::list_columns::{
+    ListColumnSet, column_chooser_menu, column_sorted_by, sort_method_for,
+};
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
 use crate::util::publisher::{ItemGroup, group_by_publisher, group_by_tag};
 use crate::util::reveal::reveal_in_file_manager;
@@ -151,35 +154,6 @@ fn text_xs_size(window: &Window) -> Pixels {
     rems(0.75).to_pixels(window.rem_size())
 }
 
-// ── Shared column definitions
-// ─────────────────────────────────────────────────
-
-/// Returns the column definitions used for the list view.
-///
-/// Used by both the `DataTable` (ungrouped) and the grouped-list header/rows
-/// to ensure column widths are always in sync between headers and cells.
-fn list_columns() -> Vec<Column> {
-    vec![Column::new("title", t!("catalog.col_title")).width(300.)
-                                                      .min_width(150.)
-                                                      .resizable(true),
-         Column::new("publisher", t!("catalog.col_publisher")).width(130.)
-                                                              .resizable(true),
-         Column::new("system", t!("catalog.col_system")).width(110.)
-                                                        .resizable(true),
-         Column::new("pages", t!("catalog.col_pages")).width(60.)
-                                                      .resizable(true),
-         Column::new("size", t!("catalog.col_size")).width(60.)
-                                                    .resizable(true),
-         Column::new("added", t!("catalog.col_added")).width(80.)
-                                                      .resizable(true),
-         Column::new("status", "").width(24.)
-                                  .resizable(false)
-                                  .selectable(false),
-         Column::new("open", "").width(28.)
-                                .resizable(false)
-                                .selectable(false),]
-}
-
 /// Returns a 2–3 character badge abbreviation for an item kind string.
 fn kind_badge(kind: &str) -> &'static str {
     if kind.contains("Core") {
@@ -267,17 +241,6 @@ pub(crate) fn render_checking_indicator(is_checking: bool)
     Some(Spinner::new().with_size(Size::XSmall))
 }
 
-/// Applies a `TableEvent::ColumnWidthsChanged` payload to a delegate's
-/// `user_widths`, ignoring mismatched-length payloads (e.g. mid-resize
-/// column-count changes).
-fn apply_column_widths(user_widths: &mut [Option<Pixels>], widths: &[Pixels]) {
-    if widths.len() == user_widths.len() {
-        for (slot, &w) in user_widths.iter_mut().zip(widths.iter()) {
-            *slot = Some(w);
-        }
-    }
-}
-
 /// Renders a single data cell (column `col_ix`) for `item`. Shared between
 /// the ungrouped `CatalogListDelegate` and the grouped
 /// `GroupedCatalogListDelegate` so grouped and ungrouped list rows stay
@@ -286,14 +249,14 @@ fn apply_column_widths(user_widths: &mut [Option<Pixels>], widths: &[Pixels]) {
 // (`render_thumb_row`, `render_grid_card`), which are all-render-context
 // parameter lists rather than a natural grouping into a smaller struct.
 #[allow(clippy::too_many_arguments)]
-fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens,
-                         storage_root: &Path, controller: &Entity<LibraryController>,
-                         tabs: &Entity<TabsController>, column_width: Pixels, window: &Window,
-                         is_checking: bool, activity: ItemActivity, selection_mode: bool,
-                         selected: bool)
+fn render_list_item_cell(item: &LibraryItem, column: ListColumn, tag_names: &[Arc<str>],
+                         colors: &ColorTokens, storage_root: &Path,
+                         controller: &Entity<LibraryController>, tabs: &Entity<TabsController>,
+                         column_width: Pixels, window: &Window, is_checking: bool,
+                         activity: ItemActivity, selection_mode: bool, selected: bool)
                          -> AnyElement {
-    match col_ix {
-        0 => {
+    match column {
+        ListColumn::Title => {
             let title = item.title.to_string();
             let badge = kind_badge(&item.kind);
             let badge_w =
@@ -356,49 +319,61 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                  .into_any_element()
         }
 
-        1 => div().h_full()
-                  .flex()
-                  .items_center()
-                  .text_sm()
-                  .text_color(colors.text_secondary)
-                  .truncate()
-                  .child(item.publisher.to_string())
-                  .into_any_element(),
+        ListColumn::Publisher => div().h_full()
+                                      .flex()
+                                      .items_center()
+                                      .text_sm()
+                                      .text_color(colors.text_secondary)
+                                      .truncate()
+                                      .child(item.publisher.to_string())
+                                      .into_any_element(),
 
-        2 => div().h_full()
-                  .flex()
-                  .items_center()
-                  .text_sm()
-                  .text_color(colors.text_secondary)
-                  .truncate()
-                  .child(item.line.to_string())
-                  .into_any_element(),
+        ListColumn::System => div().h_full()
+                                   .flex()
+                                   .items_center()
+                                   .text_sm()
+                                   .text_color(colors.text_secondary)
+                                   .truncate()
+                                   .child(item.line.to_string())
+                                   .into_any_element(),
 
-        3 => div().h_full()
-                  .flex()
-                  .items_center()
-                  .text_sm()
-                  .text_color(colors.text_secondary)
-                  .child(item.pages.to_string())
-                  .into_any_element(),
+        ListColumn::Pages => div().h_full()
+                                  .flex()
+                                  .items_center()
+                                  .text_sm()
+                                  .text_color(colors.text_secondary)
+                                  .child(item.pages.to_string())
+                                  .into_any_element(),
 
-        4 => div().h_full()
-                  .flex()
-                  .items_center()
-                  .text_sm()
-                  .text_color(colors.text_secondary)
-                  .child(format!("{:.0} MB", item.size_mb))
-                  .into_any_element(),
+        ListColumn::Size => div().h_full()
+                                 .flex()
+                                 .items_center()
+                                 .text_sm()
+                                 .text_color(colors.text_secondary)
+                                 .child(format!("{:.0} MB", item.size_mb))
+                                 .into_any_element(),
 
-        5 => div().h_full()
-                  .flex()
-                  .items_center()
-                  .text_sm()
-                  .text_color(colors.text_secondary)
-                  .child(item.year.to_string())
-                  .into_any_element(),
+        ListColumn::Added => div().h_full()
+                                  .flex()
+                                  .items_center()
+                                  .text_sm()
+                                  .text_color(colors.text_secondary)
+                                  .child(item.year.to_string())
+                                  .into_any_element(),
 
-        6 => {
+        ListColumn::Tags => div().h_full()
+                                 .flex()
+                                 .items_center()
+                                 .text_sm()
+                                 .text_color(colors.text_secondary)
+                                 .truncate()
+                                 .child(tag_names.iter()
+                                                 .map(|name| name.as_ref())
+                                                 .collect::<Vec<_>>()
+                                                 .join(", "))
+                                 .into_any_element(),
+
+        ListColumn::Status => {
             div().h_full()
                  .flex()
                  .items_center()
@@ -407,7 +382,7 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                  .into_any_element()
         }
 
-        7 => {
+        ListColumn::Open => {
             if item.status == ItemStatus::Downloaded {
                 let item_open_path =
                     dtrpg_core::data::storage::publisher_dir(storage_root, &item.publisher);
@@ -435,8 +410,6 @@ fn render_list_item_cell(item: &LibraryItem, col_ix: usize, colors: &ColorTokens
                 div().h_full().into_any_element()
             }
         }
-
-        _ => div().into_any_element(),
     }
 }
 
@@ -451,16 +424,12 @@ struct CatalogListDelegate {
     /// `OpenError::MultipleFilesRequireSelection`.
     tabs:         Entity<TabsController>,
     storage_root: PathBuf,
-    columns:      Vec<Column>,
-    /// User-adjusted column widths captured from
-    /// `TableEvent::ColumnWidthsChanged`. `None` means use the static
-    /// default from `list_columns()`.
-    user_widths:  Vec<Option<Pixels>>,
+    cols:         ListColumnSet,
 }
 
 impl TableDelegate for CatalogListDelegate {
     fn columns_count(&self, _cx: &App) -> usize {
-        self.columns.len()
+        self.cols.len()
     }
 
     fn rows_count(&self, cx: &App) -> usize {
@@ -473,30 +442,16 @@ impl TableDelegate for CatalogListDelegate {
 
     fn column(&self, col_ix: usize, cx: &App) -> Column {
         let snap = self.controller.read(cx).snapshot();
-        let active_col = match snap.sort {
-            SortMethod::Title => Some(0usize),
-            SortMethod::Publisher => Some(1),
-            SortMethod::PageCount => Some(3),
-            SortMethod::DateAdded => Some(5),
-            SortMethod::Custom { col_key: "publisher", } => Some(1),
-            SortMethod::Custom { col_key: "system" } => Some(2),
-            SortMethod::Custom { col_key: "pages" } => Some(3),
-            SortMethod::Custom { col_key: "size" } => Some(4),
-            SortMethod::Custom { col_key: "added" } => Some(5),
-            SortMethod::Custom { .. } => None,
-        };
-        let mut col = self.columns[col_ix].clone();
-        if let Some(Some(w)) = self.user_widths.get(col_ix) {
-            col = col.width(w.as_f32());
-        }
-        if active_col == Some(col_ix) {
+        let sorted_column = column_sorted_by(snap.sort).and_then(|c| self.cols.position_of(c));
+        let col = self.cols.column(col_ix);
+        if sorted_column == Some(col_ix) {
             let sort = match snap.sort_direction {
                 SortDirection::Ascending => ColumnSort::Ascending,
                 SortDirection::Descending => ColumnSort::Descending,
             };
             col.sort(sort)
         }
-        else if col_ix < 6 {
+        else if self.cols.kind(col_ix).and_then(sort_method_for).is_some() {
             col.sort(ColumnSort::Default)
         }
         else {
@@ -506,17 +461,9 @@ impl TableDelegate for CatalogListDelegate {
 
     fn perform_sort(&mut self, col_ix: usize, sort: ColumnSort, _window: &mut Window,
                     cx: &mut Context<TableState<Self>>) {
-        if col_ix >= 6 {
+        let Some(method) = self.cols.kind(col_ix).and_then(sort_method_for)
+        else {
             return;
-        }
-        let method = match col_ix {
-            0 => SortMethod::Title,
-            1 => SortMethod::Custom { col_key: "publisher", },
-            2 => SortMethod::Custom { col_key: "system" },
-            3 => SortMethod::Custom { col_key: "pages" },
-            4 => SortMethod::Custom { col_key: "size" },
-            5 => SortMethod::Custom { col_key: "added" },
-            _ => return,
         };
         let (method, direction) = match sort {
             ColumnSort::Ascending => (method, SortDirection::Ascending),
@@ -638,8 +585,14 @@ impl TableDelegate for CatalogListDelegate {
         let activity = ctrl_ref.item_activity(&item.id);
         let selection_mode = ctrl_ref.bulk_selection_mode();
         let selected = ctrl_ref.is_bulk_selected(&item.id);
+        let Some(column) = self.cols.kind(col_ix)
+        else {
+            return div().into_any_element();
+        };
+        let tags = ctrl_ref.tag_library();
         render_list_item_cell(&item,
-                              col_ix,
+                              column,
+                              tags.tag_names_of(&item.id),
                               &colors,
                               &self.storage_root,
                               &self.controller,
@@ -661,13 +614,17 @@ impl TableDelegate for CatalogListDelegate {
         // `render_td` cell. Match the cell style here.
         let name = self.column(col_ix, cx).name;
         let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
-        div().h_full()
+        let controller = self.controller.clone();
+        let chosen = controller.read(cx).list_columns.clone();
+        div().id(("list-heading", col_ix))
+             .h_full()
              .flex()
              .items_center()
              .text_sm()
              .font_family(label_font_family.to_string())
              .font_weight(FontWeight::MEDIUM)
              .child(name)
+             .context_menu(move |menu, _, _| column_chooser_menu(menu, &chosen, &controller))
     }
 }
 
@@ -699,8 +656,7 @@ struct GroupedCatalogListDelegate {
     /// `OpenError::MultipleFilesRequireSelection`.
     tabs:         Entity<TabsController>,
     storage_root: PathBuf,
-    columns:      Vec<Column>,
-    user_widths:  Vec<Option<Pixels>>,
+    cols:         ListColumnSet,
     rows:         Vec<GroupedRow>,
 }
 
@@ -712,7 +668,7 @@ impl GroupedCatalogListDelegate {
 
 impl TableDelegate for GroupedCatalogListDelegate {
     fn columns_count(&self, _cx: &App) -> usize {
-        self.columns.len()
+        self.cols.len()
     }
 
     fn loading(&self, cx: &App) -> bool {
@@ -724,11 +680,7 @@ impl TableDelegate for GroupedCatalogListDelegate {
     }
 
     fn column(&self, col_ix: usize, _cx: &App) -> Column {
-        let mut col = self.columns[col_ix].clone();
-        if let Some(Some(w)) = self.user_widths.get(col_ix) {
-            col = col.width(w.as_f32());
-        }
-        col
+        self.cols.column(col_ix)
     }
 
     fn context_menu(&mut self, row_ix: usize, menu: PopupMenu, window: &mut Window,
@@ -868,11 +820,17 @@ impl TableDelegate for GroupedCatalogListDelegate {
             }
             Some(GroupedRow::Header { .. }) => div().h_full().into_any_element(),
             Some(GroupedRow::Item(item)) => {
+                let Some(column) = self.cols.kind(col_ix)
+                else {
+                    return div().into_any_element();
+                };
                 let column_width = self.column(col_ix, cx).width;
                 let is_checking = self.controller.read(cx).is_checking(&item.id);
                 let activity = self.controller.read(cx).item_activity(&item.id);
+                let tags = self.controller.read(cx).tag_library();
                 render_list_item_cell(item,
-                                      col_ix,
+                                      column,
+                                      tags.tag_names_of(&item.id),
                                       &colors,
                                       &self.storage_root,
                                       &self.controller,
@@ -893,13 +851,17 @@ impl TableDelegate for GroupedCatalogListDelegate {
                  -> impl IntoElement {
         let name = self.column(col_ix, cx).name;
         let label_font_family = cx.global::<LibriTheme>().fonts.label_font.clone();
-        div().h_full()
+        let controller = self.controller.clone();
+        let chosen = controller.read(cx).list_columns.clone();
+        div().id(("list-heading", col_ix))
+             .h_full()
              .flex()
              .items_center()
              .text_sm()
              .font_family(label_font_family.to_string())
              .font_weight(FontWeight::MEDIUM)
              .child(name)
+             .context_menu(move |menu, _, _| column_chooser_menu(menu, &chosen, &controller))
     }
 }
 
@@ -951,13 +913,11 @@ impl CatalogView {
                tabs: Entity<TabsController>)
                -> Self {
         let storage_root = settings.read(cx).snapshot().storage_root_path;
-        let cols = list_columns();
-        let col_count = cols.len();
+        let chosen_columns = controller.read(cx).list_columns.clone();
         let delegate = CatalogListDelegate { controller:   controller.clone(),
                                              tabs:         tabs.clone(),
                                              storage_root: storage_root.clone(),
-                                             columns:      cols.clone(),
-                                             user_widths:  vec![None; col_count], };
+                                             cols:         ListColumnSet::new(&chosen_columns), };
         let catalog_list_table = cx.new(|cx| {
                                        TableState::new(delegate, window, cx).row_selectable(true)
                                                                             .col_selectable(false)
@@ -969,8 +929,8 @@ impl CatalogView {
         let grouped_delegate = GroupedCatalogListDelegate { controller: controller.clone(),
                                                             tabs: tabs.clone(),
                                                             storage_root,
-                                                            columns: cols,
-                                                            user_widths: vec![None; col_count],
+                                                            cols:
+                                                                ListColumnSet::new(&chosen_columns),
                                                             rows: Vec::new() };
         let catalog_grouped_list_table = cx.new(|cx| {
                                                TableState::new(grouped_delegate, window, cx)
@@ -984,7 +944,19 @@ impl CatalogView {
         cx.subscribe(&controller, {
               let table = catalog_list_table.clone();
               move |this, ctrl, _event: &LibraryChanged, cx| {
-                  table.update(cx, |state, cx| state.refresh(cx));
+                  let chosen = ctrl.read(cx).list_columns.clone();
+                  this.catalog_grouped_list_table.update(cx, |state, cx| {
+                                                     if state.delegate_mut()
+                                                             .cols
+                                                             .set_chosen(&chosen)
+                                                     {
+                                                         state.refresh(cx);
+                                                     }
+                                                 });
+                  table.update(cx, |state, cx| {
+                           state.delegate_mut().cols.set_chosen(&chosen);
+                           state.refresh(cx);
+                       });
                   this.grouped_cache = None;
                   if ctrl.read(cx).selected_item().is_none() {
                       this.popover_anchor_pos = None;
@@ -1028,12 +1000,13 @@ impl CatalogView {
                          TableEvent::ColumnWidthsChanged(widths) => {
                              let widths = widths.clone();
                              table.update(cx, |state, _cx| {
-                                      apply_column_widths(&mut state.delegate_mut().user_widths,
-                                                          &widths);
+                                      state.delegate_mut().cols.apply_widths(&widths);
                                   });
                              this.catalog_grouped_list_table.update(cx, |state, _cx| {
-                        apply_column_widths(&mut state.delegate_mut().user_widths, &widths);
-                    });
+                                                                state.delegate_mut()
+                                                                     .cols
+                                                                     .apply_widths(&widths);
+                                                            });
                          }
                          _ => {}
                      })
@@ -1080,12 +1053,13 @@ impl CatalogView {
                          TableEvent::ColumnWidthsChanged(widths) => {
                              let widths = widths.clone();
                              table.update(cx, |state, _cx| {
-                                      apply_column_widths(&mut state.delegate_mut().user_widths,
-                                                          &widths);
+                                      state.delegate_mut().cols.apply_widths(&widths);
                                   });
                              this.catalog_list_table.update(cx, |state, _cx| {
-                        apply_column_widths(&mut state.delegate_mut().user_widths, &widths);
-                    });
+                                                        state.delegate_mut()
+                                                             .cols
+                                                             .apply_widths(&widths);
+                                                    });
                          }
                          _ => {}
                      })

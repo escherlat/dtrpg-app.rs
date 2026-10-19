@@ -47,6 +47,11 @@ Once something is tagged, a Tags section appears in the sidebar below Publishers
 with the number of items for each tag. Selecting a tag shows only the items that
 have it. Removing a tag from its last item ends the filter.
 
+## Showing tags in the list
+
+In List layout, right-click a column heading and choose Tags to add a column with each
+item's tags. See [Choosing the list columns]({{ '/latest/catalog/' | relative_url }}#choosing-the-list-columns).
+
 ## Searching by tag
 
 Type a tag in the search box to find items by it:

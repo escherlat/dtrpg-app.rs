@@ -75,6 +75,7 @@ catalog:
   col_pages: "Pages"
   col_size: "Taille"
   col_added: "Ajouté"
+  col_tags: "Étiquettes"
   action_download: "Télécharger"
   publisher_download_all: "Tout télécharger"
   untagged: "Sans étiquette"

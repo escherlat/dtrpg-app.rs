@@ -141,6 +141,8 @@ pub struct LibrarySnapshot {
     /// Current sidebar Collections sort direction.
     pub collection_sort_direction: SortDirection,
     pub group_by:                  GroupBy,
+    /// The optional list columns that are shown.
+    pub list_columns:              Vec<ListColumn>,
     pub presentation:              CatalogPresentation,
     pub selected_item:             Option<LibraryItem>,
     pub items:                     Vec<LibraryItem>,
@@ -192,6 +194,8 @@ pub struct LibraryController {
     pub collection_sort_direction: SortDirection,
     /// What the catalog is grouped by.
     pub group_by:                  GroupBy,
+    /// The optional list columns that are shown, in their usual order.
+    pub list_columns:              Vec<ListColumn>,
     /// Active catalog presentation mode.
     pub presentation:              CatalogPresentation,
     /// The currently selected item id (for the detail panel).

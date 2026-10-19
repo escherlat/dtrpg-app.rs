@@ -86,7 +86,7 @@ written in.
 - [x] 4.3 Text describing the file-system projection only where `filesystem_tags` is true
 - [x] 4.4 Right-click a tag to set its color
 - [x] 4.5 The Native Integration settings page with the three switches
-- [ ] 4.6 The optional Tags column (group by tag is done)
+- [x] 4.6 The optional Tags column, with a way to show and hide the other list columns, and group by tag
 - [x] 4.7 `tag:` and `-tag:` in the search box (the saved-search rule editor in the mockup is not in the app)
 - [x] 4.8 MCP tools `list_tags`, `get_item_tags`, `set_tags` and `set_tag_color`. The two that change the library
       refuse unless the server is started with `--allow-write`, because the permission model in the mockup's Agent &
