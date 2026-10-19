@@ -257,3 +257,66 @@ fn tags_show_on_a_launch_that_is_signed_out(cx: &mut TestAppContext) {
 
     assert_eq!(names_of(&fixture, cx, "a"), ["solo"]);
 }
+
+// ── Searching by tag ─────────────────────────────────────────────────────────
+
+fn search(fixture: &Fixture, cx: &mut TestAppContext, query: &str) {
+    fixture.controller
+           .update(cx, |ctrl, cx| ctrl.set_search_query(query.to_owned(), cx));
+}
+
+/// A controller whose items `a` and `b` are tagged "solo", `b` also "printed",
+/// and `c` has no tags.
+fn tagged_for_search(cx: &mut TestAppContext) -> Fixture {
+    let fixture = fixture_with_index(cx);
+    add(&fixture, cx, "a", "solo");
+    add(&fixture, cx, "b", "solo");
+    add(&fixture, cx, "b", "printed");
+    wait_for(cx, |cx| {
+        names_of(&fixture, cx, "b").len() == 2 && !names_of(&fixture, cx, "a").is_empty()
+    });
+    fixture
+}
+
+#[gpui::test]
+fn a_tag_term_in_the_search_box_shows_only_the_items_with_the_tag(cx: &mut TestAppContext) {
+    let fixture = tagged_for_search(cx);
+
+    search(&fixture, cx, "tag:solo");
+
+    assert_eq!(visible_ids(&fixture, cx), ["a", "b"]);
+}
+
+#[gpui::test]
+fn a_negated_tag_term_and_several_terms_combine(cx: &mut TestAppContext) {
+    let fixture = tagged_for_search(cx);
+
+    search(&fixture, cx, "tag:solo -tag:printed");
+    assert_eq!(visible_ids(&fixture, cx), ["a"]);
+
+    search(&fixture, cx, "-tag:solo");
+    assert_eq!(visible_ids(&fixture, cx), ["c"]);
+
+    search(&fixture, cx, "tag:solo tag:printed");
+    assert_eq!(visible_ids(&fixture, cx), ["b"]);
+}
+
+#[gpui::test]
+fn plain_text_in_the_search_box_also_finds_a_tag_name(cx: &mut TestAppContext) {
+    let fixture = tagged_for_search(cx);
+
+    search(&fixture, cx, "print");
+
+    assert_eq!(visible_ids(&fixture, cx), ["b"]);
+}
+
+#[gpui::test]
+fn a_tag_search_follows_the_tags_when_they_change(cx: &mut TestAppContext) {
+    let fixture = tagged_for_search(cx);
+    search(&fixture, cx, "tag:solo");
+
+    add(&fixture, cx, "c", "solo");
+    wait_for(cx, |cx| !names_of(&fixture, cx, "c").is_empty());
+
+    assert_eq!(visible_ids(&fixture, cx), ["a", "b", "c"]);
+}

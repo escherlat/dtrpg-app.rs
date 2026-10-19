@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::util::filter::SidebarFilter;
+use crate::util::search::SearchQuery;
 
 /// Seconds in a day, used to convert a "Recently Updated window" day count
 /// into the seconds [`item_recently_updated`] compares against.
@@ -92,15 +93,12 @@ pub fn collection_member_id(item: &LibraryItem) -> u64 {
 
 /// Returns `true` if `item` contains `query` in title, publisher, or game line
 /// (case-insensitive).
+///
+/// For a search that knows the item's tags, and so can use `tag:` terms, parse
+/// it with [`SearchQuery`] and call [`SearchQuery::matches`].
 #[must_use]
 pub fn item_matches_query(item: &LibraryItem, query: &str) -> bool {
-    if query.is_empty() {
-        return true;
-    }
-    let q = query.to_lowercase();
-    item.title.to_lowercase().contains(&q)
-    || item.publisher.to_lowercase().contains(&q)
-    || item.line.to_lowercase().contains(&q)
+    SearchQuery::parse(query).matches(item, &[])
 }
 
 /// Returns `true` if `name` contains `query` (case-insensitive).

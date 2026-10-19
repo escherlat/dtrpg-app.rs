@@ -44,6 +44,20 @@ Once something is tagged, a Tags section appears in the sidebar below Publishers
 with the number of items for each tag. Selecting a tag shows only the items that
 have it. Removing a tag from its last item ends the filter.
 
+## Searching by tag
+
+Type a tag in the search box to find items by it:
+
+- `tag:solo` shows only the items tagged "solo".
+- `-tag:solo` shows only the items that are not.
+- Put a name with spaces in quotes: `tag:"to run"`.
+- Combine them with each other and with ordinary words: `tag:solo -tag:printed moria`.
+  An item has to meet every term.
+
+A tag term matches the whole tag name, ignoring case, so `tag:sol` does not find an
+item tagged "solo". Ordinary words in the search box also match an item's tag names,
+alongside its title, publisher and game line.
+
 ## Tags and your files
 
 Where the platform keeps tags on files, Libri writes an item's tags to each of its

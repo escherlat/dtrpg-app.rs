@@ -87,7 +87,7 @@ written in.
 - [x] 4.4 Right-click a tag to set its color
 - [x] 4.5 The Native Integration settings page with the three switches
 - [ ] 4.6 The optional Tags column, and group by tag
-- [ ] 4.7 `tag:` and `-tag:` in the search box, and the saved-search rule editor
+- [x] 4.7 `tag:` and `-tag:` in the search box (the saved-search rule editor in the mockup is not in the app)
 - [ ] 4.8 The `set_tags` MCP tool, and the `LibraryApi` methods it needs (3b.8)
 
 ## 5. Tests and docs
