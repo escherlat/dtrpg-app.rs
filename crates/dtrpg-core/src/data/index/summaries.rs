@@ -25,6 +25,24 @@ pub(super) fn save(conn: &mut Connection, summary: &ContentSummary) -> rusqlite:
     transaction.commit()
 }
 
+/// Sums `token_count` across every summary created at or after
+/// `since_unix_secs`, for enforcing a rolling monthly token ceiling.
+///
+/// Computed live from the stored summaries rather than a separately
+/// maintained running counter, so there is no reset bookkeeping to drift:
+/// the caller just passes the start of the current calendar month (in the
+/// user's local time) each time, and the figure is always exactly "what the
+/// summaries table says was spent since then."
+pub(super) fn tokens_used_since(conn: &Connection, since_unix_secs: i64) -> rusqlite::Result<u64> {
+    let total: i64 = conn.query_row(
+                                    "SELECT COALESCE(SUM(token_count), 0) FROM summaries
+         WHERE created_at >= ?1",
+                                    params![since_unix_secs],
+                                    |row| row.get(0),
+    )?;
+    Ok(total as u64)
+}
+
 pub(super) fn get(conn: &Connection, item_id: &str) -> rusqlite::Result<Option<ContentSummary>> {
     match conn.query_row(
                          "SELECT item_id, text, model, created_at, token_count

@@ -196,6 +196,13 @@ impl LibraryIndex {
     pub fn get_summary(&self, item_id: &str) -> Result<Option<ContentSummary>, IndexError> {
         Ok(summaries::get(&self.conn, item_id)?)
     }
+
+    /// Sums `token_count` across every summary created at or after
+    /// `since_unix_secs`, for enforcing a rolling monthly token ceiling. See
+    /// [`summaries::tokens_used_since`].
+    pub fn tokens_used_since(&self, since_unix_secs: i64) -> Result<u64, IndexError> {
+        Ok(summaries::tokens_used_since(&self.conn, since_unix_secs)?)
+    }
 }
 
 #[cfg(test)]
