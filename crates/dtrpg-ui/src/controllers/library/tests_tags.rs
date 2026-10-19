@@ -228,3 +228,32 @@ fn tags_that_arrive_after_newer_ones_are_ignored(cx: &mut TestAppContext) {
 
     assert!(names_of(&fixture, cx, "a").is_empty());
 }
+
+// ── A launch that cannot reach the network ───────────────────────────────────
+
+/// Saves `ids` to the library index in the fixture's cache directory as the app
+/// does after a load, and tags item `a` "solo", so a launch finds them on disk.
+fn saved_catalog_with_a_tag(fixture: &Fixture, ids: &[&str]) {
+    let items: Vec<_> = ids.iter()
+                           .enumerate()
+                           .map(|(n, id)| item_numbered(id, n as u64 + 1))
+                           .collect();
+    save_catalog_cache(&fixture.cache, &items).unwrap();
+    index(fixture).add_tag("a", "solo").unwrap();
+}
+
+#[gpui::test]
+fn tags_show_on_a_launch_that_is_signed_out(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::signed_out(),
+                               3,
+                               Vec::new());
+    saved_catalog_with_a_tag(&fixture, &["a", "b"]);
+
+    fixture.controller
+           .update(cx, |ctrl, cx| ctrl.start_load(cx));
+    wait_for(cx, |cx| !names_of(&fixture, cx, "a").is_empty());
+
+    assert_eq!(names_of(&fixture, cx, "a"), ["solo"]);
+}

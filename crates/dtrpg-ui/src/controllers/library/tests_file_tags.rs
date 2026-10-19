@@ -1,4 +1,5 @@
-//! Tests for reconciling the tags on downloaded files with the library index.
+//! Tests for keeping the tags on files in step with the library index: which
+//! files are looked at, and when.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -6,15 +7,8 @@ use dtrpg_core::data::activity::ActivityStatus;
 use dtrpg_core::services::tag_projection::{ProjectionFailure, ReconcileReport};
 use gpui::TestAppContext;
 
-use super::{file_tags::downloaded_files, tests_support::*, *};
+use super::{file_tags::files_on_disk, tests_support::*, *};
 use crate::util::file_presence::resolved_file_path;
-
-fn downloaded(mut item: LibraryItem, files: &[usize]) -> LibraryItem {
-    for index in files {
-        item.files[*index].downloaded = true;
-    }
-    item
-}
 
 fn report(written: &[&str], imported: &[&str], failed: &[&str]) -> ReconcileReport {
     ReconcileReport { checked:  written.len() + imported.len() + failed.len(),
@@ -35,19 +29,45 @@ fn fixture_with_items(cx: &mut TestAppContext) -> Fixture {
                  vec![item_with_files("a", 1, 2)])
 }
 
+/// Puts the file of `item` at `index` on disk where the app would have put it.
+fn put_on_disk(storage: &StorageConfig, item: &LibraryItem, index: usize) -> PathBuf {
+    let path = resolved_file_path(storage, item, &item.files[index]);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, b"data").unwrap();
+    path
+}
+
 #[test]
-fn only_downloaded_files_are_listed_with_the_item_they_belong_to() {
+fn the_files_that_are_on_disk_are_listed_with_the_item_they_belong_to() {
     let root = tempfile::tempdir().unwrap();
     let storage = StorageConfig::for_test(root.path().to_path_buf());
-    let catalog = vec![downloaded(item_with_files("a", 1, 2), &[1]),
-                       item_with_files("b", 2, 1)];
+    let catalog = vec![item_with_files("a", 1, 2), item_with_files("b", 2, 1)];
+    let on_disk = put_on_disk(&storage, &catalog[0], 1);
 
-    let files = downloaded_files(&catalog, &[], &storage);
+    let files = files_on_disk(&catalog, &[], &storage);
 
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].item_id, "a");
-    assert_eq!(files[0].path,
-               resolved_file_path(&storage, &catalog[0], &catalog[0].files[1]));
+    assert_eq!(files[0].path, on_disk);
+}
+
+#[test]
+fn a_file_is_listed_whatever_its_downloaded_flag_says() {
+    let root = tempfile::tempdir().unwrap();
+    let storage = StorageConfig::for_test(root.path().to_path_buf());
+    // Flagged downloaded but gone, and not flagged but there: the flags are
+    // only as current as the last verification, the disk is the truth.
+    let mut gone = item_with_files("gone", 1, 1);
+    gone.files[0].name = "Gone.pdf".into();
+    gone.files[0].downloaded = true;
+    let mut present = item_with_files("present", 2, 1);
+    present.files[0].name = "Present.pdf".into();
+    put_on_disk(&storage, &present, 0);
+
+    let files = files_on_disk(&[gone, present], &[], &storage);
+
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].item_id, "present");
 }
 
 #[gpui::test]
@@ -110,31 +130,85 @@ fn the_activity_panel_says_nothing_when_every_file_already_matched(cx: &mut Test
 }
 
 #[gpui::test]
-fn nothing_is_reconciled_unless_a_full_load_asked_for_it(cx: &mut TestAppContext) {
-    let fixture = fixture_with_items(cx);
+fn the_files_are_not_compared_before_there_is_a_catalog(cx: &mut TestAppContext) {
+    let fixture = fixture_with(cx,
+                               ScriptedTransport::open(),
+                               ScriptedLibrary::open(),
+                               3,
+                               Vec::new());
 
     fixture.controller.update(cx, |ctrl, cx| {
-                          ctrl.reconcile_file_tags_if_requested(cx);
-                          assert!(!ctrl.file_tags_reconciled);
+                          ctrl.begin_tag_sync(false, cx);
+                          assert!(!ctrl.file_tags_reconciled && !ctrl.file_tag_sync_running);
                       });
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[gpui::test]
-fn a_request_is_consumed_and_marks_the_launch_pass_as_started(cx: &mut TestAppContext) {
+fn the_files_are_compared_once_per_launch_and_again_when_forced(cx: &mut TestAppContext) {
+    let fixture = fixture_with_items(cx);
+    let running = |cx: &mut TestAppContext| {
+        fixture.controller
+               .read_with(cx, |ctrl, _| ctrl.file_tag_sync_running)
+    };
+
+    fixture.controller.update(cx, |ctrl, cx| {
+                          ctrl.begin_tag_sync(false, cx);
+                          assert!(ctrl.file_tags_reconciled && ctrl.file_tag_sync_running);
+                      });
+    wait_for(cx, |cx| !running(cx));
+
+    // Asked again the same launch: nothing starts.
+    fixture.controller.update(cx, |ctrl, cx| {
+                          ctrl.begin_tag_sync(false, cx);
+                          assert!(!ctrl.file_tag_sync_running);
+                      });
+    // A reload forces it.
+    fixture.controller.update(cx, |ctrl, cx| {
+                          ctrl.begin_tag_sync(true, cx);
+                          assert!(ctrl.file_tag_sync_running);
+                      });
+    wait_for(cx, |cx| !running(cx));
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[gpui::test]
+fn only_one_comparison_runs_at_a_time(cx: &mut TestAppContext) {
     let fixture = fixture_with_items(cx);
 
     fixture.controller.update(cx, |ctrl, cx| {
-                          ctrl.request_file_tag_reconcile();
-                          ctrl.reconcile_file_tags_if_requested(cx);
-                          assert!(ctrl.file_tags_reconciled);
-                          assert!(!ctrl.reconcile_tags_after_verify);
-
-                          // A later load asks again; the request is still
-                          // consumed.
-                          ctrl.request_file_tag_reconcile();
-                          ctrl.reconcile_file_tags_if_requested(cx);
-                          assert!(!ctrl.reconcile_tags_after_verify);
+                          ctrl.begin_tag_sync(true, cx);
+                          ctrl.file_tag_sync_running = true;
+                          // A forced request while one is running is dropped,
+                          // not queued.
+                          ctrl.begin_tag_sync(true, cx);
                       });
     cx.run_until_parked();
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn a_tag_added_to_a_file_outside_libri_reaches_the_library() {
+    use dtrpg_core::data::catalog_cache::save_catalog_cache;
+    use dtrpg_core::data::index::LibraryIndex;
+    use dtrpg_core::platform::{FileTag, Platform, PlatformIntegration};
+    use dtrpg_core::services::tag_projection::{SyncSettings, reconcile_with_index};
+
+    let storage_root = tempfile::tempdir().unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    let storage = StorageConfig::for_test(storage_root.path().to_path_buf());
+    let catalog = vec![item_with_files("a", 1, 1)];
+    save_catalog_cache(cache.path(), &catalog).unwrap();
+    let path = put_on_disk(&storage, &catalog[0], 0);
+    // What Finder does: tag the file, with no one asking Libri.
+    Platform.write_tags(&path, &[FileTag::plain("from finder")])
+            .unwrap();
+
+    let files = files_on_disk(&catalog, &[], &storage);
+    let report =
+        reconcile_with_index(&Platform, cache.path(), &files, SyncSettings::default()).unwrap();
+
+    assert_eq!(report.imported, [path]);
+    let index = LibraryIndex::open_and_migrate(cache.path()).unwrap();
+    assert_eq!(index.tags_for_item("a").unwrap(), ["from finder"]);
 }
