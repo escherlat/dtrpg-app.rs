@@ -40,6 +40,8 @@ struct CachedState {
 /// [`check_endpoint`](NetworkMonitor::check_endpoint).
 pub struct NetworkMonitor {
     cache: Mutex<HashMap<String, CachedState>>,
+    /// An answer to give for every target instead of probing, if set.
+    fixed: Option<bool>,
 }
 
 impl Default for NetworkMonitor {
@@ -52,7 +54,25 @@ impl NetworkMonitor {
     /// Creates a monitor with an empty cache.
     #[must_use]
     pub fn new() -> Self {
-        Self { cache: Mutex::new(HashMap::new()), }
+        Self { cache: Mutex::new(HashMap::new()),
+               fixed: None, }
+    }
+
+    /// Creates a monitor that reports every target as `reachable` without
+    /// touching the network, for tests that must not depend on it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dtrpg_core::services::network_monitor::NetworkMonitor;
+    ///
+    /// assert!(NetworkMonitor::fixed(true).check_endpoint("api.example.com:443"));
+    /// assert!(!NetworkMonitor::fixed(false).check_general());
+    /// ```
+    #[must_use]
+    pub fn fixed(reachable: bool) -> Self {
+        Self { cache: Mutex::new(HashMap::new()),
+               fixed: Some(reachable), }
     }
 
     /// Reports whether the device has general network connectivity,
@@ -70,6 +90,9 @@ impl NetworkMonitor {
     }
 
     fn check_cached(&self, key: &str, probe: impl FnOnce(&str) -> bool) -> bool {
+        if let Some(reachable) = self.fixed {
+            return reachable;
+        }
         let now = Instant::now();
         {
             // Poisoned-lock recovery: a panic while holding this lock during a
