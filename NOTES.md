@@ -366,3 +366,46 @@ All three were clean at `7cb8e17` (481 `dtrpg-core` tests, 6 `dtrpg-mcp`, 339
 Process: `develop` is the source of truth. Work on a branch from it, open a
 ready-for-review PR, subscribe to it, and fix CI. The owner enables auto-merge
 and merges. Commit messages are Conventional Commits.
+
+# Content summaries: status at 2026-10-19
+
+PR: pilgrimagesoftware/dtrpg-app.rs#351 (`feature/content-summaries`).
+
+## What exists now
+
+- `LibraryApi::summarize_item` / `summarize_text` (`crates/dtrpg-core/src/api_summary.rs`):
+  reads the first on-disk, supported file of an item, enforces the monthly
+  token ceiling, generates with the configured provider, and saves the result.
+- `provider_for` builds the provider from `SummarySettingsFile`; the Anthropic
+  key is read from the keyring (`credentials/anthropic.rs`).
+- MCP tools `get_summary` (read-only) and `summarize_item` (needs
+  `--allow-write`, because it spends tokens).
+
+## Not done
+
+- The Summaries fields in Settings > Agent & MCP, including entering the
+  Anthropic API key.
+- Showing a summary in the detail panel.
+- Auto-summarize on download (`auto_summarize_on_download` is stored but
+  nothing reads it yet).
+- Text extraction for formats other than PDF.
+- Documentation under `docs/site/`.
+- The UI crate was not built or tested in the session that wrote this.
+
+## Gotchas
+
+- `summarize_item` uses blocking `reqwest` for the Anthropic provider. The MCP
+  tool wraps it in `block_in_place`, which needs the multi-thread runtime.
+  Single-thread `#[tokio::test]` tests must not reach that path.
+- `libdbus-1-dev` is needed to build `dtrpg-core` on Linux (keyring).
+
+# Screenshots
+
+Note from the owner, recorded as given (this session has not seen the files):
+
+> I added some more screenshots for some of the views that had more than a
+> screenful, so there's a -1 and -2, and a couple other views or sub-views that
+> were missing.
+
+Whoever picks up the screenshots work should check for those `-1` / `-2`
+variants and the extra views before treating the set as complete.

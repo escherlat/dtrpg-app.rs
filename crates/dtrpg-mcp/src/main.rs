@@ -2,14 +2,18 @@
 //! archive contents.
 //!
 //! The tools that read are always available. The ones that change the library
-//! (`set_tags`, `set_tag_color`) refuse unless the server was started with
-//! `--allow-write`, so that whoever configures an MCP client decides whether it
-//! may edit the library.
+//! (`set_tags`, `set_tag_color`, `summarize_item`) refuse unless the server was
+//! started with `--allow-write`, so that whoever configures an MCP client
+//! decides whether it may edit the library or spend summary tokens.
 
 use std::path::PathBuf;
 
 use dtrpg_core::api::LibraryApi;
+use dtrpg_core::api::provider_for;
 use dtrpg_core::data::paths::cache_dir;
+use dtrpg_core::data::storage::StorageConfig;
+use dtrpg_core::data::summary::ContentSummary;
+use dtrpg_core::data::summary_settings::SummarySettings;
 use dtrpg_core::data::tag_color::TagColor;
 use dtrpg_core::services::sdk::{RustSdkCollectionsService, RustSdkLibraryService};
 use rmcp::handler::server::wrapper::Parameters;
@@ -63,6 +67,24 @@ struct TagInfo {
 #[derive(Serialize, Deserialize, JsonSchema)]
 struct GetItemRequest {
     id: String,
+}
+
+/// A summary as a tool reports it.
+#[derive(Serialize)]
+struct SummaryInfo {
+    text:       String,
+    /// The provider and model that wrote it.
+    model:      String,
+    /// Unix timestamp, in seconds, of when it was written.
+    created_at: i64,
+}
+
+impl From<ContentSummary> for SummaryInfo {
+    fn from(summary: ContentSummary) -> Self {
+        Self { text:       summary.text,
+               model:      summary.model,
+               created_at: summary.created_at, }
+    }
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -171,6 +193,40 @@ impl LibriMcpServer {
         match self.api.index_set_tag_color(&tag, color) {
             Ok(true) => serde_json::json!({ "ok": true }).to_string(),
             Ok(false) => error_json(&format!("no item has the tag {tag:?}")),
+            Err(err) => error_json(&err.to_string()),
+        }
+    }
+
+    #[tool(description = "Get the saved content summary of a library item by id, or null if it has none")]
+    async fn get_summary(&self, Parameters(GetItemRequest { id }): Parameters<GetItemRequest>)
+                         -> String {
+        match self.api.index_get_summary(&id) {
+            Ok(summary) => {
+                let summary = summary.map(SummaryInfo::from);
+                serde_json::to_string(&summary).unwrap_or_default()
+            }
+            Err(err) => error_json(&err.to_string()),
+        }
+    }
+
+    #[tool(description = "Write and save a content summary of a downloaded library item, using the provider chosen in Libri's settings. Spends tokens against the monthly ceiling set there. Changes the library; refused unless the server allows writes.")]
+    async fn summarize_item(&self, Parameters(GetItemRequest { id }): Parameters<GetItemRequest>)
+                            -> String {
+        if !self.allow_write {
+            return Self::writes_disabled();
+        }
+        let settings = SummarySettings::load().snapshot();
+        let provider = match provider_for(&settings) {
+            Ok(provider) => provider,
+            Err(err) => return error_json(&err.to_string()),
+        };
+        let storage = StorageConfig::load();
+        let api = &self.api;
+        let summarized = tokio::task::block_in_place(|| {
+            api.summarize_item(&id, &storage, &settings, &*provider)
+        });
+        match summarized {
+            Ok(summary) => serde_json::to_string(&SummaryInfo::from(summary)).unwrap_or_default(),
             Err(err) => error_json(&err.to_string()),
         }
     }
@@ -356,6 +412,40 @@ mod tests {
         assert!(bad["error"].as_str().unwrap().contains("teal"));
         let unknown = json(&server.set_tag_color(color("nothing", Some("red"))).await);
         assert!(unknown["error"].is_string());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn an_item_with_no_summary_reports_null_and_one_with_a_summary_reports_it() {
+        let (server, dir) = server(true, "summary");
+        assert_eq!(json(&server.get_summary(id("a")).await),
+                   serde_json::Value::Null);
+        server.api
+              .index_save_summary(&ContentSummary { item_id:     "a".to_owned(),
+                                                    text:        "A haunted lighthouse.".to_owned(),
+                                                    model:       "local-extractive".to_owned(),
+                                                    created_at:  1_700_000_000,
+                                                    token_count: 3, })
+              .unwrap();
+
+        let reply = json(&server.get_summary(id("a")).await);
+
+        assert_eq!(reply,
+                   serde_json::json!({ "text": "A haunted lighthouse.",
+                                       "model": "local-extractive",
+                                       "created_at": 1_700_000_000 }));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn summarizing_refuses_unless_writes_are_allowed() {
+        let (server, dir) = server(false, "summarize_refuse");
+
+        let reply = json(&server.summarize_item(id("a")).await);
+
+        assert!(reply["error"].as_str().unwrap().contains("--allow-write"));
+        assert_eq!(json(&server.get_summary(id("a")).await),
+                   serde_json::Value::Null);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

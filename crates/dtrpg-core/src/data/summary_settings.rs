@@ -40,14 +40,14 @@ fn default_monthly_token_ceiling() -> u64 {
 #[serde(default)]
 pub struct SummarySettingsFile {
     /// Which provider generates new summaries.
-    pub provider:                SummaryProviderKind,
+    pub provider:                   SummaryProviderKind,
     /// Model identifier passed to the provider (ignored by `Local`).
-    pub model:                   String,
+    pub model:                      String,
     /// Maximum tokens [`crate::data::summary::ContentSummary::token_count`]
     /// may sum to in a calendar month before generation stops. Manual and
     /// automatic generation both stop once reached; existing summaries are
     /// unaffected.
-    pub monthly_token_ceiling:   u64,
+    pub monthly_token_ceiling:      u64,
     /// Whether a summary is generated automatically when an item finishes
     /// downloading. Off by default: every summary spends tokens, so this is
     /// an opt-in, not an opt-out.
@@ -56,10 +56,10 @@ pub struct SummarySettingsFile {
 
 impl Default for SummarySettingsFile {
     fn default() -> Self {
-        Self { provider:                    SummaryProviderKind::default(),
-               model:                       default_model(),
-               monthly_token_ceiling:       default_monthly_token_ceiling(),
-               auto_summarize_on_download: false }
+        Self { provider:                   SummaryProviderKind::default(),
+               model:                      default_model(),
+               monthly_token_ceiling:      default_monthly_token_ceiling(),
+               auto_summarize_on_download: false, }
     }
 }
 
@@ -88,17 +88,21 @@ impl SummarySettings {
     /// Loads the preferences from `path`, as [`Self::load`] does.
     #[must_use]
     pub fn load_from(path: &Path) -> Self {
-        let data = std::fs::read_to_string(path)
-            .ok()
-            .and_then(|text| toml::from_str::<SummarySettingsFile>(&text).ok())
-            .unwrap_or_default();
-        Self { path: Some(path.to_owned()), data }
+        let data =
+            std::fs::read_to_string(path).ok()
+                                         .and_then(|text| {
+                                             toml::from_str::<SummarySettingsFile>(&text).ok()
+                                         })
+                                         .unwrap_or_default();
+        Self { path: Some(path.to_owned()),
+               data }
     }
 
     /// The defaults, never written to disk, for tests and previews.
     #[must_use]
     pub fn in_memory() -> Self {
-        Self { path: None, data: SummarySettingsFile::default() }
+        Self { path: None,
+               data: SummarySettingsFile::default(), }
     }
 
     /// The preferences as they are now.
@@ -139,14 +143,18 @@ impl SummarySettings {
         else {
             return;
         };
-        let result = toml::to_string_pretty(&self.data)
-            .map_err(|error| error.to_string())
-            .and_then(|text| {
-                if let Some(dir) = path.parent() {
-                    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-                }
-                std::fs::write(path, text).map_err(|e| e.to_string())
-            });
+        let result =
+            toml::to_string_pretty(&self.data).map_err(|error| error.to_string())
+                                              .and_then(|text| {
+                                                  if let Some(dir) = path.parent() {
+                                                      std::fs::create_dir_all(dir).map_err(|e| {
+                                                                                      e.to_string()
+                                                                                  })?;
+                                                  }
+                                                  std::fs::write(path, text).map_err(|e| {
+                                                                                e.to_string()
+                                                                            })
+                                              });
         if let Err(error) = result {
             tracing::warn!(%error, path = %path.display(), "could not save summary settings");
         }
@@ -206,7 +214,8 @@ mod tests {
         let snapshot = settings.snapshot();
         assert_eq!(snapshot.provider, SummaryProviderKind::Anthropic);
         assert_eq!(snapshot.model, default_model());
-        assert_eq!(snapshot.monthly_token_ceiling, default_monthly_token_ceiling());
+        assert_eq!(snapshot.monthly_token_ceiling,
+                   default_monthly_token_ceiling());
         assert!(!snapshot.auto_summarize_on_download);
     }
 
@@ -219,7 +228,8 @@ mod tests {
         let settings = SummarySettings::load_from(&path);
 
         assert_eq!(settings.snapshot().provider, SummaryProviderKind::Local);
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "this is = not [ valid");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(),
+                   "this is = not [ valid");
     }
 
     #[test]

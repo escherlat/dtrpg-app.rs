@@ -35,7 +35,12 @@ fn extract_pdf_text(path: &Path) -> Option<String> {
     pages.sort_unstable();
     pages.truncate(MAX_SUMMARY_PDF_PAGES);
     let text = doc.extract_text(&pages).ok()?;
-    if text.trim().is_empty() { None } else { Some(text) }
+    if text.trim().is_empty() {
+        None
+    }
+    else {
+        Some(text)
+    }
 }
 
 #[cfg(test)]
