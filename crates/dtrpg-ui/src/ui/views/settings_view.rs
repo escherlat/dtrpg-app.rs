@@ -13,6 +13,7 @@
 use std::path::PathBuf;
 
 use dtrpg_core::data::file_openers::FileOpenerEntry;
+use dtrpg_core::data::native_preferences::NativePreferencesFile;
 use dtrpg_core::data::storage::placement::PlacementRule;
 use dtrpg_core::data::storage::roots::StorageRoot;
 use gpui::prelude::*;
@@ -34,13 +35,14 @@ use crate::ui::views::{
     settings_advanced_view::render_advanced_section,
     settings_appearance_view::{AppearanceFontSelects, render_appearance_section},
     settings_file_openers_view::render_file_openers_section,
+    settings_native_view::render_native_section,
     settings_storage_view::render_storage_section,
 };
 
 /// Number of settings pages (Account, Appearance, Downloads Location, File
-/// Openers, Advanced); see [`page_title`] and the `match` in
-/// [`render_settings_panel`]. Sidebar order matches index order.
-const PAGE_COUNT: usize = 5;
+/// Openers, Native Integration, Advanced); see [`page_title`] and the `match`
+/// in [`render_settings_panel`]. Sidebar order matches index order.
+const PAGE_COUNT: usize = 6;
 
 /// Returns the i18n title for page `ix`, or the Account page's title if `ix`
 /// is out of range (defensive default for a persisted index from a prior app
@@ -50,7 +52,8 @@ fn page_title(ix: usize) -> String {
         1 => t!("settings.appearance_title").to_string(),
         2 => t!("settings.downloads_location").to_string(),
         3 => t!("settings.file_openers_title").to_string(),
-        4 => t!("settings.advanced_title").to_string(),
+        4 => t!("settings.native_title").to_string(),
+        5 => t!("settings.advanced_title").to_string(),
         _ => t!("settings.account_title").to_string(),
     }
 }
@@ -85,7 +88,7 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                              max_concurrent_downloads_input: Option<Entity<InputState>>,
                              create_collections: bool, recently_updated_window_days: u32,
                              recently_updated_window_input: Option<Entity<InputState>>,
-                             font_selects: AppearanceFontSelects)
+                             font_selects: AppearanceFontSelects, native: NativePreferencesFile)
                              -> AnyElement {
     let surface = colors.surface;
     let active_page_ix = if active_page_ix < PAGE_COUNT {
@@ -134,7 +137,9 @@ pub fn render_settings_panel(file_openers: &[FileOpenerEntry], auth: AuthStateSn
                                          colors,
                                          file_opener_extension_input,
                                          pending_file_opener).into_any_element(),
-        4 => render_advanced_section(entity.clone(),
+        4 => render_native_section(entity.clone(), native, colors, &theme.fonts.label_font)
+            .into_any_element(),
+        5 => render_advanced_section(entity.clone(),
                                      cache_counts,
                                      colors,
                                      &theme.fonts.label_font,

@@ -43,6 +43,12 @@ Override which application opens a given file extension, instead of
 relying on your system's default. Add, edit, or remove per-extension
 overrides here.
 
+## Native Integration
+
+How Libri works with your operating system. On macOS and Linux, three switches
+control whether tags move between Libri and your files' tags, and whether that is
+checked at launch. See [Tags]({{ '/latest/tags/' | relative_url }}).
+
 ## Advanced
 
 Cache details (size and location on disk) and maintenance actions:

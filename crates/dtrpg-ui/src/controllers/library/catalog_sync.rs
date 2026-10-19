@@ -201,6 +201,8 @@ impl LibraryController {
                                     // showing stale `downloaded` state indefinitely — that's the
                                     // whole reason the live fetch was skipped — so it needs
                                     // disk verification the most.
+                                    ctrl.request_file_tag_reconcile();
+                                    ctrl.load_tags(cx);
                                     ctrl.verify_catalog_downloads(cx);
                                 })
                                 .ok();
@@ -647,6 +649,8 @@ impl LibraryController {
                     }
                     this.update(async_cx, |ctrl, cx| {
                         ctrl.set_catalog(live_items, !catalog_was_empty, cx);
+                        ctrl.request_file_tag_reconcile();
+                                    ctrl.load_tags(cx);
                         ctrl.verify_catalog_downloads(cx);
                     }).ok();
                     // Wait for any in-flight checkpoint write to finish before writing the

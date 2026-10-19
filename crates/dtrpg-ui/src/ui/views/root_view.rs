@@ -1054,6 +1054,7 @@ impl Render for LibraryRootView {
         let auth_entity = self.auth_state.clone();
 
         let snap = self.controller.read(cx).snapshot();
+        let tags = snap.tags;
         let (filter,
              counts,
              publishers,
@@ -1147,7 +1148,8 @@ impl Render for LibraryRootView {
                                      self.tabs.clone(),
                                      self.collection_name_input.clone(),
                                      publisher_search,
-                                     collection_search);
+                                     collection_search,
+                                     tags);
         let toolbar = render_toolbar(&filter,
                                      snap.filter_count,
                                      matched_count,

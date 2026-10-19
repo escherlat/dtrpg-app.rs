@@ -7,8 +7,12 @@
 use std::io;
 use std::path::Path;
 
+mod file_tag;
 mod materialize;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod tags;
 
+pub use file_tag::FileTag;
 pub use materialize::{MaterializeWait, materialize_and_wait};
 
 /// Native capabilities available on the current operating system.
@@ -125,6 +129,46 @@ pub trait PlatformIntegration: Send + Sync {
     /// Reveals `path` in the native file manager.
     fn reveal(&self, path: &Path) -> io::Result<()>;
 
+    /// Reads the tags the file system holds for `path`, in the platform's own
+    /// format. A file with no tags has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`io::ErrorKind::Unsupported`] on platforms with no
+    /// file-system tags, and any error reading the file's attributes.
+    fn read_tags(&self, _path: &Path) -> io::Result<Vec<FileTag>> {
+        Err(io::Error::new(io::ErrorKind::Unsupported,
+                           "this platform does not keep tags on files"))
+    }
+
+    /// Makes the tags the file system holds for `path` exactly `tags`. An empty
+    /// list removes them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`io::ErrorKind::Unsupported`] on platforms with no
+    /// file-system tags or a file system that cannot hold them, and any error
+    /// writing the file's attributes.
+    fn write_tags(&self, _path: &Path, _tags: &[FileTag]) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::Unsupported,
+                           "this platform does not keep tags on files"))
+    }
+
+    /// When the file's tags last changed, in Unix seconds, or `None` if the
+    /// platform cannot say.
+    ///
+    /// This is the time the file's metadata last changed, which also moves
+    /// when the file is renamed or its permissions change, so it can be later
+    /// than the tags' own change. It is used only to decide which of two
+    /// conflicting edits is the later, and a tie goes to the library.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error reading the file's metadata.
+    fn tags_changed_at(&self, _path: &Path) -> io::Result<Option<i64>> {
+        Ok(None)
+    }
+
     /// Requests that a cloud-backed file become available locally.
     fn materialize(&self, _path: &Path) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Unsupported,
@@ -155,6 +199,21 @@ impl PlatformIntegration for Platform {
 
     fn materialize(&self, path: &Path) -> io::Result<()> {
         materialize(path)
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn read_tags(&self, path: &Path) -> io::Result<Vec<FileTag>> {
+        tags::read(path)
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn write_tags(&self, path: &Path, tags: &[FileTag]) -> io::Result<()> {
+        tags::write(path, tags)
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn tags_changed_at(&self, path: &Path) -> io::Result<Option<i64>> {
+        tags::changed_at(path).map(Some)
     }
 }
 
@@ -289,7 +348,7 @@ fn run_command<I, S>(program: &str, args: I) -> io::Result<()>
 mod tests {
     use std::path::Path;
 
-    use super::{Capabilities, FileState, Platform, PlatformIntegration};
+    use super::{Capabilities, FileState, FileTag, Platform, PlatformIntegration};
 
     #[test]
     fn capabilities_match_the_target_contract() {
@@ -348,6 +407,30 @@ mod tests {
         std::fs::write(&file, b"data")?;
 
         assert!(matches!(Platform.file_state(&file), Ok(FileState::Local)));
+        Ok(())
+    }
+
+    #[test]
+    fn file_system_tags_work_exactly_where_the_capability_says() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let file = dir.path().join("book.pdf");
+        std::fs::write(&file, b"data")?;
+        let tags = vec![FileTag::plain("solo"), FileTag::plain("to run")];
+
+        if Platform.capabilities().filesystem_tags {
+            Platform.write_tags(&file, &tags)?;
+            assert_eq!(Platform.read_tags(&file)?, tags);
+            assert!(Platform.tags_changed_at(&file)?.is_some());
+        }
+        else {
+            let error = Platform.write_tags(&file, &tags).err();
+            assert_eq!(error.map(|e| e.kind()),
+                       Some(std::io::ErrorKind::Unsupported));
+            let error = Platform.read_tags(&file).err();
+            assert_eq!(error.map(|e| e.kind()),
+                       Some(std::io::ErrorKind::Unsupported));
+            assert_eq!(Platform.tags_changed_at(&file)?, None);
+        }
         Ok(())
     }
 }

@@ -6,7 +6,7 @@ use rusqlite::Connection;
 /// Bump whenever the schema changes in a way that requires existing
 /// databases to be rebuilt, mirroring `catalog_cache.rs`'s
 /// `CACHE_SCHEMA_VERSION` convention for the JSON cache it replaces.
-pub(super) const SCHEMA_VERSION: i64 = 2;
+pub(super) const SCHEMA_VERSION: i64 = 4;
 
 /// Creates every table, index, and the FTS5 virtual table if they don't
 /// already exist, then records (or checks) the schema version via SQLite's
@@ -69,14 +69,35 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
         );
 
         CREATE TABLE IF NOT EXISTS tags (
-            id   INTEGER PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE
+            id    INTEGER PRIMARY KEY,
+            name  TEXT NOT NULL UNIQUE,
+            color TEXT
         );
 
+        -- No foreign key on item_id: the catalog is rewritten in full, and
+        -- deleting its rows must not delete the user's tags with them (the
+        -- catalog is saved in checkpoints while pages are still loading).
         CREATE TABLE IF NOT EXISTS item_tags (
-            item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            item_id TEXT NOT NULL,
             tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
             PRIMARY KEY (item_id, tag_id)
+        );
+
+        -- When an item's tags last changed in the index, in Unix seconds. It
+        -- settles which side wins when a file's tags and the index's both
+        -- changed since they were last in step.
+        CREATE TABLE IF NOT EXISTS item_tags_changed (
+            item_id    TEXT PRIMARY KEY,
+            changed_at INTEGER NOT NULL
+        );
+
+        -- The tags (names, one per line) the index and a file last agreed on,
+        -- which tells a change made in the index from one made to the file.
+        CREATE TABLE IF NOT EXISTS file_tag_sync (
+            path      TEXT PRIMARY KEY,
+            item_id   TEXT NOT NULL,
+            tags      TEXT NOT NULL,
+            synced_at INTEGER NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS storage_roots (
@@ -120,6 +141,27 @@ pub(super) fn ensure_schema(conn: &Connection) -> rusqlite::Result<()> {
     if previous_version == 1 {
         conn.execute("ALTER TABLE files ADD COLUMN offloaded INTEGER NOT NULL DEFAULT 0",
                      [])?;
+    }
+    if (1..3).contains(&previous_version) {
+        // Version 3 dropped the foreign key from `item_tags.item_id`. SQLite
+        // cannot drop a constraint, so the table is rebuilt.
+        conn.execute_batch(
+                           "
+            CREATE TABLE item_tags_new (
+                item_id TEXT NOT NULL,
+                tag_id  INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (item_id, tag_id)
+            );
+            INSERT INTO item_tags_new (item_id, tag_id) SELECT item_id, tag_id FROM item_tags;
+            DROP TABLE item_tags;
+            ALTER TABLE item_tags_new RENAME TO item_tags;
+            ",
+        )?;
+    }
+    if (1..4).contains(&previous_version) {
+        // Version 4 added a color to tags. The two tables it added are created
+        // above, empty: nothing is out of step until a file has been synced.
+        conn.execute("ALTER TABLE tags ADD COLUMN color TEXT", [])?;
     }
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())

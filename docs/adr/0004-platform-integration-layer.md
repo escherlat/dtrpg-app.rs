@@ -1,6 +1,7 @@
 ## Status
 
-Accepted
+Accepted. The tag reconciliation rule (the index wins when the two disagree) is superseded by 0008;
+the rest stands.
 
 ## Context
 

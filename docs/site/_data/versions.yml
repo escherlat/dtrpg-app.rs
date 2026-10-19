@@ -8,6 +8,7 @@ versions:
       - install
       - catalog
       - collections
+      - tags
       - downloads
       - settings
       - themes
@@ -21,6 +22,8 @@ versions:
         path: catalog/
       - title: Collections
         path: collections/
+      - title: Tags
+        path: tags/
       - title: Downloads
         path: downloads/
       - title: Settings

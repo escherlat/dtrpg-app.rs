@@ -8,6 +8,8 @@ pub mod login;
 pub mod network_monitor;
 pub mod retry;
 pub mod sdk;
+pub mod tag_editing;
+pub mod tag_projection;
 
 use crate::data::library::LibraryItem;
 

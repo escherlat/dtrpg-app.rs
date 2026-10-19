@@ -10,6 +10,9 @@ mod collections;
 mod items;
 mod migrate;
 mod schema;
+mod tag_methods;
+mod tag_sync;
+mod tags;
 
 use std::path::Path;
 
@@ -26,6 +29,17 @@ pub enum IndexError {
     /// The underlying SQLite operation failed.
     #[error("library index error: {0}")]
     Sqlite(#[from] rusqlite::Error),
+    /// A tag could not be stored as given.
+    #[error("invalid tag {tag:?}: {reason}")]
+    InvalidTag {
+        /// The tag as it was passed in.
+        tag:    String,
+        /// Why it was rejected.
+        reason: &'static str,
+    },
+    /// The item to tag is not in the catalog.
+    #[error("no item with id {0:?} in the library index")]
+    NoSuchItem(String),
 }
 
 /// The library index: one SQLite connection, opened once per process and
