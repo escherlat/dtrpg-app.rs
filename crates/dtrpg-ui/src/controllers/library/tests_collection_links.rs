@@ -10,7 +10,9 @@ use dtrpg_core::data::storage::collection_dir;
 use dtrpg_core::services::collections::CollectionsServiceError;
 use gpui::TestAppContext;
 
-use super::collection_links::{link_into_collection, root_of};
+#[cfg(unix)]
+use super::collection_links::link_into_collection;
+use super::collection_links::root_of;
 use super::{tests_support::*, *};
 
 /// What the service says when asked to add a member.
@@ -18,6 +20,8 @@ use super::{tests_support::*, *};
 enum Answer {
     Accepts,
     Rejects,
+    /// Only the unix tests make a link after this answer.
+    #[cfg(unix)]
     AlreadyAMember,
 }
 
@@ -48,6 +52,7 @@ impl CollectionsService for Scripted {
             Answer::Rejects => {
                 Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Network, "no"))
             }
+            #[cfg(unix)]
             Answer::AlreadyAMember => {
                 Err(CollectionsServiceError::new(CollectionsServiceErrorKind::Conflict, "already"))
             }
