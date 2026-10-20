@@ -9,4 +9,4 @@
 - [x] Verify `make all` (fmt-check, size-check, lint, test).
 - [x] Update `NOTES.md`.
 - [x] Open PR against `develop` and get CI green. (PR #362)
-- [ ] Archive this OpenSpec change after merge.
+- [x] Archive this OpenSpec change after merge.
