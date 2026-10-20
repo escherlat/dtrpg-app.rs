@@ -392,14 +392,35 @@ PR: pilgrimagesoftware/dtrpg-app.rs#351 (`feature/content-summaries`).
 
 # Screenshots
 
-Note from the owner, recorded as given (this session has not seen the files):
+## Status: checked
 
-> I added some more screenshots for some of the views that had more than a
-> screenful, so there's a -1 and -2, and a couple other views or sub-views that
-> were missing.
+The screenshot set lives in the `dtrpg-design` submodule at
+`claude-2/screenshots/`. A manifest now exists there:
+`claude-2/screenshots/README.md` (commit `6b954ac` in `dtrpg-design`).
 
-Whoever picks up the screenshots work should check for those `-1` / `-2`
-variants and the extra views before treating the set as complete.
+## Findings
+
+- All 15 screens from the v2 prototype's `SCREENS` array (`app.jsx`) have at
+  least one screenshot.
+- `-1` / `-2` variants are present where the owner indicated views are taller
+  than one screen: `library-covers`, `insights`, `inspector-files`,
+  `settings-appearance`, `settings-agent`.
+- Extra sub-views already captured: `inspector-info`, `windows-linux-chrome`.
+- No broken/empty files: every PNG is non-zero and renders.
+
+## Remaining gaps (documented in the manifest)
+
+- Settings pages not yet captured: `Account`, `File Openers`, `Advanced`.
+- Every screenshot is in the default light theme (Parchment); no dark-theme
+  variants exist.
+- Tag management dialog, archive/file peek sheet, and context menus are not
+  represented.
+- `library-list.png` is already very tall; the manifest notes that a
+  `library-list-2.png` should only be added if the current shot does not show
+  the full view.
+
+The set is considered complete for the main v2 design narrative; the gaps
+above are candidates for addition only when a doc or store page needs them.
 
 # Catalog reads from the index: status at 2026-10-20
 
