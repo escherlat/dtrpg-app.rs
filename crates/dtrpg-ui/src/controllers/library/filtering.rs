@@ -42,6 +42,82 @@ impl LibraryController {
             .unwrap_or_default()
     }
 
+    /// Returns the grouped result set for the current state.
+    #[must_use]
+    pub fn visible_items_grouped(&self) -> Arc<Vec<ItemGroup>> {
+        self.grouped_items_cache.clone().unwrap_or_default()
+    }
+
+    /// Builds an `ItemFilter` representing the current sidebar filter, before
+    /// the search query is applied.
+    pub(in crate::controllers::library) fn current_item_filter(
+        &self)
+        -> dtrpg_core::data::index::ItemFilter<'_> {
+        let now_secs = now_secs();
+        let window_days = self.recently_updated_window_days;
+        match &self.filter {
+            SidebarFilter::AllTitles => dtrpg_core::data::index::ItemFilter::default(),
+            SidebarFilter::Tag { name, .. } => {
+                dtrpg_core::data::index::ItemFilter { tag_name: Some(name),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::OnDevice => {
+                dtrpg_core::data::index::ItemFilter { status: Some(ItemStatus::Downloaded),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::InCloud => {
+                dtrpg_core::data::index::ItemFilter { status: Some(ItemStatus::Cloud),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::RecentlyUpdated => {
+                dtrpg_core::data::index::ItemFilter { recently_updated: Some((now_secs,
+                                                                              window_days)),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::Publisher(name) => {
+                dtrpg_core::data::index::ItemFilter { publisher: Some(name),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::Collection(..) => {
+                dtrpg_core::data::index::ItemFilter { collection_member_ids:
+                                                          Some(&self.collection_members),
+                                                      ..Default::default() }
+            }
+        }
+    }
+
+    /// Builds the grouped-items cache for the current `group_by`, or `None`
+    /// when grouping is disabled. Queries the index so grouping shares the
+    /// same source-of-truth as filtering and search.
+    pub(in crate::controllers::library) fn build_grouped_cache(&self)
+                                                               -> Option<Arc<Vec<ItemGroup>>> {
+        let mut filter = self.current_item_filter();
+        let query = SearchQuery::parse(&self.search_query);
+        filter.search = Some(&query);
+
+        match self.group_by {
+            GroupBy::None => None,
+            GroupBy::Publisher => {
+                let items =
+                    self.index
+                        .list_items_for_grouping_by_publisher(&filter,
+                                                              self.sort,
+                                                              self.sort_direction)
+                        .inspect_err(|error| tracing::warn!(%error, "could not group by publisher"))
+                        .ok()?;
+                Some(Arc::new(split_by_publisher(items)))
+            }
+            GroupBy::Tag => {
+                let rows =
+                    self.index
+                        .list_items_for_grouping_by_tag(&filter, self.sort, self.sort_direction)
+                        .inspect_err(|error| tracing::warn!(%error, "could not group by tag"))
+                        .ok()?;
+                Some(Arc::new(split_by_tag(rows, &t!("catalog.untagged"))))
+            }
+        }
+    }
+
     // ── Sidebar filter mutations
     // ──────────────────────────────────────────────
 
@@ -177,6 +253,7 @@ impl LibraryController {
     /// Groups the catalog by `group_by`, or stops grouping it.
     pub fn set_group_by(&mut self, group_by: GroupBy, cx: &mut Context<Self>) {
         self.group_by = group_by;
+        self.invalidate_cache();
         self.save_view_prefs();
         cx.emit(LibraryChanged);
     }

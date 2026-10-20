@@ -43,6 +43,8 @@ pub struct ItemGroup {
 
 /// Partitions `items` into publisher groups in the same order as
 /// `publisher_entries`.
+// SUPERSEDED: replaced by the SQL-ordered `split_by_publisher` path; kept as
+// the parity oracle for `openspec/changes/group-by-sql`.
 #[must_use]
 pub fn group_by_publisher(items: Vec<LibraryItem>) -> Vec<ItemGroup> {
     let entries = publisher_entries(&items);
@@ -66,6 +68,8 @@ pub fn group_by_publisher(items: Vec<LibraryItem>) -> Vec<ItemGroup> {
 ///
 /// An item with several tags is in the group of each of them. Items with no
 /// tag are in a last group called `untagged`, if there are any.
+// SUPERSEDED: replaced by the SQL-ordered `split_by_tag` path; kept as the
+// parity oracle for `openspec/changes/group-by-sql`.
 #[must_use]
 pub fn group_by_tag(items: Vec<LibraryItem>, tags: &TagLibrary, untagged: &str) -> Vec<ItemGroup> {
     let mut by_tag: HashMap<String, ItemGroup> = HashMap::new();
@@ -94,6 +98,57 @@ pub fn group_by_tag(items: Vec<LibraryItem>, tags: &TagLibrary, untagged: &str) 
     if !without_tags.is_empty() {
         groups.push(ItemGroup { title: Arc::from(untagged),
                                 items: without_tags, });
+    }
+    groups
+}
+
+/// Splits publisher-ordered items into groups at exact publisher boundaries.
+///
+/// Used by the SQLized grouping path; the caller must have ordered `items` by
+/// Unicode-lowercase publisher, then by the user sort.
+#[must_use]
+pub fn split_by_publisher(items: Vec<LibraryItem>) -> Vec<ItemGroup> {
+    let mut groups: Vec<ItemGroup> = Vec::new();
+    for item in items {
+        if let Some(last) = groups.last_mut()
+           && last.title == item.publisher
+        {
+            last.items.push(item);
+            continue;
+        }
+        groups.push(ItemGroup { title: Arc::clone(&item.publisher),
+                                items: vec![item], });
+    }
+    groups
+}
+
+/// Splits tag-ordered rows into groups at exact tag-name boundaries. Rows
+/// with `group = None` are folded into a final `untagged` group.
+///
+/// Used by the SQLized grouping path; the caller must have ordered rows by
+/// Unicode-lowercase tag, then by the user sort.
+#[must_use]
+pub fn split_by_tag(rows: Vec<(Option<String>, LibraryItem)>, untagged: &str) -> Vec<ItemGroup> {
+    let mut groups: Vec<ItemGroup> = Vec::new();
+    let mut untagged_items = Vec::new();
+    for (group, item) in rows {
+        match group {
+            None => untagged_items.push(item),
+            Some(name) => {
+                if let Some(last) = groups.last_mut()
+                   && last.title.to_lowercase() == name.to_lowercase()
+                {
+                    last.items.push(item);
+                    continue;
+                }
+                groups.push(ItemGroup { title: Arc::from(name),
+                                        items: vec![item], });
+            }
+        }
+    }
+    if !untagged_items.is_empty() {
+        groups.push(ItemGroup { title: Arc::from(untagged),
+                                items: untagged_items, });
     }
     groups
 }
@@ -238,5 +293,28 @@ mod tests {
         assert_eq!(groups[0].items.iter().map(|i| &*i.id).collect::<Vec<_>>(),
                    ["c", "b"]);
         assert_eq!(&*groups[1].title, "beta");
+    }
+
+    #[test]
+    fn split_by_publisher_breaks_on_exact_publisher_name() {
+        // Ordered by lowercase publisher: Kobold Press, Paizo, paizo, Wizards.
+        let items = vec![item("Kobold Press"),
+                         item("Paizo"),
+                         item("paizo"),
+                         item("Wizards"),];
+        let groups = split_by_publisher(items);
+        assert_eq!(groups.len(), 4);
+    }
+
+    #[test]
+    fn split_by_tag_groups_by_lowercase_tag_name() {
+        let rows = vec![(Some("Solo".to_owned()), titled("a")),
+                        (Some("solo".to_owned()), titled("b")),
+                        (None, titled("c")),];
+        let groups = split_by_tag(rows, "Untagged");
+        assert_eq!(groups.len(), 2);
+        assert_eq!(&*groups[0].title, "Solo");
+        assert_eq!(groups[0].items.len(), 2);
+        assert_eq!(&*groups[1].title, "Untagged");
     }
 }

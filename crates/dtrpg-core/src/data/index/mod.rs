@@ -240,6 +240,38 @@ impl LibraryIndex {
         filtered_items::count_items_filtered(&self.conn, filter)
     }
 
+    /// Returns the items matching `filter` ordered for publisher grouping.
+    ///
+    /// Rows are sorted by Unicode-lowercase publisher ascending, then by the
+    /// user's chosen `sort`/`direction` within each publisher. The caller can
+    /// split the result into `ItemGroup`s with a single linear pass.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn list_items_for_grouping_by_publisher(&self, filter: &ItemFilter<'_>,
+                                                sort: SortMethod, direction: SortDirection)
+                                                -> Result<Vec<LibraryItem>, IndexError> {
+        filtered_items::list_items_for_grouping_by_publisher(&self.conn, filter, sort, direction)
+    }
+
+    /// Returns the items matching `filter` expanded to one row per tag,
+    /// ordered for tag grouping.
+    ///
+    /// Each tuple is `(group_name, item)`; `group_name` is `None` only for the
+    /// untagged rows, which are appended at the end. Rows are sorted by
+    /// Unicode-lowercase tag ascending, then by the user's chosen
+    /// `sort`/`direction` within each tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if either query fails.
+    pub fn list_items_for_grouping_by_tag(
+        &self, filter: &ItemFilter<'_>, sort: SortMethod, direction: SortDirection)
+        -> Result<Vec<(Option<String>, LibraryItem)>, IndexError> {
+        filtered_items::list_items_for_grouping_by_tag(&self.conn, filter, sort, direction)
+    }
+
     /// Replaces the entire collection list with `entries`. See
     /// [`collections::replace_all_collections`].
     ///

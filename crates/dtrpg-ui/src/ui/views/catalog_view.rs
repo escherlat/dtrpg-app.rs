@@ -44,7 +44,7 @@ use crate::ui::views::list_columns::{
     ListColumnSet, column_chooser_menu, column_sorted_by, sort_method_for,
 };
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::util::publisher::{ItemGroup, group_by_publisher, group_by_tag};
+use crate::util::publisher::ItemGroup;
 use crate::util::reveal::reveal_in_file_manager;
 
 #[derive(Clone, Copy)]
@@ -73,12 +73,13 @@ pub struct CatalogView {
     /// Cached items-per-row for the grid layout; updated each render from
     /// the window viewport width. Initialized to 4 as a safe default.
     items_per_row:              usize,
-    /// Cached publisher grouping of the controller's visible items.
-    /// Invalidated (set to `None`) on `LibraryChanged`; repopulated lazily
-    /// during `render()` so grouped presentation modes avoid re-grouping on
-    /// every hover-triggered re-render. Also drives the flattened rows
-    /// pushed into `catalog_grouped_list_table`.
-    grouped_cache:              Option<Vec<ItemGroup>>,
+    /// Cached reference to the controller's grouped items. Compared by Arc
+    /// pointer so the grouped list only rebuilds its flattened rows when the
+    /// controller cache actually changes, not on every hover-triggered
+    /// re-render. Also drives the flattened rows pushed into
+    /// `catalog_grouped_list_table`.
+    grouped_cache:              Option<Arc<Vec<ItemGroup>>>,
+
     /// Cursor position captured at the mouse-down that opened the single-click
     /// item popover (see `render_item_popover`). Frozen for the lifetime of
     /// the popover — never updated by subsequent mouse movement — so the
@@ -90,7 +91,7 @@ pub struct CatalogView {
     /// (List) whose entries don't report their own bounds — see
     /// `LibraryController::popover_anchor_bounds` for the precise rectangle
     /// Grid/Thumbs entries supply once painted.
-    popover_anchor_pos:         Option<Point<Pixels>>,
+    popover_anchor_pos: Option<Point<Pixels>>,
 }
 
 impl CatalogView {
@@ -264,39 +265,34 @@ impl CatalogView {
                popover_anchor_pos: None }
     }
 
-    /// Returns the cached publisher grouping, computing and storing it first if
-    /// stale. Also pushes the flattened row list into
-    /// `catalog_grouped_list_table` whenever the grouping is recomputed, so
-    /// the grouped `DataTable` stays in sync without re-flattening on every
-    /// render.
+    /// Returns the controller's grouped items, rebuilding the flattened rows
+    /// for `catalog_grouped_list_table` only when the controller's cache has
+    /// changed.
     fn grouped_items(&mut self, cx: &mut Context<Self>) -> Vec<ItemGroup> {
-        if self.grouped_cache.is_none() {
-            let controller = self.controller.read(cx);
-            let items = controller.visible_items();
-            let groups = match controller.group_by {
-                GroupBy::Tag => {
-                    group_by_tag(items, &controller.tag_library(), &t!("catalog.untagged"))
-                }
-                GroupBy::Publisher | GroupBy::None => group_by_publisher(items),
-            };
-            self.grouped_cache = Some(groups.clone());
+        let controller = self.controller.read(cx);
+        let groups = controller.visible_items_grouped();
+        let rebuild = self.grouped_cache
+                          .as_ref()
+                          .is_none_or(|cached| !Arc::ptr_eq(cached, &groups));
+        if rebuild {
+            self.grouped_cache = Some(Arc::clone(&groups));
 
             let group_kind = controller.group_by;
             let mut rows = Vec::new();
-            for group in groups {
+            for group in groups.iter() {
                 rows.push(GroupedRow::Header { title: Arc::clone(&group.title),
                                                count: group.items.len(),
                                                kind:  group_kind, });
                 rows.extend(group.items
-                                 .into_iter()
-                                 .map(|item| GroupedRow::Item(Box::new(item))));
+                                 .iter()
+                                 .map(|item| GroupedRow::Item(Box::new(item.clone()))));
             }
             self.catalog_grouped_list_table.update(cx, |state, cx| {
                                                state.delegate_mut().rows = rows;
                                                state.refresh(cx);
                                            });
         }
-        self.grouped_cache.clone().unwrap_or_default()
+        (*groups).clone()
     }
 }
 

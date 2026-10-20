@@ -11,7 +11,14 @@ mod query;
 #[cfg(test)]
 // Index fixtures use unwrap for known-good in-memory database operations.
 #[allow(clippy::unwrap_used)]
+mod group_parity_tests;
+#[cfg(test)]
+// Index fixtures use unwrap for known-good in-memory database operations.
+#[allow(clippy::unwrap_used)]
 mod parity_tests;
 
 pub use clause::ItemFilter;
-pub(super) use query::{count_items_filtered, list_items_filtered};
+pub(super) use query::{
+    count_items_filtered, list_items_filtered, list_items_for_grouping_by_publisher,
+    list_items_for_grouping_by_tag,
+};
