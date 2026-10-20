@@ -117,7 +117,7 @@ pub(super) async fn run_full_fetch(ctx: &CatalogSyncCtx, async_cx: &mut AsyncApp
     // fetch.
     let catalog_was_empty = ctx.this
                                .update(async_cx, |ctrl, _cx| {
-                                   ctrl.index.count_all().unwrap_or(0) == 0
+                                   ctrl.index().count_all().unwrap_or(0) == 0
                                })
                                .unwrap_or(false);
 
@@ -267,7 +267,7 @@ pub(super) async fn run_full_fetch(ctx: &CatalogSyncCtx, async_cx: &mut AsyncApp
             // Wait for any in-flight checkpoint write to finish — it wrote
             // `save_root`'s `.tmp` file for the accumulating buffer during
             // the fetch; `set_catalog` above already wrote the finished
-            // result straight to `ctrl.index`, so no final save is needed.
+            // result straight to `ctrl.index()`, so no final save is needed.
             if let Some(prev) = checkpoint_task.take() {
                 prev.await;
             }

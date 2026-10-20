@@ -50,21 +50,15 @@ impl LibraryController {
         let prefs = dtrpg_core::data::ui_preferences::UiPreferences::load();
         let view_prefs = dtrpg_core::data::file_openers::CatalogViewPrefs::load();
         let storage = StorageConfig::load();
-        // The index is the catalog's only storage; there is no in-memory
-        // fallback to degrade to, so a controller cannot exist without one.
+        // The library session is the catalog's only storage; there is no
+        // in-memory fallback to degrade to, so a controller cannot exist
+        // without one.
         #[allow(clippy::expect_used)]
-        let index =
-            LibraryIndex::open_and_migrate(&cache_root).expect("failed to open the library index");
-        let network_monitor = Arc::new(NetworkMonitor::new());
-        let cover_fetcher = Arc::new(CoverFetcher::new(
-            Arc::new(HttpCoverTransport::new(Arc::clone(&network_monitor))),
-            covers_dir(),
-        ));
-        let (work, work_events) = WorkQueue::new(storage.max_concurrent_downloads());
+        let (library, work_events) =
+            Library::open(cache_root, &storage).expect("failed to open the library session");
 
         let ctrl = Self { vm,
                           activity,
-                          index,
                           thumbnail_attempts: HashMap::new(),
                           availability_checks: HashMap::new(),
                           filter: view_prefs.to_filter(),
@@ -84,8 +78,7 @@ impl LibraryController {
                           collections_loaded: false,
                           collections_service: Arc::from(collections_service),
                           collection_members: HashSet::new(),
-                          work,
-                          cover_fetcher,
+                          library,
                           thumbnail_jobs: ThumbnailJobs::default(),
                           thumbnail_activity_id: None,
                           thumbnail_processed: 0,
@@ -97,7 +90,6 @@ impl LibraryController {
                           load_generation: 0,
                           catalog_sync_in_flight: false,
                           pending_reload: false,
-                          network_monitor,
                           items_cache: None,
                           grouped_items_cache: None,
                           filter_count_cache: 0,
@@ -125,7 +117,6 @@ impl LibraryController {
                           verifying_downloads: HashSet::new(),
                           check_jobs: CheckJobs::default(),
                           download_jobs: DownloadJobs::default(),
-                          cache_root,
                           tags: Arc::new(TagLibrary::default()),
                           tag_generation: 0,
                           file_tag_sync_running: false,
@@ -275,7 +266,7 @@ impl LibraryController {
     /// the snapshot itself: a download that finishes while the pass is
     /// running must not be reverted to `Cloud` by a snapshot that predates it.
     pub(super) fn verify_catalog_downloads(&mut self, cx: &mut Context<Self>) {
-        let catalog = self.index.list_items().unwrap_or_default();
+        let catalog = self.index().list_items().unwrap_or_default();
         let collections = self.collections.clone();
         let ids: HashSet<Arc<str>> = catalog.iter().map(|i| Arc::clone(&i.id)).collect();
         self.verifying_downloads.extend(ids.iter().cloned());

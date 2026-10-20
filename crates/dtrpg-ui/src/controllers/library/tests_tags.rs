@@ -8,6 +8,7 @@
 use dtrpg_core::data::activity::ActivityStatus;
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::tag_color::TagColor;
+use dtrpg_core::services::network_monitor::NetworkMonitor;
 use gpui::TestAppContext;
 
 use super::{tests_support::*, *};
@@ -17,7 +18,7 @@ use super::{tests_support::*, *};
 fn fixture_with_index(cx: &mut TestAppContext) -> Fixture {
     let items = vec![item_numbered("a", 1),
                      item_numbered("b", 2),
-                     item_numbered("c", 3)];
+                     item_numbered("c", 3),];
     let fixture = fixture_with(cx,
                                ScriptedTransport::open(),
                                ScriptedLibrary::open(),
@@ -256,7 +257,7 @@ fn tags_show_on_a_launch_that_cannot_reach_the_network(cx: &mut TestAppContext) 
                                3,
                                Vec::new());
     fixture.controller.update(cx, |ctrl, _| {
-                          ctrl.network_monitor = Arc::new(NetworkMonitor::fixed(false));
+                          ctrl.library.network_monitor = Arc::new(NetworkMonitor::fixed(false));
                       });
     saved_catalog_with_a_tag(&fixture, &["a", "b"]);
 

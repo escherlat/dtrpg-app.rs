@@ -99,7 +99,7 @@ impl LibraryController {
             GroupBy::None => None,
             GroupBy::Publisher => {
                 let items =
-                    self.index
+                    self.index()
                         .list_items_for_grouping_by_publisher(&filter,
                                                               self.sort,
                                                               self.sort_direction)
@@ -109,7 +109,7 @@ impl LibraryController {
             }
             GroupBy::Tag => {
                 let rows =
-                    self.index
+                    self.index()
                         .list_items_for_grouping_by_tag(&filter, self.sort, self.sort_direction)
                         .inspect_err(|error| tracing::warn!(%error, "could not group by tag"))
                         .ok()?;

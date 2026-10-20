@@ -34,22 +34,22 @@ impl LibraryController {
         let spec = JobSpec { kind:     JobKind::Download,
                              priority: Priority::Interactive,
                              label:    format!("{title}: {file_name}"), };
-        let id = self.work.submit(spec, move |context| {
-                              let path = resolved_file_path_in_collections(&StorageConfig::load(),
-                                                                           &item,
-                                                                           &file,
-                                                                           &collection_ids);
-                              job_dest.put(path.clone());
-                              let mut on_retry =
-                                  |attempt, delay| context.report_retry(attempt, delay);
-                              let mut on_progress =
-                                  |received, total| context.report_progress(received, total);
-                              let control = DownloadControl::new(context.cancel_flag())
+        let id = self.work().submit(spec, move |context| {
+                                let path = resolved_file_path_in_collections(&StorageConfig::load(),
+                                                                             &item,
+                                                                             &file,
+                                                                             &collection_ids);
+                                job_dest.put(path.clone());
+                                let mut on_retry =
+                                    |attempt, delay| context.report_retry(attempt, delay);
+                                let mut on_progress =
+                                    |received, total| context.report_progress(received, total);
+                                let control = DownloadControl::new(context.cancel_flag())
                 .on_retry(&mut on_retry)
                 .on_progress(&mut on_progress);
-                              service.download_item(order_product_id, index, &path, control)
-                                     .map_err(|error| error.to_string())
-                          });
+                                service.download_item(order_product_id, index, &path, control)
+                                       .map_err(|error| error.to_string())
+                            });
         self.download_jobs.add(id,
                                DownloadJob { key,
                                              title,
@@ -69,7 +69,7 @@ impl LibraryController {
         let label = t!("activity.downloading_file_entry",
                        title = job.title,
                        file_name = job.file_name).to_string();
-        let work = self.work.clone();
+        let work = self.work().clone();
         let cancel: Arc<dyn Fn() + Send + Sync> = Arc::new(move || work.cancel(id));
         let activity_id = self.activity
                               .update(cx, |a, cx| a.start(&label, Some(cancel), cx));
@@ -151,7 +151,7 @@ impl LibraryController {
             // otherwise a restart before the next catalog reload shows
             // `Cloud` status regardless of what `reconcile_catalog` does
             // (see `catalog-live-data-swap`).
-            if let Err(e) = self.index.replace_item(&item) {
+            if let Err(e) = self.index_mut().replace_item(&item) {
                 tracing::error!(error = %e, "failed to write download status to the library index");
             }
         }

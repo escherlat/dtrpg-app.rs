@@ -1,0 +1,9 @@
+- [x] Create issue pilgrimagesoftware/dtrpg-app.rs#364.
+- [x] Write OpenSpec proposal/design.
+- [x] Slice 1: Extract core `Library` skeleton (move index, queue, network monitor, cover fetcher).
+- [ ] Slice 2: Move catalog load/refresh state machine into `Library`.
+- [ ] Slice 3: Move filtered/grouped queries and caches into `Library`.
+- [ ] Slice 4: Move download/check/thumbnail job orchestration into `Library`.
+- [ ] Slice 5: Move catalog mutations into `Library`; thin `LibraryController` to view-model.
+- [ ] Update `NOTES.md` ADR 0002 section when slices are merged.
+- [ ] Archive this OpenSpec change after merge.

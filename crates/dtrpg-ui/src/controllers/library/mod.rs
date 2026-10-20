@@ -18,15 +18,13 @@ use dtrpg_core::data::constants::{
 };
 use dtrpg_core::data::cover_cache::load_cached_cover;
 use dtrpg_core::data::enums::*;
-use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
 use dtrpg_core::data::tag_library::{TagEntry, TagLibrary};
+use dtrpg_core::library::Library;
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
-use dtrpg_core::services::covers::{CoverFetcher, HttpCoverTransport};
-use dtrpg_core::services::network_monitor::NetworkMonitor;
 use dtrpg_core::services::{
     DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry,
 };
@@ -36,7 +34,7 @@ use dtrpg_core::util::matching::*;
 use dtrpg_core::util::search::SearchQuery;
 use dtrpg_core::util::sort::*;
 use dtrpg_core::work::{
-    JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot, WorkQueue,
+    JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot,
 };
 use gpui::{
     AppContext, AsyncApp, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task,
@@ -265,11 +263,10 @@ pub struct LibraryController {
     /// Populated by `set_filter` when `SidebarFilter::Collection(_)` is set;
     /// cleared when any other filter is active.
     pub collection_members:        HashSet<u64>,
-    /// The core work queue that runs thumbnail fetches. Its limit is kept in
-    /// step with `max_concurrent_downloads`.
-    work:                          WorkQueue,
-    /// Fetches cover images, reading the disk cache before the network.
-    cover_fetcher:                 Arc<CoverFetcher>,
+    /// Headless library session: owns the index, work queue, cover fetcher,
+    /// and network monitor. Slice 1 of the ADR 0002 controller decomposition
+    /// moves these fields into core; later slices will move logic there too.
+    pub(super) library:            Library,
     /// Every thumbnail fetch submitted to `work` that has not finished.
     thumbnail_jobs:                ThumbnailJobs,
     /// Activity id for the aggregated thumbnail loading entry.
@@ -326,11 +323,6 @@ pub struct LibraryController {
     ///
     /// [`start_load_inner`]: Self::start_load_inner
     pending_reload:                bool,
-    /// Shared connectivity monitor consulted before catalog-sync and
-    /// cover-thumbnail network requests. Held as an `Arc` so background
-    /// tasks spawned on gpui's executor can query it without borrowing
-    /// `self`.
-    network_monitor:               Arc<NetworkMonitor>,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
@@ -436,14 +428,6 @@ pub struct LibraryController {
     /// per file (not per entry) so a multi-item entry can have more than one
     /// of its files queued or active independently.
     download_jobs:                 DownloadJobs,
-    /// Where the catalog cache is saved after a download. A field so tests
-    /// can point it somewhere other than the user's real cache.
-    cache_root:                    PathBuf,
-    /// The library index: the catalog's only storage, read and written
-    /// directly by every controller method that used to scan or mutate an
-    /// in-memory `Vec<LibraryItem>`. Opened once at construction and held
-    /// for the controller's lifetime.
-    index:                         LibraryIndex,
     /// Whether files' tags are being compared with the library's right now.
     file_tag_sync_running:         bool,
     /// The storage settings to use instead of the ones on disk. Only tests set
@@ -481,6 +465,8 @@ pub struct LibraryController {
     /// (see [`Self::clear_bulk_selection_and_exit_mode`]).
     bulk_selected_ids:             HashSet<Arc<str>>,
 }
+
+mod accessors;
 
 #[path = "pending_download.rs"]
 mod pending_download;

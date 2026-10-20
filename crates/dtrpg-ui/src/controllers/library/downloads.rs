@@ -24,7 +24,7 @@ impl LibraryController {
                 file.offloaded = false;
             }
             item.recompute_status();
-            if let Err(e) = self.index.replace_item(&item) {
+            if let Err(e) = self.index_mut().replace_item(&item) {
                 tracing::error!(error = %e, "failed to write item status to the library index");
             }
             self.refresh_section_counts();
@@ -316,7 +316,7 @@ impl LibraryController {
         else {
             return;
         };
-        self.work.cancel(job_id);
+        self.work().cancel(job_id);
         if let Some(activity_id) = activity_id {
             self.activity
                 .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));

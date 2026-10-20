@@ -4,6 +4,8 @@
 //! `catalog_sync_fresh_install`, `catalog_sync_fetch`); this file only wires
 //! them together in order.
 
+use dtrpg_core::services::network_monitor::NetworkMonitor;
+
 use super::catalog_sync_autoload::{AutoLoadOutcome, try_skip_or_partial_fetch};
 use super::catalog_sync_cache::{prepopulate_from_cache, sync_collections};
 use super::catalog_sync_fetch::run_full_fetch;
@@ -53,8 +55,8 @@ impl LibraryController {
         let service_arc = self.vm.service_arc();
         let collections_service = Arc::clone(&self.collections_service);
         let weak_activity = self.activity.downgrade();
-        let storage_root = self.cache_root.clone();
-        let network_monitor = Arc::clone(&self.network_monitor);
+        let storage_root = self.cache_root().clone();
+        let network_monitor = Arc::clone(self.network_monitor());
 
         cx.spawn(async move |this, async_cx| {
               // Single activity item for the whole load. Its label is updated

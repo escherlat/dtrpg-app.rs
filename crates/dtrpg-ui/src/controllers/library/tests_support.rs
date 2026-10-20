@@ -16,7 +16,8 @@ use dtrpg_core::{
     data::collection::CollectionEntry,
     services::{
         collections::CollectionsServiceError,
-        covers::{CoverFetchError, CoverTransport},
+        covers::{CoverFetchError, CoverFetcher, CoverTransport},
+        network_monitor::NetworkMonitor,
     },
 };
 use gpui::TestAppContext;
@@ -386,18 +387,19 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
     let activity = cx.new(|_| ActivityController::new());
     let controller =
         cx.new(|cx| {
-              let (mut ctrl, events) =
-                  LibraryController::build_with_cache_root(Box::new(SharedLibrary(Arc::clone(&library))),
-                                                           Box::new(UnusedCollections),
-                                                           activity.clone(),
-                                                           cache_path.clone());
-              ctrl.cover_fetcher = Arc::new(CoverFetcher::new(Arc::clone(&transport)
-                                                              as Arc<dyn CoverTransport>,
-                                                              covers.path().to_path_buf()));
+              let (mut ctrl, events) = LibraryController::build_with_cache_root(
+            Box::new(SharedLibrary(Arc::clone(&library))),
+            Box::new(UnusedCollections),
+            activity.clone(),
+            cache_path.clone(),
+        );
+              ctrl.library.cover_fetcher = Arc::new(CoverFetcher::new(Arc::clone(&transport)
+                                                                      as Arc<dyn CoverTransport>,
+                                                                      covers.path().to_path_buf()));
               // A test must not wait on, or depend on, the real network.
-              ctrl.network_monitor = Arc::new(NetworkMonitor::fixed(true));
-              ctrl.work.set_limit(limit);
-              ctrl.index.replace_all_items(&items).unwrap();
+              ctrl.library.network_monitor = Arc::new(NetworkMonitor::fixed(true));
+              ctrl.library.work.set_limit(limit);
+              ctrl.library.index.replace_all_items(&items).unwrap();
               ctrl.start_work_event_pump(events, cx);
               ctrl
           });
