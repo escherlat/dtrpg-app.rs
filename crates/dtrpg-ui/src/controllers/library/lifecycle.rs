@@ -56,9 +56,10 @@ impl LibraryController {
         let index =
             LibraryIndex::open_and_migrate(&cache_root).expect("failed to open the library index");
         let network_monitor = Arc::new(NetworkMonitor::new());
-        let cover_fetcher =
-            Arc::new(CoverFetcher::new(Arc::new(HttpCoverTransport::new(Arc::clone(&network_monitor))),
-                                       covers_dir()));
+        let cover_fetcher = Arc::new(CoverFetcher::new(
+            Arc::new(HttpCoverTransport::new(Arc::clone(&network_monitor))),
+            covers_dir(),
+        ));
         let (work, work_events) = WorkQueue::new(storage.max_concurrent_downloads());
 
         let ctrl = Self { vm,
@@ -98,6 +99,7 @@ impl LibraryController {
                           pending_reload: false,
                           network_monitor,
                           items_cache: None,
+                          grouped_items_cache: None,
                           filter_count_cache: 0,
                           catalog_ids_cache: Arc::default(),
                           publisher_search_open: false,

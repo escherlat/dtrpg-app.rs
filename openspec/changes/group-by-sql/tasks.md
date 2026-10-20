@@ -1,0 +1,12 @@
+- [x] Create issue pilgrimagesoftware/dtrpg-app.rs#361.
+- [x] Add `list_items_for_grouping_by_publisher` to `LibraryIndex`/`filtered_items/query.rs`.
+- [x] Add `list_items_for_grouping_by_tag` to `LibraryIndex`/`filtered_items/query.rs`.
+- [x] Add `split_by_publisher`/`split_by_tag` to `dtrpg_ui::util::publisher`.
+- [x] Cache grouped results in `LibraryController::grouped_items_cache`.
+- [x] Make `set_group_by` call `invalidate_cache()`.
+- [x] Update `CatalogView::grouped_items` to read the controller cache.
+- [x] Write parity tests in `filtered_items/group_parity_tests.rs`.
+- [x] Verify `make all` (fmt-check, size-check, lint, test).
+- [x] Update `NOTES.md`.
+- [x] Open PR against `develop` and get CI green. (PR #362)
+- [ ] Archive this OpenSpec change after merge.

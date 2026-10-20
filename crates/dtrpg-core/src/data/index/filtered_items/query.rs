@@ -60,6 +60,103 @@ pub(in crate::data::index) fn count_items_filtered(conn: &Connection, filter: &I
     Ok(count as usize)
 }
 
+/// Returns the items matching `filter`, ordered so a single linear pass
+/// can split them into publisher groups.
+///
+/// Group order is ascending by Unicode-lowercase publisher; item order within
+/// each group follows `sort`/`direction`. This matches
+/// `dtrpg_ui::util::publisher::group_by_publisher`'s behavior.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+pub(in crate::data::index) fn list_items_for_grouping_by_publisher(
+    conn: &Connection, filter: &ItemFilter<'_>, sort: SortMethod, direction: SortDirection)
+    -> Result<Vec<LibraryItem>, IndexError> {
+    let (where_clause, args) = build_where(filter);
+    let order_by = format!("ulower(publisher) ASC, publisher, {}",
+                           user_sort_clause(sort, direction));
+    let sql = format!("SELECT * FROM items {where_clause} ORDER BY {order_by}");
+
+    let mut stmt = conn.prepare(&sql)?;
+    let mut items = stmt.query_map(params_from_iter(args.iter().map(AsRef::as_ref)),
+                                   row_to_item)?
+                        .collect::<rusqlite::Result<Vec<_>>>()?;
+    for item in &mut items {
+        item.files = load_files_for(conn, &item.id)?;
+    }
+    Ok(items)
+}
+
+/// Returns the items matching `filter`, expanded to one row per tag the item
+/// carries, ordered so a single linear pass can split them into tag groups.
+/// Rows with `group = None` are untagged items and belong in the final group.
+///
+/// Group order is ascending by Unicode-lowercase tag; item order within each
+/// group follows `sort`/`direction`. This matches
+/// `dtrpg_ui::util::publisher::group_by_tag`'s behavior.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if either query fails.
+pub(in crate::data::index) fn list_items_for_grouping_by_tag(
+    conn: &Connection, filter: &ItemFilter<'_>, sort: SortMethod, direction: SortDirection)
+    -> Result<Vec<(Option<String>, LibraryItem)>, IndexError> {
+    let (where_clause, args) = build_where(filter);
+    let user_sort = user_sort_clause(sort, direction);
+
+    let mut out: Vec<(Option<String>, LibraryItem)> = Vec::new();
+
+    // Tagged items: one row per (item, tag). The WHERE already filtered items
+    // by search/tag dimensions; this JOIN only expands each surviving item
+    // into its tag groups.
+    let order_by = format!("ulower(tg.name) ASC, tg.name, {user_sort}");
+    let tagged_sql = format!("SELECT items.*, tg.name AS group_name FROM items          JOIN item_tags it ON it.item_id = items.id          JOIN tags tg ON tg.id = it.tag_id          {where_clause} ORDER BY {order_by}");
+    let mut stmt = conn.prepare(&tagged_sql)?;
+    let tagged = stmt.query_map(params_from_iter(args.iter().map(AsRef::as_ref)), |row| {
+                         let group = row.get::<_, String>("group_name")?;
+                         let item = row_to_item(row)?;
+                         Ok((Some(group), item))
+                     })?
+                     .collect::<rusqlite::Result<Vec<_>>>()?;
+    out.extend(tagged);
+
+    // Untagged items: appended as the final group.
+    let exists_clause = "NOT EXISTS (SELECT 1 FROM item_tags WHERE item_id = items.id)";
+    let untagged_sql = if where_clause.is_empty() {
+        format!("SELECT * FROM items WHERE {exists_clause} ORDER BY {user_sort}")
+    }
+    else {
+        format!("SELECT * FROM items {where_clause} AND {exists_clause} ORDER BY {user_sort}")
+    };
+    let mut stmt = conn.prepare(&untagged_sql)?;
+    let mut untagged = stmt.query_map(params_from_iter(args.iter().map(AsRef::as_ref)),
+                                      row_to_item)?
+                           .collect::<rusqlite::Result<Vec<_>>>()?;
+    for item in &mut untagged {
+        item.files = load_files_for(conn, &item.id)?;
+    }
+    out.extend(untagged.into_iter().map(|item| (None, item)));
+
+    Ok(out)
+}
+
+/// The user-sort part of an `ORDER BY` clause, with `direction` applied to
+/// every key. Kept separate from the grouping key so group order is always
+/// ascending while the secondary order respects the user's choice.
+fn user_sort_clause(sort: SortMethod, direction: SortDirection) -> String {
+    let clause = order_by_clause(sort);
+    if direction == SortDirection::Ascending {
+        clause.to_string()
+    }
+    else {
+        clause.split(", ")
+              .map(|col| format!("{col} DESC"))
+              .collect::<Vec<_>>()
+              .join(", ")
+    }
+}
+
 /// Maps `sort` to an `ORDER BY` clause, mirroring `sort_items`'s match
 /// (including its fallback-to-title arm for an unrecognized `Custom`
 /// `col_key`) exactly.

@@ -667,3 +667,49 @@ stale cache refetch runs per search keystroke. If #353 lands, revisit.
   #353.
 - `dtrpg-ui` was not rendered in this environment (no display), same caveat
   as the tags work: verified by compiling and controller/pure-function tests.
+
+---
+
+# Group by SQL: status at 2026-10-20
+
+Branch: `feature/group-by-sql`, off `develop`. Issue #361.
+OpenSpec change: `openspec/changes/group-by-sql` (`skip_specs: true` —
+mechanism swap, no observable behavior change).
+
+## What exists now
+
+- `LibraryIndex::list_items_for_grouping_by_publisher` and
+  `list_items_for_grouping_by_tag` (`data/index/filtered_items/query.rs`):
+  reuse the same `build_where` as `list_items_filtered`, then order rows so
+  `dtrpg_ui::util::publisher::split_by_publisher` / `split_by_tag` can group
+  them with one linear pass. Publisher groups are ordered by Unicode-lowercase
+  publisher with a deterministic `publisher` tie-breaker; tag groups use the
+  same `tg.name` tie-breaker.
+- `LibraryController` builds the grouped view in `invalidate_cache()` and
+  stores it in `grouped_items_cache: Option<Arc<Vec<ItemGroup>>>`. The render
+  path (`CatalogView::grouped_items`) reads the cache by Arc pointer, so
+  grouping never issues SQLite I/O while drawing.
+- `set_group_by` now calls `invalidate_cache()` so a group-mode change
+  rebuilds the cache once, not lazily on the next render.
+- The old `group_by_publisher`/`group_by_tag` Rust partitioners are marked
+  `SUPERSEDED` and kept as the parity oracle.
+- Parity tests in `data/index/filtered_items/group_parity_tests.rs` compare
+  the SQL-ordered path against a Rust reference implementation over the same
+  index state, for both sort directions and for a search-filtered subset.
+- Verified: clippy -D warnings clean, 528 core incl. 4 new / 341 ui / 6 mcp
+  tests, `make fmt-check`, `make size-check`.
+
+## Scope correction to #361
+
+Tag grouping now reads `item_tags`/`tags` from the index, not the controller's
+`TagLibrary` snapshot. That is the same source-of-truth switch already
+accepted in #353, so the two converge after `load_tags` completes.
+
+## Not done
+
+- `publisher_entries()` still exists because the old `group_by_publisher()`
+  used its ordering. It has no production callers; remove it alongside the
+  `SUPERSEDED` partitioners once the SQL path has shipped.
+- `dtrpg-ui` was not rendered in this environment (no display), same caveat
+  as previous UI work: verified by compiling and controller/pure-function
+  tests.

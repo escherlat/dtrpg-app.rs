@@ -337,6 +337,10 @@ pub struct LibraryController {
     /// The filtered, sorted result set. Shared, so handing it to a render pass
     /// costs a reference count rather than a copy of every item.
     items_cache:                   Option<Arc<Vec<LibraryItem>>>,
+    /// Grouped view of `items_cache`, rebuilt whenever grouping is active and
+    /// the filter/search/sort/group dimension changes. Render paths read this
+    /// cache instead of computing groups themselves.
+    grouped_items_cache:           Option<Arc<Vec<ItemGroup>>>,
     /// How many catalog items the sidebar filter alone matches, kept with
     /// `items_cache`.
     filter_count_cache:            usize,
