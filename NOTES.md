@@ -400,3 +400,99 @@ Note from the owner, recorded as given (this session has not seen the files):
 
 Whoever picks up the screenshots work should check for those `-1` / `-2`
 variants and the extra views before treating the set as complete.
+
+# Catalog reads from the index: status at 2026-10-20
+
+Branch: `feature/catalog-reads-from-index`, off `develop`. OpenSpec change:
+`openspec/changes/catalog-reads-from-index` (proposal/design/tasks all written;
+`skip_specs: true` — no capability spec changes, this is a storage swap).
+Scoped per claude-2 `ARCHITECTURE-REVIEW.md`'s delivery-sequence step 2 ("make
+local state authoritative for presentation").
+
+## Next step
+
+PR pilgrimagesoftware/dtrpg-app.rs#354 is open against `develop`, not yet
+reviewed or merged. The immediate next step is to get that PR green and
+merged — check its CI status and review comments before starting new work
+on top of it, same as the libri-v2-architecture-closeout handoff pattern
+earlier in this file. Once merged, the follow-ups below ("Not done") are
+each independently startable; none blocks the others.
+
+## What exists now
+
+- `catalog: Vec<LibraryItem>` is gone from `LibraryController`. The library
+  index (`LibraryIndex`, ADR 0003) is the controller's only catalog storage —
+  no fallback, no dual bookkeeping. This went further than the task's original
+  incremental-migration plan: the owner explicitly overrode that mid-session
+  ("rip the old stuff out and replace it with the new"), after an incremental
+  attempt (keep the Vec as a fallback behind `index: Option<LibraryIndex>`)
+  surfaced a real bug — tests set `ctrl.catalog` directly, bypassing the
+  index, so a partial migration silently returned empty results for anything
+  that queried the index.
+- `LibraryIndex::list_items_filtered` (new file,
+  `crates/dtrpg-core/src/data/index/filtered_items.rs`) covers every
+  `SidebarFilter` variant except `Tag` (resolved in Rust against its
+  pre-computed id set — it was never a Vec scan to begin with) and every
+  `SortMethod`, including `Custom`'s closed `col_key` set. `LibraryIndex::
+  replace_item` upserts one row for the many call sites that used to mutate
+  one `LibraryItem` in place (status changes, file-downloaded flags,
+  availability checks).
+- `self.index: LibraryIndex` is non-optional, opened once in
+  `LibraryController::build_with_cache_root()`. `.expect()`s on open failure —
+  deliberate, per the no-fallback decision above.
+- `thumbnail_last_attempted`/`availability_last_checked` (the two
+  `LibraryItem` fields the index schema has no columns for) moved to two
+  session-only `HashMap<Arc<str>, SystemTime>` fields on the controller,
+  overlaid back onto every item fetched from the index
+  (`overlay_ephemeral_state`/`item_by_id`/`all_items` in `catalog.rs`), so the
+  `LibraryItem` shape the rest of the app sees is unchanged.
+- Three now-redundant background `save_catalog_cache` write-throughs were
+  removed outright (`catalog_sync_autoload.rs`, `catalog_sync_fetch.rs`'s
+  final save, `download_dispatch.rs`'s `save_catalog_in_background`) — every
+  catalog mutation now writes to `self.index` synchronously at the point of
+  mutation, so the old background re-save of the whole catalog was pure
+  duplicate work.
+- Verified clean: `cargo check`/`clippy -D warnings --workspace --all-targets`,
+  `cargo test -p dtrpg-ui` (339 tests + 5 doctests), `make fmt`/`fmt-check`/
+  `size-check`. `dtrpg-core`'s 22 network/socket-binding test failures are
+  this sandboxed environment's pre-existing limitation (confirmed present
+  before this change too), unrelated to this work.
+
+## Not done — scoped out, not silently dropped
+
+- **Publisher/tag aggregation as SQL.** `publisher_entries()`/
+  `group_by_publisher()`/`group_by_tag()` (`util/publisher.rs`) still run in
+  Rust over `self.all_items()` (an index fetch), not as `GROUP BY` queries.
+  Every call site was migrated off the Vec, just not onto index-side
+  aggregation yet.
+- **SQL-side pagination.** `visible_items_slice()` still slices the
+  fully-materialized `items_cache: Arc<[LibraryItem]>` that `invalidate_cache()`
+  builds. That cache is deliberately still one in-memory `Vec` — it's the
+  render-path read, and the render path must do zero I/O (`AGENTS.md`) — so
+  `LIMIT`/`OFFSET` on the index query was never actually load-bearing: the
+  index query that feeds the cache runs once per filter/sort/search change,
+  not once per rendered row.
+- **Full search-box semantics in SQL.** `SearchQuery::matches()`
+  (`util/search.rs`, the search box's real matcher: substring-anywhere over
+  title/publisher/line/tags, plus a `tag:`/`-tag:` mini-syntax) is not what
+  the index's `search()` FTS5 query does (word-token match over
+  title/publisher/description/file_names). Replicating `SearchQuery`'s exact
+  semantics in SQL is tracked separately as
+  `pilgrimagesoftware/dtrpg-app.rs#353`; this change deliberately keeps search
+  in-memory, run over the index-filtered (usually much smaller) set instead
+  of the full catalog.
+
+## Gotchas
+
+- If you're tempted to reintroduce a `Vec<LibraryItem>` cache anywhere in
+  `LibraryController` "just for this one read path" — don't, without checking
+  whether a test or another call site populates it directly. That's exactly
+  the bug the incremental approach hit: a Vec that's sometimes populated and
+  sometimes not is worse than no Vec at all, because it fails silently (empty
+  results) rather than loudly.
+- `thumbnail_attempts`/`availability_checks` are populated at specific
+  mutation points (`note_thumbnail_attempt`, the availability-check result
+  handler in `checks.rs`), not derived from the index. A new per-item
+  ephemeral field would need the same treatment — a side map, overlaid in
+  `overlay_ephemeral_state` — not a new index column, unless it's actually
+  meant to survive a restart.

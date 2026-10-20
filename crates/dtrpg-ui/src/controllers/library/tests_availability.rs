@@ -28,9 +28,8 @@ fn is_checking(fixture: &Fixture, cx: &mut TestAppContext, id: &str) -> bool {
 fn item<T>(fixture: &Fixture, cx: &mut TestAppContext, id: &str,
            read: impl Fn(&LibraryItem) -> T)
            -> T {
-    fixture.controller.read_with(cx, |ctrl, _| {
-                          read(ctrl.catalog.iter().find(|item| &*item.id == id).unwrap())
-                      })
+    fixture.controller
+           .read_with(cx, |ctrl, _| read(&ctrl.item_by_id(id).unwrap()))
 }
 
 fn settle(cx: &mut TestAppContext) {

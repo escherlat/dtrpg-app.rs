@@ -18,6 +18,7 @@ use dtrpg_core::data::constants::{
 };
 use dtrpg_core::data::cover_cache::load_cached_cover;
 use dtrpg_core::data::enums::*;
+use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
@@ -216,8 +217,13 @@ pub struct LibraryController {
     /// controller.
     #[allow(dead_code)]
     activity:                      Entity<ActivityController>,
-    /// Full catalog — never filtered.
-    catalog:                       Vec<LibraryItem>,
+    /// When a thumbnail fetch for an item was last attempted — not persisted
+    /// catalog data, so it lives here rather than on the index-backed
+    /// `LibraryItem`, keyed by item id.
+    thumbnail_attempts:            HashMap<Arc<str>, std::time::SystemTime>,
+    /// When an item's availability was last checked against the live API —
+    /// same rationale as `thumbnail_attempts`.
+    availability_checks:           HashMap<Arc<str>, std::time::SystemTime>,
     /// Active sidebar filter.
     pub filter:                    SidebarFilter,
     /// Text search query.
@@ -429,6 +435,11 @@ pub struct LibraryController {
     /// Where the catalog cache is saved after a download. A field so tests
     /// can point it somewhere other than the user's real cache.
     cache_root:                    PathBuf,
+    /// The library index: the catalog's only storage, read and written
+    /// directly by every controller method that used to scan or mutate an
+    /// in-memory `Vec<LibraryItem>`. Opened once at construction and held
+    /// for the controller's lifetime.
+    index:                         LibraryIndex,
     /// Whether files' tags are being compared with the library's right now.
     file_tag_sync_running:         bool,
     /// The storage settings to use instead of the ones on disk. Only tests set

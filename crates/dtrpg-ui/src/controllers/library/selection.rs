@@ -51,16 +51,6 @@ impl LibraryController {
         }
     }
 
-    /// Looks up a catalog item by id, independent of the current popover
-    /// selection.
-    ///
-    /// Used to resolve the full item for an open expanded detail tab, which
-    /// tracks only the item id, not a full `LibraryItem` snapshot.
-    #[must_use]
-    pub fn item_by_id(&self, id: &str) -> Option<&LibraryItem> {
-        self.catalog.iter().find(|i| i.id.as_ref() == id)
-    }
-
     // ── Item selection (multi-item detail tab) ───────────────────────────────
 
     /// Returns the row index of the currently selected item file for a

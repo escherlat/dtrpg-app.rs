@@ -6,13 +6,10 @@ impl LibraryController {
     /// Returns the catalog item that `item_id` or `product_id` identify, if it
     /// is in the catalog.
     fn catalog_item_for_member(&self, item_id: u64, product_id: u64) -> Option<LibraryItem> {
-        self.catalog
-            .iter()
-            .find(|item| {
-                collection_member_id(item) == item_id
-                || (product_id > 0 && item.product_id == product_id)
-            })
-            .cloned()
+        self.all_items().into_iter().find(|item| {
+                                        collection_member_id(item) == item_id
+                                        || (product_id > 0 && item.product_id == product_id)
+                                    })
     }
 
     /// Removes the links to a downloaded item from the folder of the collection

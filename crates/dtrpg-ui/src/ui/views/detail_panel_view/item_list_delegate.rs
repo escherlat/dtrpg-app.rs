@@ -84,7 +84,7 @@ impl TableDelegate for ItemListDelegate {
     fn render_td(&mut self, row_ix: usize, col_ix: usize, _window: &mut Window,
                  cx: &mut Context<TableState<Self>>)
                  -> impl IntoElement {
-        let Some(item) = self.controller.read(cx).item_by_id(&self.entry_id).cloned()
+        let Some(item) = self.controller.read(cx).item_by_id(&self.entry_id)
         else {
             return div().into_any_element();
         };

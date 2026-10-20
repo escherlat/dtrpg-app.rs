@@ -131,18 +131,13 @@ impl LibraryController {
     fn items_affected_by(&self, edit: &TagEdit) -> Vec<LibraryItem> {
         match edit {
             TagEdit::Add { item_id, .. } | TagEdit::Remove { item_id, .. } => {
-                self.catalog
-                    .iter()
-                    .filter(|item| &*item.id == item_id.as_str())
-                    .cloned()
-                    .collect()
+                self.item_by_id(item_id).into_iter().collect()
             }
             TagEdit::SetColor { tag, .. } => {
                 let having = self.tags.items_with(tag);
-                self.catalog
-                    .iter()
+                self.all_items()
+                    .into_iter()
                     .filter(|item| having.contains(&item.id))
-                    .cloned()
                     .collect()
             }
         }

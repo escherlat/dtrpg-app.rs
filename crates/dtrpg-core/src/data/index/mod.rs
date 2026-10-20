@@ -7,6 +7,7 @@
 //! this module implements.
 
 mod collections;
+mod filtered_items;
 mod items;
 mod migrate;
 mod schema;
@@ -23,6 +24,7 @@ mod summary_tests;
 
 use std::path::Path;
 
+pub use filtered_items::ItemFilter;
 use rusqlite::Connection;
 use thiserror::Error;
 
@@ -30,6 +32,7 @@ use crate::data::collection::CollectionEntry;
 use crate::data::enums::ItemStatus;
 use crate::data::library::LibraryItem;
 use crate::data::summary::ContentSummary;
+use crate::util::sort::{SortDirection, SortMethod};
 
 /// Errors from opening or querying the library index.
 #[derive(Debug, Error)]
@@ -116,6 +119,16 @@ impl LibraryIndex {
         items::list_items(&self.conn)
     }
 
+    /// Replaces one already-cataloged item's row, files, and FTS5 entry with
+    /// `item`'s current state (status, availability, file flags, …).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the write fails.
+    pub fn replace_item(&mut self, item: &LibraryItem) -> Result<(), IndexError> {
+        items::replace_item(&mut self.conn, item)
+    }
+
     /// Returns the item identified by `id`, or `None` if no such item exists.
     ///
     /// # Errors
@@ -164,6 +177,20 @@ impl LibraryIndex {
     pub fn count_recently_updated(&self, now_secs: i64, window_days: u32)
                                   -> Result<usize, IndexError> {
         items::count_recently_updated(&self.conn, now_secs, window_days)
+    }
+
+    /// Returns every item matching `filter`, sorted by `sort`/`direction`.
+    ///
+    /// Replaces `LibraryController::invalidate_cache()`'s in-memory `Vec`
+    /// scan — see `openspec/changes/catalog-reads-from-index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn list_items_filtered(&self, filter: &ItemFilter<'_>, sort: SortMethod,
+                               direction: SortDirection)
+                               -> Result<Vec<LibraryItem>, IndexError> {
+        filtered_items::list_items_filtered(&self.conn, filter, sort, direction)
     }
 
     /// Replaces the entire collection list with `entries`. See

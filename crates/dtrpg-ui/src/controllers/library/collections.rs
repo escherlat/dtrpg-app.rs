@@ -112,10 +112,11 @@ impl LibraryController {
         self.vm.replace_service(service);
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
-        self.catalog.clear();
-        self.section_counts =
-            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&self.catalog);
+        if let Err(e) = self.index.replace_all_items(&[]) {
+            tracing::error!(error = %e, "failed to clear the library index");
+        }
+        self.section_counts = SectionCounts::default();
+        self.publishers.clear();
         self.collections.clear();
         self.collections_loaded = false;
         self.collection_members.clear();

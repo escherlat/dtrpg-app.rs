@@ -107,9 +107,8 @@ impl LibraryController {
             self.bulk_selected_ids
                 .iter()
                 .filter_map(|id| {
-                    self.catalog
-                        .iter()
-                        .find(|i| &i.id == id && i.status != ItemStatus::Downloaded)
+                    self.item_by_id(id)
+                        .filter(|i| i.status != ItemStatus::Downloaded)
                         .map(|i| (Arc::clone(&i.id), i.title.to_string()))
                 })
                 .collect();
@@ -132,15 +131,11 @@ impl LibraryController {
     /// Enqueues a thumbnail fetch for every selected item that has a cover
     /// URL, then clears the selection and exits selection mode.
     pub fn bulk_fetch_thumbnail(&mut self, cx: &mut Context<Self>) {
-        let cover_urls: Vec<Arc<str>> = self.bulk_selected_ids
-                                            .iter()
-                                            .filter_map(|id| {
-                                                self.catalog
-                                                    .iter()
-                                                    .find(|i| &i.id == id)
-                                                    .and_then(|i| i.cover_url.clone())
-                                            })
-                                            .collect();
+        let cover_urls: Vec<Arc<str>> =
+            self.bulk_selected_ids
+                .iter()
+                .filter_map(|id| self.item_by_id(id).and_then(|i| i.cover_url))
+                .collect();
         for url in cover_urls {
             self.load_thumbnail(url, cx);
         }
@@ -150,15 +145,14 @@ impl LibraryController {
     /// Adds every selected item to `collection_id`, then clears the
     /// selection and exits selection mode.
     pub fn bulk_add_to_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
-        let targets: Vec<(u64, u64)> = self.bulk_selected_ids
-                                           .iter()
-                                           .filter_map(|id| {
-                                               self.catalog
-                                                   .iter()
-                                                   .find(|i| &i.id == id)
-                                                   .map(|i| (collection_member_id(i), i.product_id))
-                                           })
-                                           .collect();
+        let targets: Vec<(u64, u64)> =
+            self.bulk_selected_ids
+                .iter()
+                .filter_map(|id| {
+                    self.item_by_id(id)
+                        .map(|i| (collection_member_id(&i), i.product_id))
+                })
+                .collect();
         for (member_id, product_id) in targets {
             self.add_item_to_collection(collection_id, member_id, product_id, cx);
         }
@@ -168,15 +162,14 @@ impl LibraryController {
     /// Removes every selected item from `collection_id` that belongs to it,
     /// then clears the selection and exits selection mode.
     pub fn bulk_remove_from_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
-        let targets: Vec<(u64, u64)> = self.bulk_selected_ids
-                                           .iter()
-                                           .filter_map(|id| {
-                                               self.catalog
-                                                   .iter()
-                                                   .find(|i| &i.id == id)
-                                                   .map(|i| (collection_member_id(i), i.product_id))
-                                           })
-                                           .collect();
+        let targets: Vec<(u64, u64)> =
+            self.bulk_selected_ids
+                .iter()
+                .filter_map(|id| {
+                    self.item_by_id(id)
+                        .map(|i| (collection_member_id(&i), i.product_id))
+                })
+                .collect();
         for (member_id, product_id) in targets {
             self.remove_item_from_collection(collection_id, member_id, product_id, cx);
         }
@@ -192,10 +185,9 @@ impl LibraryController {
         let targets: Vec<(PathBuf, Vec<LibraryItemFile>)> = self.bulk_selected_ids
                                                                 .iter()
                                                                 .filter_map(|id| {
-                                                                    self.catalog
-                    .iter()
-                    .find(|i| &i.id == id && i.status == ItemStatus::Downloaded)
-                    .map(|i| (resolved_item_dir(&storage, i), i.files.clone()))
+                                                                    self.item_by_id(id)
+                        .filter(|i| i.status == ItemStatus::Downloaded)
+                        .map(|i| (resolved_item_dir(&storage, &i), i.files))
                                                                 })
                                                                 .collect();
         for (entry_dir, files) in targets {

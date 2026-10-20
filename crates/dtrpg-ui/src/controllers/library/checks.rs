@@ -13,7 +13,7 @@ impl LibraryController {
     /// the item, and a local `Path::exists()` call per file is cheap enough
     /// that gating it adds complexity without a real cost problem to solve.
     pub(super) fn verify_selected_item_download(&mut self, id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(item) = self.item_by_id(&id).cloned()
+        let Some(item) = self.item_by_id(&id)
         else {
             return;
         };
@@ -53,16 +53,20 @@ impl LibraryController {
     pub(super) fn apply_verifications(&mut self, verifications: &[ItemVerification]) -> bool {
         let mut changed = false;
         for verification in verifications {
-            if let Some(item) = self.catalog
-                                    .iter_mut()
-                                    .find(|i| i.id == verification.item_id)
+            if let Some(mut item) = self.item_by_id(&verification.item_id)
+               && apply_presence_changes(&mut item, &verification.changes)
             {
-                changed |= apply_presence_changes(item, &verification.changes);
+                changed = true;
+                if let Err(e) = self.index.replace_item(&item) {
+                    tracing::error!(error = %e,
+                                    "failed to write item presence change to the library index");
+                }
             }
         }
         if changed {
+            let all = self.all_items();
             self.section_counts =
-                section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
+                section_counts(&all, now_secs(), self.recently_updated_window_days);
             self.invalidate_cache();
         }
         changed
@@ -211,10 +215,24 @@ impl LibraryController {
                 tracing::warn!(id = %job.item_id, error = %error,
                                "item availability check failed transiently");
             }
-            if let Some(existing) = self.catalog.iter_mut().find(|i| i.id == job.item_id) {
-                apply_check_result(existing, result, std::time::SystemTime::now());
+            if let Some(mut existing) = self.item_by_id(&job.item_id) {
+                let checked_at = std::time::SystemTime::now();
+                apply_check_result(&mut existing, result, checked_at);
+                // `apply_check_result` leaves `availability_last_checked`
+                // unchanged on a transient error (preserving whatever the
+                // overlay in `item_by_id` already set it to) — only record
+                // a new value here when it actually changed.
+                if let Some(checked_at) = existing.availability_last_checked {
+                    self.availability_checks
+                        .insert(Arc::clone(&job.item_id), checked_at);
+                }
+                if let Err(e) = self.index.replace_item(&existing) {
+                    tracing::error!(error = %e,
+                                    "failed to write availability check result to the library index");
+                }
+                let all = self.all_items();
                 self.section_counts =
-                    section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
+                    section_counts(&all, now_secs(), self.recently_updated_window_days);
                 self.invalidate_cache();
             }
         }
@@ -275,8 +293,8 @@ impl LibraryController {
             return;
         }
 
-        let ids = select_check_batch(&self.catalog,
-                                     dtrpg_core::data::constants::ITEM_CHECK_BATCH_SIZE);
+        let all = self.all_items();
+        let ids = select_check_batch(&all, dtrpg_core::data::constants::ITEM_CHECK_BATCH_SIZE);
         if let Err(e) = save_check_batch_timestamp(&root, now_secs) {
             tracing::warn!(error = %e, "failed to persist check-batch cooldown timestamp");
         }

@@ -7,8 +7,8 @@ impl LibraryController {
     /// Returns distinct publisher names currently present in the catalog for
     /// placement-rule auto-completion.
     pub fn publisher_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.catalog
-                                         .iter()
+        let mut names: Vec<String> = self.all_items()
+                                         .into_iter()
                                          .map(|item| item.publisher.to_string())
                                          .collect();
         names.sort_unstable_by_key(|name| name.to_ascii_lowercase());
@@ -135,9 +135,9 @@ impl LibraryController {
 
     /// Returns the selected `LibraryItem`, if any.
     #[must_use]
-    pub fn selected_item(&self) -> Option<&LibraryItem> {
+    pub fn selected_item(&self) -> Option<LibraryItem> {
         match &self.selection {
-            Selection::Item(id) => self.catalog.iter().find(|i| &i.id == id),
+            Selection::Item(id) => self.item_by_id(id),
             Selection::None => None,
         }
     }
@@ -145,6 +145,6 @@ impl LibraryController {
     /// Total file size of all items in the catalog, in MB.
     #[must_use]
     pub fn total_size_mb(&self) -> f64 {
-        self.catalog.iter().map(|i| i.size_mb).sum()
+        self.all_items().iter().map(|i| i.size_mb).sum()
     }
 }

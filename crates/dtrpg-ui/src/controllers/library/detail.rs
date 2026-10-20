@@ -178,7 +178,7 @@ impl LibraryController {
     /// Loads one archive entry for inline text preview off the render path.
     pub fn preview_inspector_entry(&mut self, entry_id: Arc<str>, name: String,
                                    cx: &mut Context<Self>) {
-        let Some(item) = self.item_by_id(&entry_id).cloned()
+        let Some(item) = self.item_by_id(&entry_id)
         else {
             return;
         };
@@ -264,7 +264,7 @@ impl LibraryController {
         if names.is_empty() {
             return;
         }
-        let Some(item) = self.item_by_id(&entry_id).cloned()
+        let Some(item) = self.item_by_id(&entry_id)
         else {
             return;
         };
@@ -327,7 +327,7 @@ impl LibraryController {
         {
             return;
         }
-        let Some(item) = self.item_by_id(&entry_id).cloned()
+        let Some(item) = self.item_by_id(&entry_id)
         else {
             return;
         };
@@ -388,11 +388,14 @@ impl LibraryController {
     pub fn file_info(&mut self, entry_id: &Arc<str>, row_ix: usize, entry_dir: &Path)
                      -> crate::util::file_info::FileInfo {
         let Some((downloaded, path, format)) =
-            self.item_by_id(entry_id)
-                .and_then(|item| item.files.get(row_ix))
-                .map(|file| {
-                    (file.downloaded, entry_dir.join(file.name.as_ref()), file.format.clone())
-                })
+            self.item_by_id(entry_id).and_then(|item| {
+                                         item.files.get(row_ix).map(|file| {
+                                                                   (file.downloaded,
+                                                                    entry_dir.join(file.name
+                                                                                       .as_ref()),
+                                                                    file.format.clone())
+                                                               })
+                                     })
         else {
             return crate::util::file_info::FileInfo::None;
         };

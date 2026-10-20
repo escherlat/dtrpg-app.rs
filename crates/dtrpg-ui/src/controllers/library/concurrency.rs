@@ -32,7 +32,7 @@ impl LibraryController {
             return;
         }
         self.recently_updated_window_days = days;
-        self.section_counts = section_counts(&self.catalog, now_secs(), days);
+        self.section_counts = section_counts(&self.all_items(), now_secs(), days);
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }

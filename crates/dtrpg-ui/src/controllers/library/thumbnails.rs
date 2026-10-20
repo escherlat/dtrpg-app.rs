@@ -192,10 +192,10 @@ impl LibraryController {
     /// caches — this action exists specifically to retry or refresh a
     /// cover, not to redundantly reload whatever is already cached.
     pub fn load_thumbnail(&mut self, cover_url: Arc<str>, cx: &mut Context<Self>) {
-        let item_id = self.catalog
-                          .iter()
+        let item_id = self.all_items()
+                          .into_iter()
                           .find(|i| i.cover_url.as_deref() == Some(&*cover_url))
-                          .map(|i| Arc::clone(&i.id));
+                          .map(|i| i.id);
 
         if let Some(id) = item_id {
             self.submit_thumbnail(id, cover_url, true, Priority::Interactive, cx);
@@ -211,10 +211,7 @@ impl LibraryController {
     /// never opened in the detail panel, so eagerly downloading a full-size
     /// or WebP image for all of them would waste bandwidth and disk space.
     pub fn ensure_detail_cover(&mut self, item_id: &Arc<str>, cx: &mut Context<Self>) {
-        let Some(url) = self.catalog
-                            .iter()
-                            .find(|i| i.id == *item_id)
-                            .and_then(|i| i.detail_cover_url.clone())
+        let Some(url) = self.item_by_id(item_id).and_then(|i| i.detail_cover_url)
         else {
             return;
         };
@@ -236,15 +233,15 @@ impl LibraryController {
     /// action. Falls back to refreshing the small-context `cover_url` when
     /// the item has no `detail_cover_url`.
     pub fn refresh_detail_cover(&mut self, item_id: Arc<str>, cx: &mut Context<Self>) {
-        let Some(item) = self.catalog.iter().find(|i| i.id == item_id)
+        let Some(item) = self.item_by_id(&item_id)
         else {
             return;
         };
-        if let Some(url) = item.detail_cover_url.clone() {
+        if let Some(url) = item.detail_cover_url {
             let cache_key = detail_cache_key(&item_id);
             self.submit_thumbnail(cache_key, url, true, Priority::Interactive, cx);
         }
-        else if let Some(url) = item.cover_url.clone() {
+        else if let Some(url) = item.cover_url {
             self.load_thumbnail(url, cx);
         }
     }
@@ -257,14 +254,11 @@ impl LibraryController {
     /// skip items already present in the cache — every eligible item is
     /// re-queued with a forced network re-fetch.
     pub fn refresh_all_thumbnails(&mut self, cx: &mut Context<Self>) {
-        let to_enqueue: Vec<(Arc<str>, Arc<str>)> = self.catalog
-                                                        .iter()
-                                                        .filter_map(|item| {
-                                                            let url = item.cover_url.as_ref()?;
-                                                            Some((Arc::clone(&item.id),
-                                                                  Arc::clone(url)))
-                                                        })
-                                                        .collect();
+        let to_enqueue: Vec<(Arc<str>, Arc<str>)> =
+            self.all_items()
+                .into_iter()
+                .filter_map(|item| item.cover_url.map(|url| (item.id, url)))
+                .collect();
 
         if to_enqueue.is_empty() {
             cx.emit(ThumbnailRefreshNoOp);

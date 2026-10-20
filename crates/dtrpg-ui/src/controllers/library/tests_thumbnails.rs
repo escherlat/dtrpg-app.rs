@@ -18,11 +18,10 @@ fn requested(fixture: &Fixture, cx: &mut TestAppContext, id: &str) {
 fn all_attempted(fixture: &Fixture, cx: &mut TestAppContext, ids: &[&str]) -> bool {
     fixture.controller.read_with(cx, |ctrl, _| {
                           ids.iter().all(|id| {
-                                        ctrl.catalog.iter().any(|item| {
-                                                               &*item.id == *id
-                                                               && item.thumbnail_last_attempted
-                                                                      .is_some()
-                                                           })
+                                        ctrl.item_by_id(id)
+                                            .is_some_and(|item| {
+                                                item.thumbnail_last_attempted.is_some()
+                                            })
                                     })
                       })
 }

@@ -85,10 +85,8 @@ fn a_thumbnail_attempt_is_recorded_without_rebuilding_the_result_set(cx: &mut Te
                                                  .iter()
                                                  .find(|item| &*item.id == "id3")
                                                  .and_then(|item| item.thumbnail_last_attempted);
-                              let in_catalog = ctrl.catalog
-                                                   .iter()
-                                                   .find(|item| &*item.id == "id3")
-                                                   .and_then(|item| item.thumbnail_last_attempted);
+                              let in_catalog =
+                                  ctrl.thumbnail_attempts.get(&Arc::from("id3")).copied();
                               (before != after, in_cache, in_catalog)
                           });
 

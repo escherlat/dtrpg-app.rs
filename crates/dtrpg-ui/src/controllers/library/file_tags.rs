@@ -56,7 +56,8 @@ impl LibraryController {
     /// before there is a catalog to look at.
     pub(super) fn begin_tag_sync(&mut self, force: bool, cx: &mut Context<Self>) {
         self.load_tags(cx);
-        if self.catalog.is_empty()
+        let catalog = self.all_items();
+        if catalog.is_empty()
            || self.file_tag_sync_running
            || (self.file_tags_reconciled && !force)
            || !Platform.capabilities().filesystem_tags
@@ -65,8 +66,6 @@ impl LibraryController {
         }
         self.file_tags_reconciled = true;
         self.file_tag_sync_running = true;
-
-        let catalog = self.catalog.clone();
         let collections = self.collections.clone();
         let cache_root = self.cache_root.clone();
         cx.spawn(async move |this, async_cx| {
