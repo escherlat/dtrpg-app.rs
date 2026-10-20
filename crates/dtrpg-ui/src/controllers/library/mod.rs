@@ -38,7 +38,8 @@ use dtrpg_core::work::{
     JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot, WorkQueue,
 };
 use gpui::{
-    AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task, Window,
+    AppContext, AsyncApp, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task,
+    WeakEntity, Window,
 };
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
@@ -60,6 +61,10 @@ use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 mod bulk_selection;
 mod catalog;
 mod catalog_sync;
+mod catalog_sync_autoload;
+mod catalog_sync_cache;
+mod catalog_sync_fetch;
+mod catalog_sync_fresh_install;
 mod check_jobs;
 mod checks;
 mod collection_links;

@@ -271,15 +271,6 @@ repeats an item under each of its tags and sits beside group by publisher.
 
 ## Open
 
-- **Task 5.4, the manual check on a real Mac, is the only unchecked task.**
-  The owner has confirmed the View menu is enabled and that scrolling is fast
-  again. Still unchecked: tag in Libri with a color and see both in Finder;
-  remove the tag in Finder, relaunch, and see it gone from Libri with the
-  activity panel saying so; the right-click menu on a list column heading
-  (the only way to open the column chooser) and showing and hiding Tags; Group
-  by Tag in List, Thumbs and Grid, in particular whether an item that appears
-  in several groups can be selected from each copy. Tick 5.4 in `tasks.md`
-  when the owner says it is done, and fix what they report.
 - **The views were never rendered by the agent.** There is no display in the
   cloud environment, so every view change was checked by compiling and by
   controller or pure-function tests. The macOS extended-attribute code is
