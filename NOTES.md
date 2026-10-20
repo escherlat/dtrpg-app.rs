@@ -48,6 +48,14 @@ Branch: `feature/libri-v2-crate-inversion`, off `develop`.
 Per the task brief, these were always meant to be separate follow-up
 commits on this branch, not folded into the move commit. None are started:
 
+**Resolution as of 2026-10-20 (superseding the list below, which was
+accurate when written):** the queue merge landed via ADR 0007 / PR #318
+(specs restated in `openspec/changes/archive/2026-10-18-adopt-core-work-queue`);
+the shared runtime landed (`dtrpg_core::runtime`, `connection.rs` takes a
+`Handle`); the controller decomposition is substantially done — the catalog
+Vec is gone and reads go through the index (PR #354) — though the controller
+remains a UI-side entity, not a thin view-model over `LibraryApi`.
+
 - Merge the three hand-rolled work queues (thumbnails, downloads,
   availability checks) in `LibraryController` into one bounded priority
   queue in the core.
@@ -411,12 +419,29 @@ local state authoritative for presentation").
 
 ## Next step
 
-PR pilgrimagesoftware/dtrpg-app.rs#354 is open against `develop`, not yet
-reviewed or merged. The immediate next step is to get that PR green and
-merged — check its CI status and review comments before starting new work
-on top of it, same as the libri-v2-architecture-closeout handoff pattern
-earlier in this file. Once merged, the follow-ups below ("Not done") are
-each independently startable; none blocks the others.
+PR pilgrimagesoftware/dtrpg-app.rs#354 is merged (`bbf1634`, 2026-10-20) and
+the openspec change is archived at
+`openspec/changes/archive/2026-10-20-catalog-reads-from-index`. The
+follow-ups below ("Not done") are each independently startable; none blocks
+the others. Tasks 3-4 (publisher/tag aggregation as SQL) now have a tracking
+issue, pilgrimagesoftware/dtrpg-app.rs#355; search-box semantics in SQL are
+tracked in #353. Task 5 (SQL-side LIMIT/OFFSET) was judged not load-bearing
+and intentionally not filed as an issue — the render-path cache reads with
+zero I/O by design, see "Gotchas" below.
+
+Other open threads in this file, each independently startable:
+- Content summaries ("Not done" under that section): the Settings > Agent &
+  MCP summary fields (including the Anthropic key entry), showing a summary
+  in the detail panel, auto-summarize-on-download, non-PDF text extraction,
+  and `docs/site/` documentation. That section also notes the UI crate was
+  never built or tested in the session that wrote the core code — worth a
+  `make test` run there before starting.
+- The screenshots note above (check for `-1`/`-2` variants and missing
+  views before treating the set as complete).
+- `make size-check` backlog of files over 500 lines (CI warning, not a
+  gate): `catalog_view.rs`, `root_view.rs`, `detail_panel_view.rs`,
+  `settings.rs`, and the seven files listed under ADR 0002's "in scope, not
+  reached" table.
 
 ## What exists now
 
