@@ -45,8 +45,8 @@ impl LibraryController {
                               let mut on_progress =
                                   |received, total| context.report_progress(received, total);
                               let control = DownloadControl::new(context.cancel_flag())
-                                 .on_retry(&mut on_retry)
-                                 .on_progress(&mut on_progress);
+                .on_retry(&mut on_retry)
+                .on_progress(&mut on_progress);
                               service.download_item(order_product_id, index, &path, control)
                                      .map_err(|error| error.to_string())
                           });
@@ -155,8 +155,7 @@ impl LibraryController {
                 tracing::error!(error = %e, "failed to write download status to the library index");
             }
         }
-        let all = self.all_items();
-        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
+        self.refresh_section_counts();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
 

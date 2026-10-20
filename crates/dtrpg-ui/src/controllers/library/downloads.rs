@@ -27,9 +27,7 @@ impl LibraryController {
             if let Err(e) = self.index.replace_item(&item) {
                 tracing::error!(error = %e, "failed to write item status to the library index");
             }
-            let all = self.all_items();
-            self.section_counts =
-                section_counts(&all, now_secs(), self.recently_updated_window_days);
+            self.refresh_section_counts();
             self.invalidate_cache();
             self.file_info_cache
                 .retain(|(entry_id, _), _| entry_id.as_ref() != id);
