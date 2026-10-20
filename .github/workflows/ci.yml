@@ -66,6 +66,12 @@ jobs:
         continue-on-error: true
         run: cargo +nightly fmt --check
 
+      - name: Size check
+        # OS-independent source-tree check; one leg is enough.
+        if: runner.os == 'Linux'
+        run: |
+          make size-check
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
