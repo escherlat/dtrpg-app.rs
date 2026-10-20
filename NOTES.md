@@ -53,10 +53,12 @@ accurate when written):** the queue merge landed via ADR 0007 / PR #318
 (specs restated in `openspec/changes/archive/2026-10-18-adopt-core-work-queue`);
 the shared runtime landed (`dtrpg_core::runtime`, `connection.rs` takes a
 `Handle`); the controller decomposition is in progress — the catalog Vec is
-gone and reads go through the index (PR #354), and Slice 1 extracted the
+gone and reads go through the index (PR #354); Slice 1 extracted the
 headless `dtrpg_core::library::Library` session that owns the index, queue,
-cover fetcher, network monitor, and cache root (PR #365) — though the
-controller still holds the logic, not just a view-model over `LibraryApi`.
+cover fetcher, network monitor, and cache root (PR #365); and Slice 2 moved
+the catalog-sync state machine itself into `Library`, gpui-free (PR #367) —
+though the controller still holds the job-orchestration and catalog-mutation
+logic Slices 3–5 cover, not just a view-model over `LibraryApi`.
 
 - Merge the three hand-rolled work queues (thumbnails, downloads,
   availability checks) in `LibraryController` into one bounded priority
@@ -769,3 +771,81 @@ make size-check
 ```
 
 All five are clean as of PR #365.
+
+---
+
+# Controller decomposition / ADR 0002 Slice 2: status at 2026-10-20
+
+Branch: `feature/adr-0002-slice-2-library-load`, off `develop`. Issue #364.
+OpenSpec change: `openspec/changes/adr-0002-controller-decomposition`.
+Merged to `develop` via PR #367.
+
+## What exists now
+
+- `dtrpg_core::library::Library` now owns the catalog-sync state machine,
+  not just the session fields Slice 1 moved: `Library::start_load` runs
+  collections sync, the on-disk cache, the auto-load freshness policy
+  (skip/partial-fetch/full-fetch), and the full paginated live fetch with
+  checkpointing — all gpui-free, as one `spawn_blocking` task on the shared
+  runtime (`dtrpg_core::runtime`) rather than a `gpui::Context::spawn`
+  closure.
+- Single-flight/generation tracking (`load_generation`/
+  `catalog_sync_in_flight`/`pending_reload` on the old `LibraryController`)
+  moved into `Library`'s own `SyncState`, behind a `Mutex`.
+- A new `LibraryEvent` channel (`dtrpg_core::library::{LibraryEvent,
+  LibraryEvents}`), shaped like the existing `WorkQueue` `JobEvent` channel,
+  carries the run's progress and outcome back to the UI. `LibraryController`
+  pumps it (`start_catalog_sync_event_pump`, mirroring
+  `start_work_event_pump`) and reacts per-event — thumbnail enqueue, sidebar
+  facet refresh, filtered-cache invalidation, activity label/progress,
+  `LibraryChanged` — holding no catalog-sync state of its own beyond the
+  current activity item's id.
+- `Library.index` is now `Mutex<LibraryIndex>` and
+  `LibraryController.library` is `Arc<Library>` (the open question from
+  Slice 1's design doc, resolved in favor of `Arc` over `gpui::Global` for
+  testability) — the catalog-sync run mutates the index from a background
+  thread while the controller renders concurrently.
+- `dtrpg-core` gained core-level tests (`library::sync::tests`) that drive
+  `Library::start_load` directly, asserting on `LibraryEvent`s, with no
+  `gpui` involved — the testability goal this slice existed for. The
+  pure merge/gating helpers (`reconcile_catalog`, `merge_partial_fetch`,
+  `dedupe_by_product_id`, `reload_cooldown_active`,
+  `fresh_install_request_gated`, `partial_fetch_since`,
+  `should_attempt_partial_fetch`) and their existing unit tests moved from
+  the UI controller's `helpers.rs`/`tests_catalog.rs` into
+  `dtrpg_core::library::sync::merge` alongside the functions.
+- Verified clean: `cargo check --workspace --all-targets`, `cargo clippy
+  --workspace --all-targets --all-features -- -D warnings`, `cargo test
+  --workspace --all-features` (912 tests total across both crates plus
+  doctests), `make fmt-check`, `make size-check`, `cargo check --workspace
+  --no-default-features`.
+
+## Known simplification
+
+Per-page progress-bar percentage (the old `live_items.len() / total`
+recompute on every page) was not reproduced — the activity item's progress
+bar is seeded once from `LibraryEvent::Total` and otherwise just advances
+its label from `LibraryEvent::Page`. The real DriveThruRPG API never
+reports a total count during the paginated fetch in practice, so the old
+per-page percentage was already mostly inert; revisit if that changes.
+
+## Not done
+
+Slices 3–5 remain tracked in issue #364 / the OpenSpec change:
+
+- Slice 3: Move filtered/grouped queries and caches into `Library`.
+- Slice 4: Move download/check/thumbnail job orchestration into `Library`.
+- Slice 5: Move catalog mutations into `Library`; thin `LibraryController`
+  to a view-model over the core session.
+
+## Verify before continuing
+
+```sh
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+make fmt-check
+make size-check
+```
+
+All five are clean as of PR #367.
