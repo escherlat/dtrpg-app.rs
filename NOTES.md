@@ -52,9 +52,11 @@ commits on this branch, not folded into the move commit. None are started:
 accurate when written):** the queue merge landed via ADR 0007 / PR #318
 (specs restated in `openspec/changes/archive/2026-10-18-adopt-core-work-queue`);
 the shared runtime landed (`dtrpg_core::runtime`, `connection.rs` takes a
-`Handle`); the controller decomposition is substantially done — the catalog
-Vec is gone and reads go through the index (PR #354) — though the controller
-remains a UI-side entity, not a thin view-model over `LibraryApi`.
+`Handle`); the controller decomposition is in progress — the catalog Vec is
+gone and reads go through the index (PR #354), and Slice 1 extracted the
+headless `dtrpg_core::library::Library` session that owns the index, queue,
+cover fetcher, network monitor, and cache root (PR #365) — though the
+controller still holds the logic, not just a view-model over `LibraryApi`.
 
 - Merge the three hand-rolled work queues (thumbnails, downloads,
   availability checks) in `LibraryController` into one bounded priority
@@ -719,3 +721,51 @@ accepted in #353, so the two converge after `load_tags` completes.
 - `dtrpg-ui` was not rendered in this environment (no display), same caveat
   as previous UI work: verified by compiling and controller/pure-function
   tests.
+
+---
+
+# Controller decomposition / ADR 0002 Slice 1: status at 2026-10-20
+
+Branch: `feature/library-core-slice-1`, off `develop`. Issue #364.
+OpenSpec change: `openspec/changes/adr-0002-controller-decomposition`
+(`skip_specs: true` — structural refactor, no observable behavior change).
+Merged to `develop` via PR #365.
+
+## What exists now
+
+- `dtrpg_core::library::Library` owns the long-lived session state:
+  `LibraryIndex`, `WorkQueue`, `Arc<CoverFetcher>`, `Arc<NetworkMonitor>`,
+  and the `cache_root: PathBuf`.
+- `LibraryController` no longer holds these fields directly; it owns a
+  `Library` and reaches them through helper accessors in
+  `controllers/library/accessors.rs` (`index`, `index_mut`, `work`,
+  `cover_fetcher`, `network_monitor`, `cache_root`).
+- `LibraryController::build_with_cache_root` opens the session via
+  `Library::open` and wires the resulting work-queue events into the
+  controller's event pump.
+- Verified clean: `cargo check --workspace --all-targets`, `cargo clippy
+  --workspace --all-targets -- -D warnings`, `cargo test --workspace`,
+  `make fmt-check`, `make size-check`.
+
+## Not done
+
+Slices 2–5 of the decomposition remain tracked in issue #364 / the OpenSpec
+change:
+
+- Slice 2: Move catalog load/refresh state machine into `Library`.
+- Slice 3: Move filtered/grouped queries and caches into `Library`.
+- Slice 4: Move download/check/thumbnail job orchestration into `Library`.
+- Slice 5: Move catalog mutations into `Library`; thin `LibraryController`
+  to a view-model over the core session.
+
+## Verify before continuing
+
+```sh
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+make fmt-check
+make size-check
+```
+
+All five are clean as of PR #365.
