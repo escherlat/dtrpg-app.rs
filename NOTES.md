@@ -409,6 +409,15 @@ Branch: `feature/catalog-reads-from-index`, off `develop`. OpenSpec change:
 Scoped per claude-2 `ARCHITECTURE-REVIEW.md`'s delivery-sequence step 2 ("make
 local state authoritative for presentation").
 
+## Next step
+
+PR pilgrimagesoftware/dtrpg-app.rs#354 is open against `develop`, not yet
+reviewed or merged. The immediate next step is to get that PR green and
+merged — check its CI status and review comments before starting new work
+on top of it, same as the libri-v2-architecture-closeout handoff pattern
+earlier in this file. Once merged, the follow-ups below ("Not done") are
+each independently startable; none blocks the others.
+
 ## What exists now
 
 - `catalog: Vec<LibraryItem>` is gone from `LibraryController`. The library
