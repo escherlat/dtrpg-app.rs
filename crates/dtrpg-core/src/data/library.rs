@@ -232,7 +232,7 @@ pub struct LibraryItemFile {
 // ──────────────────────────────────────────────────────
 
 /// Counts for each smart sidebar section given the full catalog.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SectionCounts {
     pub all:              usize,
     pub recently_updated: usize,

@@ -7,6 +7,7 @@
 //! this module implements.
 
 mod collections;
+mod facets;
 mod filtered_items;
 mod functions;
 mod items;
@@ -24,6 +25,7 @@ mod tags;
 mod summary_tests;
 
 use std::path::Path;
+use std::sync::Arc;
 
 pub use filtered_items::ItemFilter;
 use rusqlite::Connection;
@@ -31,7 +33,7 @@ use thiserror::Error;
 
 use crate::data::collection::CollectionEntry;
 use crate::data::enums::ItemStatus;
-use crate::data::library::LibraryItem;
+use crate::data::library::{LibraryItem, SectionCounts};
 use crate::data::summary::ContentSummary;
 use crate::util::sort::{SortDirection, SortMethod};
 
@@ -187,6 +189,30 @@ impl LibraryIndex {
     pub fn count_recently_updated(&self, now_secs: i64, window_days: u32)
                                   -> Result<usize, IndexError> {
         items::count_recently_updated(&self.conn, now_secs, window_days)
+    }
+
+    /// Each publisher with its item count, ordered by lowercased name.
+    ///
+    /// The index-backed equivalent of `dtrpg_ui::util::publisher::
+    /// publisher_entries` over a full-catalog fetch — see issue #355.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn publisher_counts(&self) -> Result<Vec<(Arc<str>, usize)>, IndexError> {
+        facets::publisher_counts(&self.conn)
+    }
+
+    /// The sidebar section counts for the whole catalog, composing the
+    /// facet queries — the index-backed equivalent of
+    /// [`crate::data::library::section_counts`] over a full-catalog fetch.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if any constituent query fails.
+    pub fn section_counts(&self, now_secs: i64, window_days: u32)
+                          -> Result<SectionCounts, IndexError> {
+        facets::section_counts(&self.conn, now_secs, window_days)
     }
 
     /// Returns every item matching `filter`, sorted by `sort`/`direction`.

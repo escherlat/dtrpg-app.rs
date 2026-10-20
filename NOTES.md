@@ -48,6 +48,14 @@ Branch: `feature/libri-v2-crate-inversion`, off `develop`.
 Per the task brief, these were always meant to be separate follow-up
 commits on this branch, not folded into the move commit. None are started:
 
+**Resolution as of 2026-10-20 (superseding the list below, which was
+accurate when written):** the queue merge landed via ADR 0007 / PR #318
+(specs restated in `openspec/changes/archive/2026-10-18-adopt-core-work-queue`);
+the shared runtime landed (`dtrpg_core::runtime`, `connection.rs` takes a
+`Handle`); the controller decomposition is substantially done — the catalog
+Vec is gone and reads go through the index (PR #354) — though the controller
+remains a UI-side entity, not a thin view-model over `LibraryApi`.
+
 - Merge the three hand-rolled work queues (thumbnails, downloads,
   availability checks) in `LibraryController` into one bounded priority
   queue in the core.
@@ -411,12 +419,29 @@ local state authoritative for presentation").
 
 ## Next step
 
-PR pilgrimagesoftware/dtrpg-app.rs#354 is open against `develop`, not yet
-reviewed or merged. The immediate next step is to get that PR green and
-merged — check its CI status and review comments before starting new work
-on top of it, same as the libri-v2-architecture-closeout handoff pattern
-earlier in this file. Once merged, the follow-ups below ("Not done") are
-each independently startable; none blocks the others.
+PR pilgrimagesoftware/dtrpg-app.rs#354 is merged (`bbf1634`, 2026-10-20) and
+the openspec change is archived at
+`openspec/changes/archive/2026-10-20-catalog-reads-from-index`. The
+follow-ups below ("Not done") are each independently startable; none blocks
+the others. Tasks 3-4 (publisher/tag aggregation as SQL) now have a tracking
+issue, pilgrimagesoftware/dtrpg-app.rs#355; search-box semantics in SQL are
+tracked in #353. Task 5 (SQL-side LIMIT/OFFSET) was judged not load-bearing
+and intentionally not filed as an issue — the render-path cache reads with
+zero I/O by design, see "Gotchas" below.
+
+Other open threads in this file, each independently startable:
+- Content summaries ("Not done" under that section): the Settings > Agent &
+  MCP summary fields (including the Anthropic key entry), showing a summary
+  in the detail panel, auto-summarize-on-download, non-PDF text extraction,
+  and `docs/site/` documentation. That section also notes the UI crate was
+  never built or tested in the session that wrote the core code — worth a
+  `make test` run there before starting.
+- The screenshots note above (check for `-1`/`-2` variants and missing
+  views before treating the set as complete).
+- `make size-check` backlog of files over 500 lines (CI warning, not a
+  gate): `catalog_view.rs`, `root_view.rs`, `detail_panel_view.rs`,
+  `settings.rs`, and the seven files listed under ADR 0002's "in scope, not
+  reached" table.
 
 ## What exists now
 
@@ -566,3 +591,53 @@ trigram table for the text part (keep the EXISTS shapes for tags) —
 `group_by_tag` SQLization is now unblocked in principle (search is a query
 dimension), but still render-path-cached Rust; revisit only with a measured
 reason.
+
+# Publisher/tag aggregation from the index: status at 2026-10-20
+
+Branch: `feature/publisher-aggregation-sql`, off `develop`. Issue #355.
+OpenSpec change: `openspec/changes/publisher-aggregation-sql`
+(`skip_specs: true` — mechanism swap, no observable behavior change).
+
+## What exists now
+
+- `LibraryIndex::publisher_counts()` (`data/index/facets.rs`):
+  `GROUP BY publisher ORDER BY publisher`, then a stable Rust sort by
+  `to_lowercase()`. Sorting in Rust rather than `COLLATE NOCASE` because
+  SQLite folds ASCII only and would order non-ASCII publisher names
+  differently than the scan it replaces; the SQL `ORDER BY` pins the
+  pre-sort order so case-only-differing ties are deterministic.
+- `LibraryIndex::section_counts(now, window)`: composes the ADR 0003 facet
+  queries (`count_all`/`count_by_status`/`count_recently_updated`), which
+  had no production callers until now. Identity-tested against the pure
+  `data::library::section_counts` scan over a fixture that exercises both
+  recency paths (`date_updated` priority, `date_added` fallback) and asserts
+  nonzero recency first, so a 0-vs-0 pass can't hide a wrong rule.
+- Eight whole-catalog `all_items()` scans are gone from `LibraryController`:
+  the three load-completion sites (`set_catalog`, `apply_partial_fetch`,
+  `append_catalog_page`) use `refresh_sidebar_facets()`; five per-item
+  status-change sites (`downloads`, `checks` x2, `download_dispatch`,
+  `concurrency`'s window-days change) use counts-only
+  `refresh_section_counts()` — status changes never move an item between
+  publishers. On query failure the previous values are kept and
+  `refresh_sidebar_facets()` returns `false` so the caller skips
+  `revalidate_publisher_filter()` against stale numbers.
+- Verified: check/clippy -D warnings/test workspace (523 core incl. 4 new,
+  339 ui, 8 mcp), SEED 1/2/7/13 ui runs, fmt-check, size-check.
+
+## Scope correction to #355 (deliberate, not dropped)
+
+`group_by_publisher()`/`group_by_tag()` stay in Rust. They partition the
+*current result set* (post-search, cached in `items_cache`), not the catalog;
+SQLizing them needs #353 (search-box semantics in SQL) first, and querying
+from `grouped_items()` would put SQLite I/O on the render path — where a
+stale cache refetch runs per search keystroke. If #353 lands, revisit.
+
+## Not done
+
+- The pure `data::library::section_counts` scan and `publisher_entries()`
+  still exist (the first as the identity reference for the SQL composition,
+  the second because `group_by_publisher()` still uses its ordering). They
+  have no production callers other than those; decide on removal alongside
+  #353.
+- `dtrpg-ui` was not rendered in this environment (no display), same caveat
+  as the tags work: verified by compiling and controller/pure-function tests.

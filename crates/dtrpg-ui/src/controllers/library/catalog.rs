@@ -53,6 +53,47 @@ impl LibraryController {
         Some(item)
     }
 
+    /// Recomputes the sidebar's section counts from the index facet query,
+    /// replacing the whole-catalog `all_items()` scan (issue #355).
+    ///
+    /// On query failure the previous counts are kept: a failed count leaves
+    /// stale-but-plausible numbers in the sidebar rather than zeroes in the
+    /// middle of a load that otherwise succeeds. Status changes never move
+    /// an item between publishers, so callers reacting to one item's status
+    /// only need this — see [`Self::refresh_sidebar_facets`] for the full
+    /// load-completion refresh.
+    pub(super) fn refresh_section_counts(&mut self) {
+        let now = now_secs();
+        match self.index
+                  .section_counts(now, self.recently_updated_window_days)
+        {
+            Ok(counts) => self.section_counts = counts,
+            Err(error) => tracing::warn!(%error, "could not count the catalog sections"),
+        }
+    }
+
+    /// Refreshes both sidebar facet lists (section counts and publishers)
+    /// after a whole-catalog load, and returns whether the publisher list
+    /// was refreshed successfully. Callers that revalidate a `Publisher`
+    /// filter against the new list should skip it when this returns `false`:
+    /// revalidating stale numbers could drop a filter the catalog still
+    /// satisfies.
+    pub(super) fn refresh_sidebar_facets(&mut self) -> bool {
+        self.refresh_section_counts();
+        match self.index.publisher_counts() {
+            Ok(counts) => {
+                self.publishers = counts.into_iter()
+                                        .map(|(name, count)| PublisherEntry { name, count })
+                                        .collect();
+                true
+            }
+            Err(error) => {
+                tracing::warn!(%error, "could not count the catalog publishers");
+                false
+            }
+        }
+    }
+
     /// Atomically replaces the catalog with a complete dataset and recomputes
     /// derived state.
     ///
@@ -77,10 +118,9 @@ impl LibraryController {
             tracing::error!(error = %e, "failed to write the catalog to the library index");
         }
         self.catalog_loading = false;
-        let all = self.all_items();
-        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&all);
-        self.revalidate_publisher_filter();
+        if self.refresh_sidebar_facets() {
+            self.revalidate_publisher_filter();
+        }
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -135,10 +175,9 @@ impl LibraryController {
             tracing::error!(error = %e, "failed to write the catalog to the library index");
         }
         self.catalog_loading = false;
-        let all = self.all_items();
-        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&all);
-        self.revalidate_publisher_filter();
+        if self.refresh_sidebar_facets() {
+            self.revalidate_publisher_filter();
+        }
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -155,9 +194,7 @@ impl LibraryController {
         if let Err(e) = self.index.replace_all_items(&merged) {
             tracing::error!(error = %e, "failed to write the catalog to the library index");
         }
-        let all = self.all_items();
-        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&all);
+        self.refresh_sidebar_facets();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
