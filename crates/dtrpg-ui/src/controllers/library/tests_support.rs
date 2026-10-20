@@ -387,20 +387,26 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
     let activity = cx.new(|_| ActivityController::new());
     let controller =
         cx.new(|cx| {
-              let (mut ctrl, events) = LibraryController::build_with_cache_root(
+              let (mut ctrl, events, sync_events) = LibraryController::build_with_cache_root(
             Box::new(SharedLibrary(Arc::clone(&library))),
             Box::new(UnusedCollections),
             activity.clone(),
             cache_path.clone(),
         );
-              ctrl.library.cover_fetcher = Arc::new(CoverFetcher::new(Arc::clone(&transport)
-                                                                      as Arc<dyn CoverTransport>,
-                                                                      covers.path().to_path_buf()));
+              // `ctrl.library` was just constructed above and not yet shared
+              // with anything else, so this is the one unique reference —
+              // `get_mut` can't fail.
+              #[allow(clippy::expect_used)]
+              let lib = Arc::get_mut(&mut ctrl.library).expect("library is not yet shared");
+              lib.cover_fetcher = Arc::new(CoverFetcher::new(Arc::clone(&transport)
+                                                             as Arc<dyn CoverTransport>,
+                                                             covers.path().to_path_buf()));
               // A test must not wait on, or depend on, the real network.
-              ctrl.library.network_monitor = Arc::new(NetworkMonitor::fixed(true));
-              ctrl.library.work.set_limit(limit);
-              ctrl.library.index.replace_all_items(&items).unwrap();
+              lib.network_monitor = Arc::new(NetworkMonitor::fixed(true));
+              lib.work.set_limit(limit);
+              lib.index.lock().unwrap().replace_all_items(&items).unwrap();
               ctrl.start_work_event_pump(events, cx);
+              ctrl.start_catalog_sync_event_pump(sync_events, cx);
               ctrl
           });
     Fixture { controller,

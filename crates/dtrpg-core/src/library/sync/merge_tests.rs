@@ -1,38 +1,41 @@
-//! Tests for the library controller, grouped by concern.
+//! Tests for the pure catalog-merge and timing-gate helpers in
+//! `super::merge`. Moved here from the UI controller's `tests_catalog.rs` in
+//! ADR 0002 Slice 2, alongside the functions themselves.
 
-#[cfg(test)]
+use super::merge::*;
+use crate::data::catalog_cache::CacheMetadata;
+use crate::data::enums::ItemStatus;
+use crate::data::library::{LibraryItem, LibraryItemFile};
+
+fn item(id: &str, title: &str) -> LibraryItem {
+    LibraryItem::new(id,
+                     title,
+                     "Publisher",
+                     "Line",
+                     "Core",
+                     "PDF",
+                     0,
+                     0.0,
+                     2020,
+                     0,
+                     ItemStatus::Cloud,
+                     "#000000",
+                     "",
+                     None)
+}
+
+fn file(id: &str, downloaded: bool) -> LibraryItemFile {
+    LibraryItemFile { id: id.into(),
+                      index: 0,
+                      name: "File".into(),
+                      format: "PDF".into(),
+                      size_mb: 1.0,
+                      downloaded,
+                      offloaded: false }
+}
+
 mod reconcile_catalog_tests {
-    use dtrpg_core::data::enums::ItemStatus;
-    use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
-
-    use super::super::reconcile_catalog;
-
-    fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(id,
-                         title,
-                         "Publisher",
-                         "Line",
-                         "Core",
-                         "PDF",
-                         0,
-                         0.0,
-                         2020,
-                         0,
-                         ItemStatus::Cloud,
-                         "#000000",
-                         "",
-                         None)
-    }
-
-    fn file(id: &str, downloaded: bool) -> LibraryItemFile {
-        LibraryItemFile { id: id.into(),
-                          index: 0,
-                          name: "File".into(),
-                          format: "PDF".into(),
-                          size_mb: 1.0,
-                          downloaded,
-                          offloaded: false }
-    }
+    use super::*;
 
     #[test]
     fn item_present_in_both_is_refreshed_and_marked_available() {
@@ -149,11 +152,8 @@ mod reconcile_catalog_tests {
     }
 }
 
-#[cfg(test)]
 mod reload_cooldown_tests {
-    use dtrpg_core::data::catalog_cache::CacheMetadata;
-
-    use super::super::reload_cooldown_active;
+    use super::*;
 
     fn meta(saved_at_secs: u64) -> CacheMetadata {
         CacheMetadata { saved_at_secs,
@@ -187,9 +187,8 @@ mod reload_cooldown_tests {
     }
 }
 
-#[cfg(test)]
 mod fresh_install_gating_tests {
-    use super::super::fresh_install_request_gated;
+    use super::*;
 
     #[test]
     fn request_is_suppressed_within_the_minimum_interval() {
@@ -210,29 +209,8 @@ mod fresh_install_gating_tests {
     }
 }
 
-#[cfg(test)]
 mod partial_fetch_tests {
-    use dtrpg_core::data::enums::ItemStatus;
-    use dtrpg_core::data::library::LibraryItem;
-
-    use super::super::{merge_partial_fetch, partial_fetch_since, should_attempt_partial_fetch};
-
-    fn item(id: &str, title: &str) -> LibraryItem {
-        LibraryItem::new(id,
-                         title,
-                         "Publisher",
-                         "Line",
-                         "Core",
-                         "PDF",
-                         0,
-                         0.0,
-                         2020,
-                         0,
-                         ItemStatus::Cloud,
-                         "#000000",
-                         "",
-                         None)
-    }
+    use super::*;
 
     #[test]
     fn growth_only_mismatch_triggers_partial_fetch() {

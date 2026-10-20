@@ -6,6 +6,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use dtrpg_core::data::activity::ActivityStatus;
+use dtrpg_core::data::catalog_cache::save_catalog_cache;
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::tag_color::TagColor;
 use dtrpg_core::services::network_monitor::NetworkMonitor;
@@ -257,7 +258,14 @@ fn tags_show_on_a_launch_that_cannot_reach_the_network(cx: &mut TestAppContext) 
                                3,
                                Vec::new());
     fixture.controller.update(cx, |ctrl, _| {
-                          ctrl.library.network_monitor = Arc::new(NetworkMonitor::fixed(false));
+                          // Must run before any catalog-sync run starts —
+                          // `Library::start_load` clones the `Arc<Library>`
+                          // into its background task, after which `get_mut`
+                          // can no longer succeed.
+                          #[allow(clippy::expect_used)]
+                          let lib = Arc::get_mut(&mut ctrl.library)
+                              .expect("library is still uniquely held");
+                          lib.network_monitor = Arc::new(NetworkMonitor::fixed(false));
                       });
     saved_catalog_with_a_tag(&fixture, &["a", "b"]);
 

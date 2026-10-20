@@ -6,16 +6,9 @@ use std::sync::Arc;
 
 use check_jobs::{CheckJob, CheckJobs};
 use download_jobs::DownloadJobs;
-use dtrpg_core::data::catalog_cache::{
-    CacheMetadata, load_cache_metadata, load_catalog_cache, save_catalog_cache,
-    save_check_batch_timestamp, save_fresh_install_request_timestamp,
-};
+use dtrpg_core::data::catalog_cache::{load_cache_metadata, save_check_batch_timestamp};
 use dtrpg_core::data::collection::CollectionEntry;
-use dtrpg_core::data::collections_cache::{load_collections_cache, save_collections_cache};
-use dtrpg_core::data::constants::{
-    CATALOG_CHECKPOINT_MIN_INTERVAL_SECS, CATALOG_CHECKPOINT_PAGE_INTERVAL,
-    CATALOG_FRESH_INSTALL_MIN_REQUEST_INTERVAL_SECS,
-};
+use dtrpg_core::data::collections_cache::save_collections_cache;
 use dtrpg_core::data::cover_cache::load_cached_cover;
 use dtrpg_core::data::enums::*;
 use dtrpg_core::data::library::*;
@@ -23,10 +16,12 @@ use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
 use dtrpg_core::data::tag_library::{TagEntry, TagLibrary};
-use dtrpg_core::library::Library;
+use dtrpg_core::library::{
+    Library, LibraryEvent, LibraryEvents, SyncStage, reload_cooldown_active,
+};
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use dtrpg_core::services::{
-    DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind, retry,
+    DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind,
 };
 use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
@@ -36,10 +31,7 @@ use dtrpg_core::util::sort::*;
 use dtrpg_core::work::{
     JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot,
 };
-use gpui::{
-    AppContext, AsyncApp, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Task,
-    WeakEntity, Window,
-};
+use gpui::{AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Window};
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
 use thumbnail_jobs::ThumbnailJobs;
@@ -60,17 +52,12 @@ use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 mod bulk_selection;
 mod catalog;
 mod catalog_sync;
-mod catalog_sync_autoload;
-mod catalog_sync_cache;
-mod catalog_sync_fetch;
-mod catalog_sync_fresh_install;
 mod check_jobs;
 mod checks;
 mod collection_links;
 mod collections;
 mod concurrency;
 mod detail;
-mod diagnostics;
 mod download_dispatch;
 mod download_jobs;
 mod downloads;
@@ -87,8 +74,6 @@ mod thumbnails;
 
 #[cfg(test)]
 mod tests_availability;
-#[cfg(test)]
-mod tests_catalog;
 #[cfg(test)]
 mod tests_checks;
 #[cfg(test)]
@@ -110,9 +95,6 @@ mod tests_view_cache;
 
 // Re-export the free helpers so `super::*` sees them in the split impl
 // modules and the tests keep addressing them by their original path.
-// `app_backtrace` lives in `diagnostics`, but the catalog-sync error path
-// reaches it through `super::*`.
-pub(crate) use self::diagnostics::app_backtrace;
 // `create_collections_symlinks` lives with the download code that uses it, but
 // the dispatch path in `download_dispatch` reaches it through `super::*`.
 pub(crate) use self::downloads::create_collections_symlinks;
@@ -264,9 +246,11 @@ pub struct LibraryController {
     /// cleared when any other filter is active.
     pub collection_members:        HashSet<u64>,
     /// Headless library session: owns the index, work queue, cover fetcher,
-    /// and network monitor. Slice 1 of the ADR 0002 controller decomposition
-    /// moves these fields into core; later slices will move logic there too.
-    pub(super) library:            Library,
+    /// network monitor, and (since Slice 2) the catalog-sync state machine.
+    /// `Arc` since catalog-sync runs on a background thread while the
+    /// controller renders — see `dtrpg_core::library::Library`'s own doc
+    /// comment.
+    pub(super) library:            Arc<Library>,
     /// Every thumbnail fetch submitted to `work` that has not finished.
     thumbnail_jobs:                ThumbnailJobs,
     /// Activity id for the aggregated thumbnail loading entry.
@@ -297,32 +281,18 @@ pub struct LibraryController {
     /// Number of refresh-batch fetches that failed. Only items removed from
     /// `thumbnail_refresh_pending` count here.
     thumbnail_refresh_failed:      usize,
-    /// True from startup until the first `set_catalog` call completes.
+    /// True from startup until the first catalog-sync run completes.
     catalog_loading:               bool,
-    /// Incremented each time [`start_load_inner`](Self::start_load_inner)
-    /// starts a new load attempt. Background tasks from a superseded load
-    /// compare their captured generation against the current value before
-    /// writing catalog state, so a load started before a `clear_and_reload`
-    /// cannot clobber it after the fact.
-    load_generation:               u64,
-    /// True while a catalog-sync load (from [`start_load_inner`]) is in
-    /// flight. Unlike `load_generation` (which lets a superseded load's
-    /// *results* be discarded after the fact), this prevents a second
-    /// catalog-sync task from starting at all while one is running, per
-    /// `rust-resource-work-queue-topology`'s serial-catalog-sync requirement.
-    ///
-    /// [`start_load_inner`]: Self::start_load_inner
-    catalog_sync_in_flight:        bool,
-    /// True if a load was requested (via [`start_load_inner`]) while
-    /// `catalog_sync_in_flight` was already set, so it couldn't start
-    /// immediately. Consumed by [`Self::finish_catalog_sync`], which starts
-    /// a follow-up load once the in-flight one completes rather than
-    /// silently dropping the request — critical for callers like
-    /// [`Self::replace_service`] that clear the catalog and depend on their
-    /// reload actually happening.
-    ///
-    /// [`start_load_inner`]: Self::start_load_inner
-    pending_reload:                bool,
+    /// Activity id for the catalog-sync run currently in flight, if any.
+    /// Single-flight tracking itself (generation, in-flight, pending
+    /// reload) moved into `Library` in ADR 0002 Slice 2; this is the one
+    /// piece of state that stays here, since activity items are a view
+    /// concern.
+    catalog_activity_id:           Option<u64>,
+    /// The most recent total item count a catalog-sync run has reported,
+    /// for seeding the activity item's progress bar. Cleared when the run
+    /// finishes.
+    catalog_progress_total:        Option<usize>,
     /// Cached filtered/sorted result of the current catalog, filter, search
     /// query, and sort settings. `None` means stale; recomputed lazily by
     /// [`cached_visible_items`](Self::cached_visible_items).
