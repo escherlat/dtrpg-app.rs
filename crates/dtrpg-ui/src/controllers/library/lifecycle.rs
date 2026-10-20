@@ -7,8 +7,9 @@ impl LibraryController {
     /// background thread.
     ///
     /// The controller starts in the `Loading` pane state with an empty catalog.
-    /// When the background fetch completes, [`apply_load_result`] is called
-    /// and [`LibraryChanged`] emitted.
+    /// When the background fetch completes, [`Self::handle_sync_event`]
+    /// reacts to `Library`'s `FullyLoaded`/`Failed` events and emits
+    /// [`LibraryChanged`].
     ///
     /// # Panics
     ///
@@ -17,16 +18,19 @@ impl LibraryController {
                collections_service: Box<dyn CollectionsService>,
                activity: Entity<ActivityController>, cx: &mut Context<Self>)
                -> Self {
-        let (mut ctrl, work_events) = Self::build(service, collections_service, activity);
+        let (mut ctrl, work_events, sync_events) =
+            Self::build(service, collections_service, activity);
         ctrl.start_work_event_pump(work_events, cx);
+        ctrl.start_catalog_sync_event_pump(sync_events, cx);
         ctrl.start_load(cx);
         ctrl.start_periodic_check_batch_timer(cx);
         ctrl.start_periodic_catalog_refresh_timer(cx);
         ctrl
     }
 
-    /// Builds the controller's initial state, along with the receiver for its
-    /// work queue's events, without starting anything.
+    /// Builds the controller's initial state, along with the receivers for
+    /// its work queue's and catalog-sync's events, without starting
+    /// anything.
     ///
     /// Reads saved preferences from disk, but loads no catalog and starts no
     /// timers or event loop, so tests can build a controller and drive it
@@ -34,7 +38,7 @@ impl LibraryController {
     pub(super) fn build(service: Box<dyn LibraryService>,
                         collections_service: Box<dyn CollectionsService>,
                         activity: Entity<ActivityController>)
-                        -> (Self, JobEvents) {
+                        -> (Self, JobEvents, LibraryEvents) {
         Self::build_with_cache_root(service, collections_service, activity, cache_dir())
     }
 
@@ -45,7 +49,7 @@ impl LibraryController {
                                         collections_service: Box<dyn CollectionsService>,
                                         activity: Entity<ActivityController>,
                                         cache_root: PathBuf)
-                                        -> (Self, JobEvents) {
+                                        -> (Self, JobEvents, LibraryEvents) {
         let vm = LibraryViewModel::new(service);
         let prefs = dtrpg_core::data::ui_preferences::UiPreferences::load();
         let view_prefs = dtrpg_core::data::file_openers::CatalogViewPrefs::load();
@@ -54,8 +58,9 @@ impl LibraryController {
         // in-memory fallback to degrade to, so a controller cannot exist
         // without one.
         #[allow(clippy::expect_used)]
-        let (library, work_events) =
+        let (library, work_events, sync_events) =
             Library::open(cache_root, &storage).expect("failed to open the library session");
+        let library = Arc::new(library);
 
         let ctrl = Self { vm,
                           activity,
@@ -87,9 +92,8 @@ impl LibraryController {
                           thumbnail_refresh_succeeded: 0,
                           thumbnail_refresh_failed: 0,
                           catalog_loading: true,
-                          load_generation: 0,
-                          catalog_sync_in_flight: false,
-                          pending_reload: false,
+                          catalog_activity_id: None,
+                          catalog_progress_total: None,
                           items_cache: None,
                           grouped_items_cache: None,
                           filter_count_cache: 0,
@@ -127,7 +131,7 @@ impl LibraryController {
                           pending_download: None,
                           bulk_selection_mode: false,
                           bulk_selected_ids: HashSet::new() };
-        (ctrl, work_events)
+        (ctrl, work_events, sync_events)
     }
 
     /// Applies a work-queue event. Each handler ignores jobs that are not its
@@ -209,11 +213,11 @@ impl LibraryController {
     /// `rust-resource-refresh-scheduling`'s recurring-timer requirement.
     ///
     /// Calls the same non-forced [`Self::start_load`] the startup sequence
-    /// uses: `catalog_sync_in_flight` (see `start_load_inner`) makes an
-    /// overlapping wake-up a no-op, and the existing auto-load-policy
-    /// staleness check inside `start_load_inner` decides whether this
-    /// wake-up actually triggers a fetch or is itself a no-op. The loop
-    /// exits once the controller entity is dropped.
+    /// uses: `Library`'s own single-flight gate (see `Library::start_load`)
+    /// makes an overlapping wake-up a no-op, and the existing
+    /// auto-load-policy staleness check inside the catalog-sync run decides
+    /// whether this wake-up actually triggers a fetch or is itself a no-op.
+    /// The loop exits once the controller entity is dropped.
     pub(super) fn start_periodic_catalog_refresh_timer(&self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, async_cx| {
               loop {
@@ -298,18 +302,114 @@ impl LibraryController {
           .detach();
     }
 
-    /// Clears `catalog_sync_in_flight` and, if a load was requested while
-    /// this sync was running (see `start_load_inner`'s single-flight guard),
-    /// immediately starts a fresh one instead of leaving it dropped.
-    ///
-    /// Every exit path of `start_load_inner`'s background task must call
-    /// this exactly once instead of setting `catalog_sync_in_flight = false`
-    /// directly, so a queued follow-up (e.g. from `replace_service`) is
-    /// never silently lost.
-    pub(super) fn finish_catalog_sync(&mut self, cx: &mut Context<Self>) {
-        self.catalog_sync_in_flight = false;
-        if std::mem::take(&mut self.pending_reload) {
-            self.start_load(cx);
+    /// Applies one catalog-sync event from `Library`, updating only this
+    /// controller's own view state — the catalog-sync state machine itself
+    /// (generation tracking, single-flight, the on-disk cache, the live
+    /// fetch) lives in `Library` since ADR 0002 Slice 2.
+    pub(super) fn handle_sync_event(&mut self, event: LibraryEvent, cx: &mut Context<Self>) {
+        match event {
+            LibraryEvent::Stage(stage) => self.sync_stage_label(stage, cx),
+            LibraryEvent::Total(total) => {
+                self.catalog_progress_total = Some(total);
+                if let Some(id) = self.catalog_activity_id {
+                    self.activity
+                        .update(cx, |a, cx| a.update_progress(id, 0.0, cx));
+                }
+            }
+            LibraryEvent::Page(page) => {
+                if let Some(id) = self.catalog_activity_id {
+                    let label = t!("activity.loading_library_page", page = page).to_string();
+                    self.activity
+                        .update(cx, |a, cx| a.update_label(id, label, cx));
+                }
+            }
+            LibraryEvent::CachePrepopulated { items,
+                                              force_reload, } => {
+                if !items.is_empty() {
+                    self.react_to_prepopulated_items(&items, cx);
+                }
+                self.begin_tag_sync(force_reload, cx);
+            }
+            LibraryEvent::CollectionsChanged(entries) => self.apply_collections(entries, cx),
+            LibraryEvent::PageAppended { items } => self.react_to_prepopulated_items(&items, cx),
+            LibraryEvent::PartialMerged { items } => {
+                self.react_to_new_catalog_items(&items, cx);
+                self.catalog_loading = false;
+                cx.emit(LibraryChanged);
+                self.complete_catalog_activity(cx);
+                self.verify_catalog_downloads(cx);
+            }
+            LibraryEvent::SkippedFreshCache => {
+                self.catalog_loading = false;
+                self.revalidate_publisher_filter();
+                cx.emit(LibraryChanged);
+                self.complete_catalog_activity(cx);
+                self.verify_catalog_downloads(cx);
+            }
+            LibraryEvent::FullyLoaded { items } => {
+                self.react_to_new_catalog_items(&items, cx);
+                self.catalog_loading = false;
+                cx.emit(LibraryChanged);
+                self.complete_catalog_activity(cx);
+                self.begin_tag_sync(false, cx);
+                self.verify_catalog_downloads(cx);
+            }
+            LibraryEvent::Failed { message, quiet } => {
+                self.catalog_loading = false;
+                cx.emit(LibraryChanged);
+                if quiet {
+                    self.complete_catalog_activity(cx);
+                }
+                else if let Some(id) = self.catalog_activity_id.take() {
+                    self.activity.update(cx, |a, cx| a.error(id, message, cx));
+                }
+            }
+            LibraryEvent::Finished { reload_requested } => {
+                self.catalog_progress_total = None;
+                if reload_requested {
+                    self.start_load(cx);
+                }
+            }
         }
+    }
+
+    /// Updates the catalog-sync activity item's label for `stage`.
+    fn sync_stage_label(&mut self, stage: SyncStage, cx: &mut Context<Self>) {
+        let Some(id) = self.catalog_activity_id
+        else {
+            return;
+        };
+        let label = match stage {
+            SyncStage::Collections => t!("activity.loading_library_collections").to_string(),
+            SyncStage::CountCheck => t!("activity.loading_library_count").to_string(),
+            SyncStage::PartialFetch => t!("activity.loading_library_partial").to_string(),
+            SyncStage::LiveFetch => t!("activity.loading_library").to_string(),
+        };
+        self.activity
+            .update(cx, |a, cx| a.update_label(id, label, cx));
+    }
+
+    /// Dismisses the catalog-sync activity item, if one is in flight.
+    fn complete_catalog_activity(&mut self, cx: &mut Context<Self>) {
+        if let Some(id) = self.catalog_activity_id.take() {
+            self.activity.update(cx, |a, cx| a.complete(id, cx));
+        }
+    }
+
+    /// Starts a loop that applies each catalog-sync event to the controller,
+    /// for as long as the controller lives. See [`Self::start_work_event_pump`]
+    /// for the same pattern applied to the work queue's events.
+    pub(super) fn start_catalog_sync_event_pump(&self, mut events: LibraryEvents,
+                                                cx: &mut Context<Self>) {
+        cx.spawn(async move |this, async_cx| {
+              while let Some(event) = events.recv().await {
+                  let alive = this.update(async_cx, |ctrl, cx| ctrl.handle_sync_event(event, cx))
+                                  .is_ok();
+                  if !alive {
+                      break;
+                  }
+              }
+          })
+          .detach();
     }
 }

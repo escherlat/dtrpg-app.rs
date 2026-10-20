@@ -4,24 +4,36 @@
 //! into `Library` itself.
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, MutexGuard, PoisonError};
 
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::services::covers::CoverFetcher;
-use dtrpg_core::services::network_monitor::NetworkMonitor;
 use dtrpg_core::work::WorkQueue;
 
 use super::LibraryController;
 
 impl LibraryController {
-    /// Shared reference to the core library index.
-    pub(super) fn index(&self) -> &LibraryIndex {
-        &self.library.index
+    /// Locks and returns the core library index.
+    ///
+    /// The index lives behind a `Mutex` (since ADR 0002 Slice 2: the
+    /// catalog-sync run mutates it from a background thread while `Library`
+    /// is shared via `Arc`), not because callers need read/write
+    /// distinction — both `index()` and `index_mut()` take the same lock;
+    /// kept as two methods only so call sites written for the old
+    /// `&LibraryIndex`/`&mut LibraryIndex` split keep compiling unchanged.
+    pub(super) fn index(&self) -> MutexGuard<'_, LibraryIndex> {
+        self.library
+            .index
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Mutable reference to the core library index.
-    pub(super) fn index_mut(&mut self) -> &mut LibraryIndex {
-        &mut self.library.index
+    /// See [`Self::index`].
+    pub(super) fn index_mut(&self) -> MutexGuard<'_, LibraryIndex> {
+        self.library
+            .index
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Shared reference to the core work queue.
@@ -32,11 +44,6 @@ impl LibraryController {
     /// Shared reference to the cover fetcher.
     pub(super) fn cover_fetcher(&self) -> &Arc<CoverFetcher> {
         &self.library.cover_fetcher
-    }
-
-    /// Shared reference to the network monitor.
-    pub(super) fn network_monitor(&self) -> &Arc<NetworkMonitor> {
-        &self.library.network_monitor
     }
 
     /// Path to the directory that holds the library index database.

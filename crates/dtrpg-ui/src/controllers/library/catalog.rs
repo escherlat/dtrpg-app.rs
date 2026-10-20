@@ -64,9 +64,9 @@ impl LibraryController {
     /// load-completion refresh.
     pub(super) fn refresh_section_counts(&mut self) {
         let now = now_secs();
-        match self.index()
-                  .section_counts(now, self.recently_updated_window_days)
-        {
+        let result = self.index()
+                         .section_counts(now, self.recently_updated_window_days);
+        match result {
             Ok(counts) => self.section_counts = counts,
             Err(error) => tracing::warn!(%error, "could not count the catalog sections"),
         }
@@ -80,7 +80,8 @@ impl LibraryController {
     /// satisfies.
     pub(super) fn refresh_sidebar_facets(&mut self) -> bool {
         self.refresh_section_counts();
-        match self.index().publisher_counts() {
+        let result = self.index().publisher_counts();
+        match result {
             Ok(counts) => {
                 self.publishers = counts.into_iter()
                                         .map(|(name, count)| PublisherEntry { name, count })
@@ -94,33 +95,39 @@ impl LibraryController {
         }
     }
 
-    /// Atomically replaces the catalog with a complete dataset and recomputes
-    /// derived state.
+    /// Reacts to new items a catalog-sync run (`dtrpg_core::library::Library`)
+    /// just wrote to the index as a *load-completing* step: enqueues their
+    /// thumbnails, refreshes the sidebar facets (revalidating a restored
+    /// `Publisher` filter against the refreshed publisher list), invalidates
+    /// the filtered-result cache, and emits [`LibraryChanged`].
     ///
-    /// Used after all live SDK pages have been collected so the UI transitions
-    /// from cached data to the full live set in one render pass.
-    /// `reconcile` selects between two behaviors, per `catalog-live-data-swap`:
-    /// `false` replaces the catalog outright with `items` (used when there
-    /// was no local baseline to reconcile against — first launch or after
-    /// `clear_and_reload`); `true` merges `items` into the existing catalog
-    /// by id via `reconcile_catalog` (items missing from `items` are kept,
-    /// flagged `is_available = false`, rather than dropped).
-    pub(super) fn set_catalog(&mut self, items: Vec<LibraryItem>, reconcile: bool,
-                              cx: &mut Context<Self>) {
-        self.enqueue_thumbnails(&items, cx);
-        let merged = if reconcile {
-            reconcile_catalog(self.index().list_items().unwrap_or_default(), items)
-        }
-        else {
-            items
-        };
-        if let Err(e) = self.index_mut().replace_all_items(&merged) {
-            tracing::error!(error = %e, "failed to write the catalog to the library index");
-        }
-        self.catalog_loading = false;
+    /// `Library` already wrote `items` to the index; this only updates this
+    /// controller's own view state in reaction (see ADR 0002 Slice 2). Used
+    /// by every `LibraryEvent` handler except the incremental
+    /// pre-population ones (see [`Self::react_to_prepopulated_items`]),
+    /// which must not revalidate the filter against a still-partial
+    /// publisher list.
+    pub(super) fn react_to_new_catalog_items(&mut self, items: &[LibraryItem],
+                                             cx: &mut Context<Self>) {
+        self.enqueue_thumbnails(items, cx);
         if self.refresh_sidebar_facets() {
             self.revalidate_publisher_filter();
         }
+        self.invalidate_cache();
+        cx.emit(LibraryChanged);
+    }
+
+    /// Reacts to items appended incrementally during cache pre-population or
+    /// the live fetch's catalog-was-empty fast path: enqueues their
+    /// thumbnails, refreshes the sidebar facets *without* revalidating the
+    /// `Publisher` filter (the publisher list computed from a still-partial
+    /// catalog isn't authoritative enough to decide a filter is now
+    /// invalid), invalidates the filtered-result cache, and emits
+    /// [`LibraryChanged`].
+    pub(super) fn react_to_prepopulated_items(&mut self, items: &[LibraryItem],
+                                              cx: &mut Context<Self>) {
+        self.enqueue_thumbnails(items, cx);
+        self.refresh_sidebar_facets();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -146,57 +153,14 @@ impl LibraryController {
     /// the just-recomputed `self.publishers` as the known set.
     ///
     /// Every catalog-load completion path that (re)computes `self.publishers`
-    /// must call this — not just the full live-fetch path
-    /// ([`Self::set_catalog`]) — since the cache-fresh skip-fetch branch in
-    /// [`Self::start_load_inner`] and [`Self::apply_partial_fetch`] both also
-    /// complete a load without ever calling `set_catalog`. Missing one of
-    /// these left a restored `Publisher` filter that no longer matched
-    /// permanently un-validated on an ordinary cache-hit cold start.
+    /// must call this — see [`Self::react_to_new_catalog_items`], which every
+    /// load-completing `LibraryEvent` handler goes through.
     pub(super) fn revalidate_publisher_filter(&mut self) {
         let known_publishers: Vec<Arc<str>> = self.publishers
                                                   .iter()
                                                   .map(|p| Arc::clone(&p.name))
                                                   .collect();
         self.validate_publisher_filter(&known_publishers);
-    }
-
-    /// Merges a partial date-filtered fetch's `partial` results into the
-    /// catalog additively (see [`merge_partial_fetch`]) and performs the
-    /// same finalization as [`Self::set_catalog`] (thumbnail enqueue,
-    /// derived state recompute, cache invalidation, `LibraryChanged`).
-    ///
-    /// Unlike a full reconcile, this never flags any existing item
-    /// unavailable — a partial response is never a complete listing.
-    pub(super) fn apply_partial_fetch(&mut self, partial: Vec<LibraryItem>,
-                                      cx: &mut Context<Self>) {
-        self.enqueue_thumbnails(&partial, cx);
-        let merged = merge_partial_fetch(self.index().list_items().unwrap_or_default(), partial);
-        if let Err(e) = self.index_mut().replace_all_items(&merged) {
-            tracing::error!(error = %e, "failed to write the catalog to the library index");
-        }
-        self.catalog_loading = false;
-        if self.refresh_sidebar_facets() {
-            self.revalidate_publisher_filter();
-        }
-        self.invalidate_cache();
-        cx.emit(LibraryChanged);
-    }
-
-    /// Appends a page of items received incrementally from the background load
-    /// task.
-    ///
-    /// Used only for the initial disk-cache pre-population, not for live SDK
-    /// pages.
-    pub(super) fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
-        self.enqueue_thumbnails(&items, cx);
-        let mut merged = self.index().list_items().unwrap_or_default();
-        merged.extend(items);
-        if let Err(e) = self.index_mut().replace_all_items(&merged) {
-            tracing::error!(error = %e, "failed to write the catalog to the library index");
-        }
-        self.refresh_sidebar_facets();
-        self.invalidate_cache();
-        cx.emit(LibraryChanged);
     }
 
     /// Invokes the catalog auto-load freshness policy, running a full live
@@ -225,9 +189,10 @@ impl LibraryController {
     /// disappears from the UI immediately instead of lingering until an
     /// unrelated reload repopulates it from what is now a missing cache file.
     ///
-    /// Any catalog load already in flight is superseded: `start_load_inner`
-    /// bumps `load_generation`, so the older task's completion is discarded
-    /// rather than clobbering the fresh reload triggered here.
+    /// Any catalog load already in flight is superseded: `Library::start_load`
+    /// bumps its own generation (or queues this as a follow-up if one is
+    /// already running — see ADR 0002 Slice 2), so an older run's completion
+    /// is discarded rather than clobbering the fresh reload triggered here.
     /// Queued-but-not-yet-started thumbnail fetches are dropped too; a
     /// fetch already in flight still completes and populates `CoverCache`,
     /// which is harmless since it only caches an image for a URL that may
