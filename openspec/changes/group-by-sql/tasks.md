@@ -8,5 +8,5 @@
 - [x] Write parity tests in `filtered_items/group_parity_tests.rs`.
 - [x] Verify `make all` (fmt-check, size-check, lint, test).
 - [x] Update `NOTES.md`.
-- [ ] Open PR against `develop` and get CI green.
+- [x] Open PR against `develop` and get CI green. (PR #362)
 - [ ] Archive this OpenSpec change after merge.
