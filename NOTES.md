@@ -496,3 +496,53 @@ each independently startable; none blocks the others.
   ephemeral field would need the same treatment — a side map, overlaid in
   `overlay_ephemeral_state` — not a new index column, unless it's actually
   meant to survive a restart.
+
+# Publisher/tag aggregation from the index: status at 2026-10-20
+
+Branch: `feature/publisher-aggregation-sql`, off `develop`. Issue #355.
+OpenSpec change: `openspec/changes/publisher-aggregation-sql`
+(`skip_specs: true` — mechanism swap, no observable behavior change).
+
+## What exists now
+
+- `LibraryIndex::publisher_counts()` (`data/index/facets.rs`):
+  `GROUP BY publisher ORDER BY publisher`, then a stable Rust sort by
+  `to_lowercase()`. Sorting in Rust rather than `COLLATE NOCASE` because
+  SQLite folds ASCII only and would order non-ASCII publisher names
+  differently than the scan it replaces; the SQL `ORDER BY` pins the
+  pre-sort order so case-only-differing ties are deterministic.
+- `LibraryIndex::section_counts(now, window)`: composes the ADR 0003 facet
+  queries (`count_all`/`count_by_status`/`count_recently_updated`), which
+  had no production callers until now. Identity-tested against the pure
+  `data::library::section_counts` scan over a fixture that exercises both
+  recency paths (`date_updated` priority, `date_added` fallback) and asserts
+  nonzero recency first, so a 0-vs-0 pass can't hide a wrong rule.
+- Eight whole-catalog `all_items()` scans are gone from `LibraryController`:
+  the three load-completion sites (`set_catalog`, `apply_partial_fetch`,
+  `append_catalog_page`) use `refresh_sidebar_facets()`; five per-item
+  status-change sites (`downloads`, `checks` x2, `download_dispatch`,
+  `concurrency`'s window-days change) use counts-only
+  `refresh_section_counts()` — status changes never move an item between
+  publishers. On query failure the previous values are kept and
+  `refresh_sidebar_facets()` returns `false` so the caller skips
+  `revalidate_publisher_filter()` against stale numbers.
+- Verified: check/clippy -D warnings/test workspace (523 core incl. 4 new,
+  339 ui, 8 mcp), SEED 1/2/7/13 ui runs, fmt-check, size-check.
+
+## Scope correction to #355 (deliberate, not dropped)
+
+`group_by_publisher()`/`group_by_tag()` stay in Rust. They partition the
+*current result set* (post-search, cached in `items_cache`), not the catalog;
+SQLizing them needs #353 (search-box semantics in SQL) first, and querying
+from `grouped_items()` would put SQLite I/O on the render path — where a
+stale cache refetch runs per search keystroke. If #353 lands, revisit.
+
+## Not done
+
+- The pure `data::library::section_counts` scan and `publisher_entries()`
+  still exist (the first as the identity reference for the SQL composition,
+  the second because `group_by_publisher()` still uses its ordering). They
+  have no production callers other than those; decide on removal alongside
+  #353.
+- `dtrpg-ui` was not rendered in this environment (no display), same caveat
+  as the tags work: verified by compiling and controller/pure-function tests.
