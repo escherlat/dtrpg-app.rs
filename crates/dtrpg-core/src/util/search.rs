@@ -42,9 +42,11 @@ fn read_tag_name(text: &str) -> (&str, &str) {
 impl SearchQuery {
     /// Splits what the user typed into free text and tag terms.
     ///
-    /// A query with no tag term keeps its text exactly as typed, so a plain
-    /// search behaves as it always has. A `tag:` with no name is a tag term
-    /// that asks for nothing, and is left out of the text.
+    /// The stored text is always lower cased. A query with no tag term keeps
+    /// the typed text's spacing verbatim (untrimmed, whole-query), so a plain
+    /// search behaves as it always has; with a tag term the leftover words
+    /// rejoin with single spaces. A `tag:` with no name is a tag term that
+    /// asks for nothing, and is left out of the text.
     #[must_use]
     pub fn parse(query: &str) -> Self {
         let mut parsed = Self::default();
@@ -91,7 +93,29 @@ impl SearchQuery {
         !self.with_tags.is_empty() || !self.without_tags.is_empty()
     }
 
+    /// The free-text part, always lower cased — see [`Self::parse`] for when
+    /// it preserves the typed spacing verbatim vs. rejoining words.
+    pub(crate) fn free_text(&self) -> &str {
+        &self.text
+    }
+
+    /// The tags an item must have, lower cased.
+    pub(crate) fn required_tags(&self) -> &[String] {
+        &self.with_tags
+    }
+
+    /// The tags an item must not have, lower cased.
+    pub(crate) fn excluded_tags(&self) -> &[String] {
+        &self.without_tags
+    }
+
     /// Whether `item`, which has the tags `tags`, matches the search.
+    ///
+    /// No production caller since the search box became a SQL query
+    /// dimension (#353): kept as the specification the index's
+    /// `instr(ulower(col), ?)` predicates are tested against
+    /// (`data/index/filtered_items/parity_tests.rs`). Do not delete without
+    /// retiring that equivalence bar.
     #[must_use]
     pub fn matches(&self, item: &LibraryItem, tags: &[Arc<str>]) -> bool {
         let has = |wanted: &String| tags.iter().any(|tag| tag.to_lowercase() == *wanted);

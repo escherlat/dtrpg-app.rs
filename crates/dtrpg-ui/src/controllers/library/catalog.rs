@@ -351,9 +351,13 @@ impl LibraryController {
         let window_days = self.recently_updated_window_days;
         let query = SearchQuery::parse(&self.search_query);
 
-        let item_filter = match &self.filter {
-            SidebarFilter::AllTitles | SidebarFilter::Tag { .. } => {
-                dtrpg_core::data::index::ItemFilter::default()
+        let mut item_filter = match &self.filter {
+            SidebarFilter::AllTitles => dtrpg_core::data::index::ItemFilter::default(),
+            // `Tag` is a SQL dimension now (#353); the enum's pre-computed id
+            // set is no longer read here.
+            SidebarFilter::Tag { name, .. } => {
+                dtrpg_core::data::index::ItemFilter { tag_name: Some(name),
+                                                      ..Default::default() }
             }
             SidebarFilter::OnDevice => {
                 dtrpg_core::data::index::ItemFilter { status: Some(ItemStatus::Downloaded),
@@ -378,29 +382,30 @@ impl LibraryController {
                                                       ..Default::default() }
             }
         };
-        let matched = self.index
-                          .list_items_filtered(&item_filter, self.sort, self.sort_direction)
-                          .unwrap_or_default();
-        // `Tag` is resolved against a pre-computed id set rather than a SQL
-        // dimension (see `catalog-reads-from-index`'s design notes), so it's
-        // applied as an extra pass here instead of through `item_filter`.
-        let matched: Vec<LibraryItem> = if let SidebarFilter::Tag { items, .. } = &self.filter {
-            matched.into_iter()
-                   .filter(|item| items.contains(&item.id))
-                   .collect()
+        // The toolbar's `filter_count` means "section size with search
+        // ignored" (`count_label_for`), so the count runs before `search`
+        // joins the WHERE. A failed count keeps the previous number, the same
+        // keep-stale-on-failure policy as the facet refreshes (issue #355).
+        match self.index.count_items_filtered(&item_filter) {
+            Ok(count) => self.filter_count_cache = count,
+            Err(error) => tracing::warn!(%error, "could not count the filtered catalog"),
         }
-        else {
-            matched
+        item_filter.search = Some(&query);
+        let matched = match self.index
+                                .list_items_filtered(&item_filter, self.sort, self.sort_direction)
+        {
+            Ok(items) => items,
+            Err(error) => {
+                // Both toolbar numbers describe the (empty) table that follows;
+                // a stale count over an empty result would contradict it.
+                tracing::warn!(%error, "could not query the filtered catalog");
+                self.filter_count_cache = 0;
+                Vec::new()
+            }
         };
-        let filter_count = matched.len();
-        let items: Vec<LibraryItem> =
-            self.overlaid_items(matched)
-                .into_iter()
-                .filter(|item| query.matches(item, self.tags.tag_names_of(&item.id)))
-                .collect();
+        let items = self.overlaid_items(matched);
 
         self.items_cache = Some(Arc::new(items));
-        self.filter_count_cache = filter_count;
         self.catalog_ids_cache = Arc::new(self.catalog_ids());
     }
 }

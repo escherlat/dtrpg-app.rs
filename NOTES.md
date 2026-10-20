@@ -496,3 +496,73 @@ each independently startable; none blocks the others.
   ephemeral field would need the same treatment — a side map, overlaid in
   `overlay_ephemeral_state` — not a new index column, unless it's actually
   meant to survive a restart.
+
+# Search box in SQL: status at 2026-10-20
+
+Branch: `feature/search-box-semantics-sql`, off `develop`. Issue #353.
+OpenSpec change: `openspec/changes/search-box-semantics-sql` (`skip_specs`,
+results equivalence is the acceptance bar, not a spec change).
+
+## What exists now
+
+- The search box is a query dimension. `ItemFilter` gained
+  `search: Option<&SearchQuery>` and `tag_name: Option<&str>`;
+  `invalidate_cache()` issues one count (filter-only, the toolbar's
+  `filter_count` semantics) and one list query (filter + tag + search) and no
+  longer runs Rust passes. Query parsing stays in Rust — SQL receives the
+  parsed parts, never the raw string.
+- `data/index/functions.rs` registers a deterministic `ulower` scalar
+  (Rust `str::to_lowercase()`, NULL-in/NULL-out) on every connection through
+  a single `LibraryIndex::initialized` path — SQLite's `lower()`/`LIKE`/
+  `NOCASE` fold ASCII only and would diverge from the matcher on Unicode
+  names. Substring match is `instr(ulower(col), ?) > 0`, which equals
+  `to_lowercase().contains()` by construction on both sides.
+- The `Tag` sidebar filter is SQL `EXISTS` on `item_tags`/`tags` by
+  case-folded name. The old Rust pass intersected the fetched set with the
+  `SidebarFilter::Tag.items` snapshot; survivor sets are identical (both drop
+  ids absent from `items`), the only difference being *when* they diverge
+  during the async tag-reload window (index truth now, snapshot before).
+  `Tag.items` keeps one production reader: "download all in section"
+  (`item_matches_filter`) — unchanged, also still ignores search, see
+  design.md's divergence note before touching it.
+- `filtered_items.rs` is now a directory (`clause`/`query`/`parity_tests`);
+  `count_items_filtered` shares `build_where` with the list query so the two
+  can never drift. Empty `collection_member_ids` renders `1 = 0` (an empty
+  `IN ()` is a SQLite syntax error whose list/count fallout used to differ);
+  `IN` placeholders are numbered and bound once, referenced by both id
+  columns. A list-query failure zeroes `filter_count_cache` so the toolbar
+  can't contradict the empty table.
+- `SearchQuery::matches()` has no production caller; it is the specification
+  the SQL predicates are tested against — `parity_tests.rs` runs a 23-case
+  battery (word-crossing substrings, É/ö folds, every `tag:` form, tag
+  section x text, collection x search) comparing old vs new pipeline
+  survivor-for-survivor, plus hit-count pins so an agreeing-on-nothing
+  regression can't pass.
+- Verified: clippy -D warnings clean, 524 core (+5 new) / 339 ui / 8 mcp
+  tests, SEED 1/2/7/13, `make fmt-check`, `make size-check`.
+
+## Gotchas
+
+- Both `rustup run nightly-2026-09-21 cargo fmt` AND `cargo +nightly fmt` run
+  WITHOUT the Makefile's `RUSTFMT` export silently pick up Homebrew's stable
+  rustfmt (thousands of "Diff in" hunks against this repo — that's the tell).
+  Always `make fmt` / `make fmt-check`. Also: stable's reflow of
+  `search.rs`'s method chain is NOT reverted by pinned nightly (two fixed
+  points); once the harness formatter touches a file, hand-revert unrelated
+  hunks against develop before committing.
+- CI's fmt step is `cargo +nightly fmt --check` with `continue-on-error:
+  true` (hosted nightly rejects some historical options) — CI does NOT gate
+  formatting; the pinned toolchain via `make fmt-check` is the real bar.
+- rusqlite needed the `functions` cargo feature (`default-features = false`
+  hid `create_scalar_function`); 0.40 takes `FunctionFlags`
+  (UTF8|DETERMINISTIC), not a bool.
+
+## Next step
+
+PR against `develop`, ready for review. If the owner reports search latency
+regression at large catalog sizes, the escape hatch is a second FTS5
+trigram table for the text part (keep the EXISTS shapes for tags) —
+`design.md` records why plain `instr` was chosen first. `group_by_publisher`/
+`group_by_tag` SQLization is now unblocked in principle (search is a query
+dimension), but still render-path-cached Rust; revisit only with a measured
+reason.
