@@ -404,7 +404,8 @@ PR: pilgrimagesoftware/dtrpg-app.rs#351 (`feature/content-summaries`).
 
 The screenshot set lives in the `dtrpg-design` submodule at
 `claude-2/screenshots/`. A manifest now exists there:
-`claude-2/screenshots/README.md` (commit `6b954ac` in `dtrpg-design`).
+`claude-2/screenshots/README.md` (commit `6b954ac` in `dtrpg-design`),
+merged to `dtrpg-app.rs` `develop` via PR #359.
 
 ## Findings
 
@@ -457,8 +458,10 @@ Other open threads in this file, each independently startable:
   and `docs/site/` documentation. That section also notes the UI crate was
   never built or tested in the session that wrote the core code — worth a
   `make test` run there before starting.
-- The screenshots note above (check for `-1`/`-2` variants and missing
-  views before treating the set as complete).
+- `group_by_publisher`/`group_by_tag` SQLization (see the publisher/tag
+  aggregation section below): now unblocked because search is a query
+  dimension, but still a render-path-cached Rust partition; revisit only
+  with a measured reason.
 - `make size-check` backlog of files over 500 lines (CI warning, not a
   gate): `catalog_view.rs`, `root_view.rs`, `detail_panel_view.rs`,
   `settings.rs`, and the seven files listed under ADR 0002's "in scope, not
@@ -603,15 +606,17 @@ results equivalence is the acceptance bar, not a spec change).
   hid `create_scalar_function`); 0.40 takes `FunctionFlags`
   (UTF8|DETERMINISTIC), not a bool.
 
-## Next step
+## Status
 
-PR against `develop`, ready for review. If the owner reports search latency
-regression at large catalog sizes, the escape hatch is a second FTS5
-trigram table for the text part (keep the EXISTS shapes for tags) —
-`design.md` records why plain `instr` was chosen first. `group_by_publisher`/
-`group_by_tag` SQLization is now unblocked in principle (search is a query
-dimension), but still render-path-cached Rust; revisit only with a measured
-reason.
+Merged to `develop` via PR #358 (`4003f71`) and archived at
+`openspec/changes/archive/2026-10-20-search-box-semantics-sql`.
+
+`group_by_publisher`/`group_by_tag` SQLization is now unblocked in principle
+(search is a query dimension), but still render-path-cached Rust; revisit
+only with a measured reason. If search latency regresses at large catalog
+sizes, the escape hatch is a second FTS5 trigram table for the text part
+(keep the EXISTS shapes for tags) — `design.md` records why plain `instr`
+was chosen first.
 
 # Publisher/tag aggregation from the index: status at 2026-10-20
 
