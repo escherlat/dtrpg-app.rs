@@ -52,7 +52,7 @@ gpui = { package = "gpui-pre", version = "=0.3.9" }
 gpui_platform = { package = "gpui-pre-platform", version = "=0.3.9", features = ["font-kit", "wayland", "x11"] }
 gpui-kit = "0.7"
 cocoa = "=0.27.0"
-cocoa-foundation = "=0.2.0"
+cocoa-foundation = "=0.2.1"
 core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.6.1", features = ["metal"] }
