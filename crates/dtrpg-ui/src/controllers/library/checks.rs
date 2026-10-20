@@ -57,7 +57,7 @@ impl LibraryController {
                && apply_presence_changes(&mut item, &verification.changes)
             {
                 changed = true;
-                if let Err(e) = self.index.replace_item(&item) {
+                if let Err(e) = self.index_mut().replace_item(&item) {
                     tracing::error!(error = %e,
                                     "failed to write item presence change to the library index");
                 }
@@ -156,7 +156,7 @@ impl LibraryController {
                 return;
             }
             if let Some(waiting) = self.check_jobs.remove_pending(&id) {
-                self.work.cancel(waiting);
+                self.work().cancel(waiting);
             }
         }
 
@@ -166,14 +166,15 @@ impl LibraryController {
         let spec = JobSpec { kind: JobKind::Check,
                              priority,
                              label: id.to_string() };
-        let job_id =
-            self.work.submit(spec, move |_context| {
-                         // A failed check is still a result: the caller decides
-                         // from the error whether the item is gone or the
-                         // network was merely unavailable.
-                         job_result.put(service.get_item(numeric_id));
-                         Ok(())
-                     });
+        let job_id = self.work().submit(spec, move |_context| {
+                                    // A failed check is still a result: the
+                                    // caller decides
+                                    // from the error whether the item is gone
+                                    // or the
+                                    // network was merely unavailable.
+                                    job_result.put(service.get_item(numeric_id));
+                                    Ok(())
+                                });
         self.check_jobs.add(job_id, CheckJob::new(id, result));
     }
 
@@ -224,7 +225,7 @@ impl LibraryController {
                     self.availability_checks
                         .insert(Arc::clone(&job.item_id), checked_at);
                 }
-                if let Err(e) = self.index.replace_item(&existing) {
+                if let Err(e) = self.index_mut().replace_item(&existing) {
                     tracing::error!(error = %e,
                                     "failed to write availability check result to the library index");
                 }
@@ -239,7 +240,7 @@ impl LibraryController {
     /// running is left to finish.
     pub(super) fn cancel_pending_checks(&mut self) {
         for id in self.check_jobs.remove_all_pending() {
-            self.work.cancel(id);
+            self.work().cancel(id);
         }
     }
 
@@ -279,7 +280,7 @@ impl LibraryController {
     /// slow-running batch doesn't leave the cooldown window open to a second
     /// trigger firing mid-batch.
     fn request_check_batch_as(&mut self, priority: Priority, _cx: &mut Context<Self>) {
-        let root = self.cache_root.clone();
+        let root = self.cache_root().clone();
         let last_batch_secs = load_cache_metadata(&root).and_then(|m| m.last_item_check_batch_secs);
         let now = std::time::SystemTime::now();
         let now_secs = now.duration_since(std::time::UNIX_EPOCH)

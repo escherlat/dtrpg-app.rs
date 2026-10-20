@@ -10,6 +10,7 @@ pub mod api;
 pub mod constants;
 pub mod credentials;
 pub mod data;
+pub mod library;
 pub mod logging;
 pub mod models;
 pub mod platform;

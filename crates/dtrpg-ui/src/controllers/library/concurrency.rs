@@ -17,7 +17,7 @@ impl LibraryController {
             return;
         }
         self.max_concurrent_downloads = n;
-        self.work.set_limit(n);
+        self.work().set_limit(n);
     }
 
     /// Updates the "Recently Updated" sidebar window and recomputes the

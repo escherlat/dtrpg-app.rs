@@ -1,6 +1,6 @@
 - [x] Create issue pilgrimagesoftware/dtrpg-app.rs#364.
 - [x] Write OpenSpec proposal/design.
-- [ ] Slice 1: Extract core `Library` skeleton (move index, queue, network monitor, cover fetcher).
+- [x] Slice 1: Extract core `Library` skeleton (move index, queue, network monitor, cover fetcher).
 - [ ] Slice 2: Move catalog load/refresh state machine into `Library`.
 - [ ] Slice 3: Move filtered/grouped queries and caches into `Library`.
 - [ ] Slice 4: Move download/check/thumbnail job orchestration into `Library`.

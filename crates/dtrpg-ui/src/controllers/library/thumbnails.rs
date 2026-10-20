@@ -59,22 +59,22 @@ impl LibraryController {
           .mark_in_flight(Arc::clone(&key));
 
         let bytes = ResultSlot::new();
-        let fetcher = Arc::clone(&self.cover_fetcher);
+        let fetcher = Arc::clone(self.cover_fetcher());
         let job_key = Arc::clone(&key);
         let job_url = Arc::clone(&url);
         let job_bytes = bytes.clone();
         let spec = JobSpec { kind: JobKind::Thumbnail,
                              priority,
                              label: key.to_string() };
-        let id = self.work.submit(spec, move |context| {
-                              let fetched = fetcher.fetch(&job_key,
-                                                          &job_url,
-                                                          force_network,
-                                                          context.cancel_flag())
-                                                   .map_err(|error| error.to_string())?;
-                              job_bytes.put(fetched);
-                              Ok(())
-                          });
+        let id = self.work().submit(spec, move |context| {
+                                let fetched = fetcher.fetch(&job_key,
+                                                            &job_url,
+                                                            force_network,
+                                                            context.cancel_flag())
+                                                     .map_err(|error| error.to_string())?;
+                                job_bytes.put(fetched);
+                                Ok(())
+                            });
         self.thumbnail_jobs
             .add(id, ThumbnailJob { key, url, bytes });
     }
@@ -83,7 +83,7 @@ impl LibraryController {
     /// running is left to finish.
     fn cancel_pending_thumbnail(&mut self, key: &str) {
         if let Some(id) = self.thumbnail_jobs.remove_pending(key) {
-            self.work.cancel(id);
+            self.work().cancel(id);
         }
     }
 
@@ -92,7 +92,7 @@ impl LibraryController {
     /// running are left to finish.
     pub(super) fn cancel_pending_thumbnails(&mut self, cx: &mut Context<Self>) {
         for (key, id) in self.thumbnail_jobs.remove_all_pending() {
-            self.work.cancel(id);
+            self.work().cancel(id);
             cx.global_mut::<CoverCache>().in_flight.remove(&key);
         }
     }

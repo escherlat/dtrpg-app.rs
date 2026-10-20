@@ -53,7 +53,7 @@ impl LibraryController {
     pub(super) fn load_tags(&mut self, cx: &mut Context<Self>) {
         self.tag_generation += 1;
         let generation = self.tag_generation;
-        let cache_root = self.cache_root.clone();
+        let cache_root = self.cache_root().clone();
         cx.spawn(async move |this, async_cx| {
               let loaded = async_cx.background_executor()
                                    .spawn(async move { read_tag_library(&cache_root) })
@@ -152,7 +152,7 @@ impl LibraryController {
     fn edit_tags(&mut self, edit: TagEdit, cx: &mut Context<Self>) {
         let affected = self.items_affected_by(&edit);
         let collections = self.collections.clone();
-        let cache_root = self.cache_root.clone();
+        let cache_root = self.cache_root().clone();
         cx.spawn(async move |this, async_cx| {
               let outcome =
                   async_cx.background_executor()

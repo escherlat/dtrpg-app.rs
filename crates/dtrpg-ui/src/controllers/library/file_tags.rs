@@ -67,7 +67,7 @@ impl LibraryController {
         self.file_tags_reconciled = true;
         self.file_tag_sync_running = true;
         let collections = self.collections.clone();
-        let cache_root = self.cache_root.clone();
+        let cache_root = self.cache_root().clone();
         cx.spawn(async move |this, async_cx| {
               let outcome = async_cx.background_executor()
                                     .spawn(async move {
@@ -99,7 +99,7 @@ impl LibraryController {
             return;
         }
         let item_id = Arc::clone(item_id);
-        let cache_root = self.cache_root.clone();
+        let cache_root = self.cache_root().clone();
         cx.background_executor()
           .spawn(async move {
               match project_indexed_tags(&Platform,

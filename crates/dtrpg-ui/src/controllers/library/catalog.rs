@@ -1,9 +1,9 @@
 //! Catalog apply/reload logic, publisher-filter validation, and the render
 //! snapshot.
 //!
-//! The library index (`self.index`) is the catalog's only storage — there is
+//! The library index (`self.index()`) is the catalog's only storage — there is
 //! no in-memory `Vec<LibraryItem>` mirror of it. Every method here that used
-//! to scan or mutate one now reads from or writes to `self.index` directly.
+//! to scan or mutate one now reads from or writes to `self.index()` directly.
 //! `thumbnail_last_attempted`/`availability_last_checked` are the two
 //! exceptions: they're session-only state the index never persists, kept in
 //! `self.thumbnail_attempts`/`self.availability_checks` and overlaid onto an
@@ -34,7 +34,7 @@ impl LibraryController {
     /// The one place every other catalog-reading method in this controller
     /// should go through, so none of them forget the overlay.
     pub(super) fn all_items(&self) -> Vec<LibraryItem> {
-        self.overlaid_items(self.index.list_items().unwrap_or_default())
+        self.overlaid_items(self.index().list_items().unwrap_or_default())
     }
 
     /// Looks up a catalog item by id, independent of the current popover
@@ -44,7 +44,7 @@ impl LibraryController {
     /// tracks only the item id, not a full `LibraryItem` snapshot.
     #[must_use]
     pub fn item_by_id(&self, id: &str) -> Option<LibraryItem> {
-        let mut item = self.index
+        let mut item = self.index()
                            .get_item(id)
                            .map_err(|e| tracing::warn!(error = %e, "library index query failed"))
                            .ok()
@@ -64,7 +64,7 @@ impl LibraryController {
     /// load-completion refresh.
     pub(super) fn refresh_section_counts(&mut self) {
         let now = now_secs();
-        match self.index
+        match self.index()
                   .section_counts(now, self.recently_updated_window_days)
         {
             Ok(counts) => self.section_counts = counts,
@@ -80,7 +80,7 @@ impl LibraryController {
     /// satisfies.
     pub(super) fn refresh_sidebar_facets(&mut self) -> bool {
         self.refresh_section_counts();
-        match self.index.publisher_counts() {
+        match self.index().publisher_counts() {
             Ok(counts) => {
                 self.publishers = counts.into_iter()
                                         .map(|(name, count)| PublisherEntry { name, count })
@@ -109,12 +109,12 @@ impl LibraryController {
                               cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
         let merged = if reconcile {
-            reconcile_catalog(self.index.list_items().unwrap_or_default(), items)
+            reconcile_catalog(self.index().list_items().unwrap_or_default(), items)
         }
         else {
             items
         };
-        if let Err(e) = self.index.replace_all_items(&merged) {
+        if let Err(e) = self.index_mut().replace_all_items(&merged) {
             tracing::error!(error = %e, "failed to write the catalog to the library index");
         }
         self.catalog_loading = false;
@@ -170,8 +170,8 @@ impl LibraryController {
     pub(super) fn apply_partial_fetch(&mut self, partial: Vec<LibraryItem>,
                                       cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&partial, cx);
-        let merged = merge_partial_fetch(self.index.list_items().unwrap_or_default(), partial);
-        if let Err(e) = self.index.replace_all_items(&merged) {
+        let merged = merge_partial_fetch(self.index().list_items().unwrap_or_default(), partial);
+        if let Err(e) = self.index_mut().replace_all_items(&merged) {
             tracing::error!(error = %e, "failed to write the catalog to the library index");
         }
         self.catalog_loading = false;
@@ -189,9 +189,9 @@ impl LibraryController {
     /// pages.
     pub(super) fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
-        let mut merged = self.index.list_items().unwrap_or_default();
+        let mut merged = self.index().list_items().unwrap_or_default();
         merged.extend(items);
-        if let Err(e) = self.index.replace_all_items(&merged) {
+        if let Err(e) = self.index_mut().replace_all_items(&merged) {
             tracing::error!(error = %e, "failed to write the catalog to the library index");
         }
         self.refresh_sidebar_facets();
@@ -233,7 +233,7 @@ impl LibraryController {
     /// which is harmless since it only caches an image for a URL that may
     /// no longer be visible.
     pub fn clear_and_reload(&mut self, cx: &mut Context<Self>) {
-        if let Err(e) = self.index.replace_all_items(&[]) {
+        if let Err(e) = self.index_mut().replace_all_items(&[]) {
             tracing::error!(error = %e, "failed to clear the library index");
         }
         self.collections.clear();
@@ -333,7 +333,7 @@ impl LibraryController {
     /// Returns true while the initial catalog fetch is still in flight and no
     /// items have arrived.
     pub fn is_loading(&self) -> bool {
-        self.catalog_loading && self.index.count_all().unwrap_or(0) == 0
+        self.catalog_loading && self.index().count_all().unwrap_or(0) == 0
     }
 
     /// Builds the set of all product IDs that can match a collection's
@@ -390,7 +390,7 @@ impl LibraryController {
         // keep-stale-on-failure policy as the facet refreshes (issue #355).
         let count = {
             let item_filter = self.current_item_filter();
-            match self.index.count_items_filtered(&item_filter) {
+            match self.index().count_items_filtered(&item_filter) {
                 Ok(count) => Some(count),
                 Err(error) => {
                     tracing::warn!(%error, "could not count the filtered catalog");
@@ -406,7 +406,7 @@ impl LibraryController {
             let query = SearchQuery::parse(&self.search_query);
             let mut item_filter = self.current_item_filter();
             item_filter.search = Some(&query);
-            match self.index
+            match self.index()
                       .list_items_filtered(&item_filter, self.sort, self.sort_direction)
             {
                 Ok(items) => Some(items),

@@ -21,7 +21,7 @@ pub(super) async fn prepopulate_from_cache(ctx: &CatalogSyncCtx, async_cx: &mut 
                if ctrl.load_generation != ctx.generation {
                    return; // superseded by a newer load (e.g. cache-clear reload)
                }
-               if force_reload && let Err(e) = ctrl.index.replace_all_items(&[]) {
+               if force_reload && let Err(e) = ctrl.index_mut().replace_all_items(&[]) {
                    tracing::error!(error = %e, "failed to clear the library index");
                }
                // Only pre-populate when there's nothing in the index yet (fresh
@@ -30,7 +30,7 @@ pub(super) async fn prepopulate_from_cache(ctx: &CatalogSyncCtx, async_cx: &mut 
                // already-populated catalog (e.g. a periodic refresh tick after
                // the initial load completed, or any later call to
                // `start_load`/`start_load_inner`) would duplicate every item.
-               if ctrl.index.count_all().unwrap_or(0) == 0 {
+               if ctrl.index().count_all().unwrap_or(0) == 0 {
                    ctrl.append_catalog_page(items.clone(), cx);
                }
                // Whatever the network does next, the tags are on disk.
