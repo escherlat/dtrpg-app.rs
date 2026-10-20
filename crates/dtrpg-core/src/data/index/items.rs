@@ -8,7 +8,7 @@ use crate::data::enums::ItemStatus;
 use crate::data::index::{IndexError, tags};
 use crate::data::library::{LibraryItem, LibraryItemFile};
 
-fn status_to_text(status: ItemStatus) -> &'static str {
+pub(super) fn status_to_text(status: ItemStatus) -> &'static str {
     match status {
         ItemStatus::Downloaded => "downloaded",
         ItemStatus::Cloud => "cloud",
@@ -46,6 +46,29 @@ pub(super) fn replace_all_items(conn: &mut Connection, items: &[LibraryItem])
         insert_item(&tx, item)?;
     }
 
+    tx.commit()?;
+    Ok(())
+}
+
+/// Replaces one item's row, files, and FTS5 entry with `item`'s current
+/// state. The item must already exist in the index — this updates a known
+/// catalog entry's fields (status, availability, file flags, tags, …), it
+/// does not add a new item to the catalog (see [`replace_all_items`] for
+/// that).
+///
+/// Runs as a single transaction, same rationale as `replace_all_items`.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if any statement in the transaction fails.
+pub(super) fn replace_item(conn: &mut Connection, item: &LibraryItem) -> Result<(), IndexError> {
+    let tx = conn.transaction()?;
+    tx.execute("DELETE FROM files WHERE item_id = ?1",
+               params![item.id.as_ref()])?;
+    tx.execute("DELETE FROM items WHERE id = ?1", params![item.id.as_ref()])?;
+    tx.execute("DELETE FROM items_fts WHERE item_id = ?1",
+               params![item.id.as_ref()])?;
+    insert_item(&tx, item)?;
     tx.commit()?;
     Ok(())
 }
@@ -121,7 +144,7 @@ fn insert_item(conn: &Connection, item: &LibraryItem) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn row_to_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
+pub(super) fn row_to_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
     Ok(LibraryItem { id:                        Arc::from(row.get::<_, String>("id")?),
                      numeric_id:                row.get::<_, i64>("numeric_id")? as u64,
                      order_product_id:          row.get::<_, i64>("order_product_id")? as u64,
@@ -150,7 +173,8 @@ fn row_to_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
                      files:                     Vec::new(), })
 }
 
-fn load_files_for(conn: &Connection, item_id: &str) -> rusqlite::Result<Vec<LibraryItemFile>> {
+pub(super) fn load_files_for(conn: &Connection, item_id: &str)
+                             -> rusqlite::Result<Vec<LibraryItemFile>> {
     let mut stmt =
         conn.prepare(
                      "SELECT file_id, file_index, name, format, size_mb, downloaded, offloaded

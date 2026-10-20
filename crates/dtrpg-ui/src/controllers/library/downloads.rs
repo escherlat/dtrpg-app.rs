@@ -16,7 +16,7 @@ impl LibraryController {
     /// `LibraryItem::recompute_status`): every file's `downloaded` flag is
     /// cleared first, then the entry status is re-derived.
     pub fn remove_download(&mut self, id: &str, cx: &mut Context<Self>) {
-        if let Some(item) = self.catalog.iter_mut().find(|i| i.id.as_ref() == id)
+        if let Some(mut item) = self.item_by_id(id)
            && item.status == ItemStatus::Downloaded
         {
             for file in &mut item.files {
@@ -24,8 +24,12 @@ impl LibraryController {
                 file.offloaded = false;
             }
             item.recompute_status();
+            if let Err(e) = self.index.replace_item(&item) {
+                tracing::error!(error = %e, "failed to write item status to the library index");
+            }
+            let all = self.all_items();
             self.section_counts =
-                section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
+                section_counts(&all, now_secs(), self.recently_updated_window_days);
             self.invalidate_cache();
             self.file_info_cache
                 .retain(|(entry_id, _), _| entry_id.as_ref() != id);
@@ -43,9 +47,7 @@ impl LibraryController {
     /// queued/in flight — see [`Self::enqueue_item_download`].
     pub fn enqueue_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(indices) = self.catalog
-                                .iter()
-                                .find(|i| i.id.as_ref() == id)
+        let Some(indices) = self.item_by_id(id)
                                 .map(|item| missing_file_indices(&item.files))
         else {
             return;
@@ -68,7 +70,8 @@ impl LibraryController {
             return;
         };
         let member_ids = Arc::clone(&collection.member_ids);
-        let targets = collection_download_targets(&self.catalog, &member_ids);
+        let all = self.all_items();
+        let targets = collection_download_targets(&all, &member_ids);
         for (id, title) in targets {
             self.enqueue_download(&id, title.to_string(), cx);
         }
@@ -81,7 +84,8 @@ impl LibraryController {
     /// Already-downloaded, already-queued, and already-active items/files
     /// are left untouched — see [`Self::enqueue_download`].
     pub fn download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
-        let targets = publisher_download_targets(&self.catalog, publisher);
+        let all = self.all_items();
+        let targets = publisher_download_targets(&all, publisher);
         for (id, title) in targets {
             self.enqueue_download(&id, title.to_string(), cx);
         }
@@ -97,7 +101,8 @@ impl LibraryController {
     /// already-queued, and already-active items/files are left untouched —
     /// see [`Self::enqueue_download`].
     pub fn download_all_for_filter(&mut self, filter: &SidebarFilter, cx: &mut Context<Self>) {
-        let targets = filter_download_targets(&self.catalog,
+        let all = self.all_items();
+        let targets = filter_download_targets(&all,
                                               filter,
                                               &self.collection_members,
                                               now_secs(),
@@ -114,13 +119,11 @@ impl LibraryController {
     /// downloaded, or that specific file is already queued/in flight.
     pub fn enqueue_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
                                  cx: &mut Context<Self>) {
-        let Some(item) = self.catalog
-                             .iter()
-                             .find(|i| {
-                                 i.id.as_ref() == id
-                                 && i.files.get(index as usize).is_some_and(|f| !f.downloaded)
-                             })
-                             .cloned()
+        let Some(item) = self.item_by_id(id).filter(|item| {
+                                                item.files
+                                                    .get(index as usize)
+                                                    .is_some_and(|f| !f.downloaded)
+                                            })
         else {
             return;
         };
@@ -140,7 +143,7 @@ impl LibraryController {
     /// queuing anything.
     pub fn request_download(&mut self, id: &str, title: impl Into<String>, cx: &mut Context<Self>) {
         let title = title.into();
-        let Some(item) = self.catalog.iter().find(|i| i.id.as_ref() == id).cloned()
+        let Some(item) = self.item_by_id(id)
         else {
             return;
         };
@@ -160,15 +163,14 @@ impl LibraryController {
     pub fn request_item_download(&mut self, id: &str, index: u32, title: impl Into<String>,
                                  cx: &mut Context<Self>) {
         let title = title.into();
-        let Some((item, needed_mb)) = self.catalog
-                                          .iter()
-                                          .find(|i| i.id.as_ref() == id)
-                                          .and_then(|item| {
-                                              item.files
-                                                  .get(index as usize)
-                                                  .filter(|f| !f.downloaded)
-                                                  .map(|f| (item.clone(), f.size_mb))
-                                          })
+        let Some(item) = self.item_by_id(id)
+        else {
+            return;
+        };
+        let Some(needed_mb) = item.files
+                                  .get(index as usize)
+                                  .filter(|f| !f.downloaded)
+                                  .map(|f| f.size_mb)
         else {
             return;
         };
@@ -194,9 +196,10 @@ impl LibraryController {
             return;
         };
         let member_ids = Arc::clone(&collection.member_ids);
-        let targets = collection_download_targets(&self.catalog, &member_ids);
-        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
-                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        let all = self.all_items();
+        let targets = collection_download_targets(&all, &member_ids);
+        let needed_mb =
+            missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
         if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::Collection { collection_id });
             cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });
@@ -211,9 +214,10 @@ impl LibraryController {
     /// The check is evaluated once as an aggregate across every matching
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_publisher(&mut self, publisher: &str, cx: &mut Context<Self>) {
-        let targets = publisher_download_targets(&self.catalog, publisher);
-        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
-                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        let all = self.all_items();
+        let targets = publisher_download_targets(&all, publisher);
+        let needed_mb =
+            missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
         if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
             self.pending_download =
                 Some(PendingDownloadRequest::Publisher { publisher: Arc::from(publisher), });
@@ -230,13 +234,14 @@ impl LibraryController {
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_filter(&mut self, filter: SidebarFilter,
                                            cx: &mut Context<Self>) {
-        let targets = filter_download_targets(&self.catalog,
+        let all = self.all_items();
+        let targets = filter_download_targets(&all,
                                               &filter,
                                               &self.collection_members,
                                               now_secs(),
                                               self.recently_updated_window_days);
-        let needed_mb = missing_files_size_mb_for_items(&self.catalog,
-                                                        targets.iter().map(|(id, _)| id.as_ref()));
+        let needed_mb =
+            missing_files_size_mb_for_items(&all, targets.iter().map(|(id, _)| id.as_ref()));
         if let Some(free_mb) = Self::warn_if_insufficient_space(needed_mb) {
             self.pending_download = Some(PendingDownloadRequest::Filter { filter });
             cx.emit(LowDiskSpaceWarning { needed_mb, free_mb });

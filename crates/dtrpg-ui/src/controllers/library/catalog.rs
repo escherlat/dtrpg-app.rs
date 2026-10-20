@@ -1,16 +1,65 @@
 //! Catalog apply/reload logic, publisher-filter validation, and the render
 //! snapshot.
+//!
+//! The library index (`self.index`) is the catalog's only storage — there is
+//! no in-memory `Vec<LibraryItem>` mirror of it. Every method here that used
+//! to scan or mutate one now reads from or writes to `self.index` directly.
+//! `thumbnail_last_attempted`/`availability_last_checked` are the two
+//! exceptions: they're session-only state the index never persists, kept in
+//! `self.thumbnail_attempts`/`self.availability_checks` and overlaid onto an
+//! item right after it's fetched from the index (see
+//! [`Self::overlay_ephemeral_state`]), so the UI-facing `LibraryItem` API is
+//! unchanged.
 
 use super::*;
 
 impl LibraryController {
+    /// Sets `item.thumbnail_last_attempted`/`availability_last_checked` from
+    /// the controller's session-only tracking maps, since the index never
+    /// persists either (see this module's doc comment).
+    pub(super) fn overlay_ephemeral_state(&self, item: &mut LibraryItem) {
+        item.thumbnail_last_attempted = self.thumbnail_attempts.get(&item.id).copied();
+        item.availability_last_checked = self.availability_checks.get(&item.id).copied();
+    }
+
+    fn overlaid_items(&self, mut items: Vec<LibraryItem>) -> Vec<LibraryItem> {
+        for item in &mut items {
+            self.overlay_ephemeral_state(item);
+        }
+        items
+    }
+
+    /// Returns every item in the catalog, with ephemeral state overlaid.
+    ///
+    /// The one place every other catalog-reading method in this controller
+    /// should go through, so none of them forget the overlay.
+    pub(super) fn all_items(&self) -> Vec<LibraryItem> {
+        self.overlaid_items(self.index.list_items().unwrap_or_default())
+    }
+
+    /// Looks up a catalog item by id, independent of the current popover
+    /// selection, with ephemeral state overlaid.
+    ///
+    /// Used to resolve the full item for an open expanded detail tab, which
+    /// tracks only the item id, not a full `LibraryItem` snapshot.
+    #[must_use]
+    pub fn item_by_id(&self, id: &str) -> Option<LibraryItem> {
+        let mut item = self.index
+                           .get_item(id)
+                           .map_err(|e| tracing::warn!(error = %e, "library index query failed"))
+                           .ok()
+                           .flatten()?;
+        self.overlay_ephemeral_state(&mut item);
+        Some(item)
+    }
+
     /// Atomically replaces the catalog with a complete dataset and recomputes
     /// derived state.
     ///
     /// Used after all live SDK pages have been collected so the UI transitions
     /// from cached data to the full live set in one render pass.
     /// `reconcile` selects between two behaviors, per `catalog-live-data-swap`:
-    /// `false` replaces `self.catalog` outright with `items` (used when there
+    /// `false` replaces the catalog outright with `items` (used when there
     /// was no local baseline to reconcile against — first launch or after
     /// `clear_and_reload`); `true` merges `items` into the existing catalog
     /// by id via `reconcile_catalog` (items missing from `items` are kept,
@@ -18,16 +67,19 @@ impl LibraryController {
     pub(super) fn set_catalog(&mut self, items: Vec<LibraryItem>, reconcile: bool,
                               cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
-        self.catalog = if reconcile {
-            reconcile_catalog(std::mem::take(&mut self.catalog), items)
+        let merged = if reconcile {
+            reconcile_catalog(self.index.list_items().unwrap_or_default(), items)
         }
         else {
             items
         };
+        if let Err(e) = self.index.replace_all_items(&merged) {
+            tracing::error!(error = %e, "failed to write the catalog to the library index");
+        }
         self.catalog_loading = false;
-        self.section_counts =
-            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&self.catalog);
+        let all = self.all_items();
+        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
+        self.publishers = publisher_entries(&all);
         self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -78,11 +130,14 @@ impl LibraryController {
     pub(super) fn apply_partial_fetch(&mut self, partial: Vec<LibraryItem>,
                                       cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&partial, cx);
-        self.catalog = merge_partial_fetch(std::mem::take(&mut self.catalog), partial);
+        let merged = merge_partial_fetch(self.index.list_items().unwrap_or_default(), partial);
+        if let Err(e) = self.index.replace_all_items(&merged) {
+            tracing::error!(error = %e, "failed to write the catalog to the library index");
+        }
         self.catalog_loading = false;
-        self.section_counts =
-            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&self.catalog);
+        let all = self.all_items();
+        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
+        self.publishers = publisher_entries(&all);
         self.revalidate_publisher_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -95,10 +150,14 @@ impl LibraryController {
     /// pages.
     pub(super) fn append_catalog_page(&mut self, items: Vec<LibraryItem>, cx: &mut Context<Self>) {
         self.enqueue_thumbnails(&items, cx);
-        self.catalog.extend(items);
-        self.section_counts =
-            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
-        self.publishers = publisher_entries(&self.catalog);
+        let mut merged = self.index.list_items().unwrap_or_default();
+        merged.extend(items);
+        if let Err(e) = self.index.replace_all_items(&merged) {
+            tracing::error!(error = %e, "failed to write the catalog to the library index");
+        }
+        let all = self.all_items();
+        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
+        self.publishers = publisher_entries(&all);
         self.invalidate_cache();
         cx.emit(LibraryChanged);
     }
@@ -123,8 +182,7 @@ impl LibraryController {
         self.start_load_inner(cx, false);
     }
 
-    /// Drops the in-memory catalog and collections, then forces a full live
-    /// fetch.
+    /// Drops the catalog and collections, then forces a full live fetch.
     ///
     /// Used after the on-disk app cache has been cleared, so stale content
     /// disappears from the UI immediately instead of lingering until an
@@ -138,7 +196,9 @@ impl LibraryController {
     /// which is harmless since it only caches an image for a URL that may
     /// no longer be visible.
     pub fn clear_and_reload(&mut self, cx: &mut Context<Self>) {
-        self.catalog.clear();
+        if let Err(e) = self.index.replace_all_items(&[]) {
+            tracing::error!(error = %e, "failed to clear the library index");
+        }
         self.collections.clear();
         self.collection_members.clear();
         self.section_counts = SectionCounts::default();
@@ -199,7 +259,7 @@ impl LibraryController {
     pub fn snapshot(&self) -> LibrarySnapshot {
         let items = self.visible_items_shared();
         let matched_count = items.len();
-        let selected_item = self.selected_item().cloned();
+        let selected_item = self.selected_item();
         LibrarySnapshot { filter: self.filter.clone(),
                           counts: self.section_counts,
                           publishers: self.publishers.clone(),
@@ -236,7 +296,7 @@ impl LibraryController {
     /// Returns true while the initial catalog fetch is still in flight and no
     /// items have arrived.
     pub fn is_loading(&self) -> bool {
-        self.catalog_loading && self.catalog.is_empty()
+        self.catalog_loading && self.index.count_all().unwrap_or(0) == 0
     }
 
     /// Builds the set of all product IDs that can match a collection's
@@ -246,8 +306,9 @@ impl LibraryController {
     /// list items API returns `productId` (not `orderProductId`) in its
     /// response.
     pub(super) fn catalog_ids(&self) -> HashSet<u64> {
-        let mut ids = HashSet::with_capacity(self.catalog.len() * 2);
-        for item in &self.catalog {
+        let all = self.all_items();
+        let mut ids = HashSet::with_capacity(all.len() * 2);
+        for item in &all {
             if item.order_product_id > 0 {
                 ids.insert(item.order_product_id);
             }
@@ -259,7 +320,7 @@ impl LibraryController {
     }
 
     /// Records that a thumbnail fetch for item `id` was attempted at `at`, in
-    /// the catalog and in the cached result set.
+    /// the session-only tracking map and in the cached result set.
     ///
     /// Does not recompute the result set, as [`invalidate_cache`] would: the
     /// time is in neither the filter nor the sort, and a cover arrives for
@@ -267,9 +328,7 @@ impl LibraryController {
     ///
     /// [`invalidate_cache`]: Self::invalidate_cache
     pub(super) fn note_thumbnail_attempt(&mut self, id: &Arc<str>, at: std::time::SystemTime) {
-        if let Some(item) = self.catalog.iter_mut().find(|item| item.id == *id) {
-            item.thumbnail_last_attempted = Some(at);
-        }
+        self.thumbnail_attempts.insert(Arc::clone(id), at);
         let Some(cached) = self.items_cache.as_mut()
         else {
             return;
@@ -282,7 +341,7 @@ impl LibraryController {
     // ── Filtered result set
     // ───────────────────────────────────────────────────
 
-    /// Recomputes the filtered, sorted item cache from the current catalog,
+    /// Recomputes the filtered, sorted item cache from the catalog's current
     /// filter, search query, and sort settings.
     ///
     /// Called eagerly at every mutation site that changes any of those inputs
@@ -291,23 +350,55 @@ impl LibraryController {
         let now_secs = now_secs();
         let window_days = self.recently_updated_window_days;
         let query = SearchQuery::parse(&self.search_query);
-        let mut filter_count = 0;
-        let mut items: Vec<LibraryItem> = Vec::new();
-        for item in &self.catalog {
-            if !item_matches_filter(item,
-                                    &self.filter,
-                                    &self.collection_members,
-                                    now_secs,
-                                    window_days)
-            {
-                continue;
+
+        let item_filter = match &self.filter {
+            SidebarFilter::AllTitles | SidebarFilter::Tag { .. } => {
+                dtrpg_core::data::index::ItemFilter::default()
             }
-            filter_count += 1;
-            if query.matches(item, self.tags.tag_names_of(&item.id)) {
-                items.push(item.clone());
+            SidebarFilter::OnDevice => {
+                dtrpg_core::data::index::ItemFilter { status: Some(ItemStatus::Downloaded),
+                                                      ..Default::default() }
             }
+            SidebarFilter::InCloud => {
+                dtrpg_core::data::index::ItemFilter { status: Some(ItemStatus::Cloud),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::RecentlyUpdated => {
+                dtrpg_core::data::index::ItemFilter { recently_updated: Some((now_secs,
+                                                                              window_days)),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::Publisher(name) => {
+                dtrpg_core::data::index::ItemFilter { publisher: Some(name),
+                                                      ..Default::default() }
+            }
+            SidebarFilter::Collection(..) => {
+                dtrpg_core::data::index::ItemFilter { collection_member_ids:
+                                                          Some(&self.collection_members),
+                                                      ..Default::default() }
+            }
+        };
+        let matched = self.index
+                          .list_items_filtered(&item_filter, self.sort, self.sort_direction)
+                          .unwrap_or_default();
+        // `Tag` is resolved against a pre-computed id set rather than a SQL
+        // dimension (see `catalog-reads-from-index`'s design notes), so it's
+        // applied as an extra pass here instead of through `item_filter`.
+        let matched: Vec<LibraryItem> = if let SidebarFilter::Tag { items, .. } = &self.filter {
+            matched.into_iter()
+                   .filter(|item| items.contains(&item.id))
+                   .collect()
         }
-        sort_items(&mut items, self.sort, self.sort_direction);
+        else {
+            matched
+        };
+        let filter_count = matched.len();
+        let items: Vec<LibraryItem> =
+            self.overlaid_items(matched)
+                .into_iter()
+                .filter(|item| query.matches(item, self.tags.tag_names_of(&item.id)))
+                .collect();
+
         self.items_cache = Some(Arc::new(items));
         self.filter_count_cache = filter_count;
         self.catalog_ids_cache = Arc::new(self.catalog_ids());

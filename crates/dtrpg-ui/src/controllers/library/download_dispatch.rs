@@ -131,7 +131,7 @@ impl LibraryController {
         let (item_id, index) = job.key.clone();
         let dest = job.dest.take();
         let succeeded = outcome == Outcome::Succeeded;
-        if let Some(item) = self.catalog.iter_mut().find(|i| i.id == item_id) {
+        if let Some(mut item) = self.item_by_id(&item_id) {
             if succeeded {
                 if let Some(file) = item.files.get_mut(index as usize) {
                     file.downloaded = true;
@@ -147,22 +147,21 @@ impl LibraryController {
                 }
             }
             item.recompute_status();
+            // Persist the download to the library index immediately —
+            // otherwise a restart before the next catalog reload shows
+            // `Cloud` status regardless of what `reconcile_catalog` does
+            // (see `catalog-live-data-swap`).
+            if let Err(e) = self.index.replace_item(&item) {
+                tracing::error!(error = %e, "failed to write download status to the library index");
+            }
         }
-        self.section_counts =
-            section_counts(&self.catalog, now_secs(), self.recently_updated_window_days);
+        let all = self.all_items();
+        self.section_counts = section_counts(&all, now_secs(), self.recently_updated_window_days);
         self.invalidate_cache();
         cx.emit(LibraryChanged);
 
-        // Persist the download to the on-disk catalog cache immediately —
-        // otherwise a restart before the next live-fetch cache write (see
-        // `start_load_inner`) loads a cache that never recorded this
-        // download, showing `Cloud` status regardless of what
-        // `reconcile_catalog` does (see `catalog-live-data-swap`).
-        if succeeded {
-            self.save_catalog_in_background(cx);
-            if let Some(dest) = dest.clone() {
-                self.project_tags_after_download(&item_id, dest, cx);
-            }
+        if succeeded && let Some(dest) = dest.clone() {
+            self.project_tags_after_download(&item_id, dest, cx);
         }
 
         let activity_id = job.activity_id;
@@ -189,18 +188,5 @@ impl LibraryController {
                 }
             }
         }
-    }
-
-    /// Writes a copy of the catalog to the on-disk cache without blocking.
-    fn save_catalog_in_background(&self, cx: &mut Context<Self>) {
-        let items = self.catalog.clone();
-        let root = self.cache_root.clone();
-        cx.background_executor()
-          .spawn(async move {
-              if let Err(error) = save_catalog_cache(&root, &items) {
-                  tracing::warn!(error = %error, "failed to save catalog cache");
-              }
-          })
-          .detach();
     }
 }

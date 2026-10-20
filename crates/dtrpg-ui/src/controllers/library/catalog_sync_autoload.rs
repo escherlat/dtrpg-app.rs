@@ -134,17 +134,8 @@ pub(super) async fn try_skip_or_partial_fetch(ctx: &CatalogSyncCtx, async_cx: &m
            ctrl.verify_catalog_downloads(cx);
        })
        .ok();
-    let items_to_save = ctx.this
-                           .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
-                           .unwrap_or_default();
-    let save_root = ctx.storage_root.clone();
-    async_cx.background_executor()
-            .spawn(async move {
-                if let Err(e) = save_catalog_cache(&save_root, &items_to_save) {
-                    tracing::warn!(error = %e, "failed to save catalog cache");
-                }
-            })
-            .await;
+    // No separate save step: `apply_partial_fetch` already wrote the merged
+    // catalog to `ctrl.index` synchronously above.
     ctx.weak_activity
        .update(async_cx, |a, cx| a.complete(ctx.activity_id, cx))
        .ok();

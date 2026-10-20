@@ -116,7 +116,9 @@ pub(super) async fn run_full_fetch(ctx: &CatalogSyncCtx, async_cx: &mut AsyncApp
     // loading observable/testable without waiting through a full multi-page
     // fetch.
     let catalog_was_empty = ctx.this
-                               .update(async_cx, |ctrl, _cx| ctrl.catalog.is_empty())
+                               .update(async_cx, |ctrl, _cx| {
+                                   ctrl.index.count_all().unwrap_or(0) == 0
+                               })
                                .unwrap_or(false);
 
     let mut rx = Some(rx);
@@ -262,23 +264,13 @@ pub(super) async fn run_full_fetch(ctx: &CatalogSyncCtx, async_cx: &mut AsyncApp
                    ctrl.verify_catalog_downloads(cx);
                })
                .ok();
-            // Wait for any in-flight checkpoint write to finish before writing
-            // the final cache — both write `save_root`'s `.tmp`
-            // file, so they must never run concurrently.
+            // Wait for any in-flight checkpoint write to finish — it wrote
+            // `save_root`'s `.tmp` file for the accumulating buffer during
+            // the fetch; `set_catalog` above already wrote the finished
+            // result straight to `ctrl.index`, so no final save is needed.
             if let Some(prev) = checkpoint_task.take() {
                 prev.await;
             }
-            let items_to_save = ctx.this
-                                   .update(async_cx, |ctrl, _cx| ctrl.catalog.clone())
-                                   .unwrap_or_default();
-            let save_root = ctx.storage_root.clone();
-            async_cx.background_executor()
-                    .spawn(async move {
-                        if let Err(e) = save_catalog_cache(&save_root, &items_to_save) {
-                            tracing::warn!(error = %e, "failed to save catalog cache");
-                        }
-                    })
-                    .await;
             ctx.weak_activity
                .update(async_cx, |a, cx| a.complete(ctx.activity_id, cx))
                .ok();

@@ -387,17 +387,17 @@ pub(super) fn fixture_with(cx: &mut TestAppContext, transport: Arc<ScriptedTrans
     let controller =
         cx.new(|cx| {
               let (mut ctrl, events) =
-                  LibraryController::build(Box::new(SharedLibrary(Arc::clone(&library))),
-                                           Box::new(UnusedCollections),
-                                           activity.clone());
+                  LibraryController::build_with_cache_root(Box::new(SharedLibrary(Arc::clone(&library))),
+                                                           Box::new(UnusedCollections),
+                                                           activity.clone(),
+                                                           cache_path.clone());
               ctrl.cover_fetcher = Arc::new(CoverFetcher::new(Arc::clone(&transport)
                                                               as Arc<dyn CoverTransport>,
                                                               covers.path().to_path_buf()));
-              ctrl.cache_root = cache_path.clone();
               // A test must not wait on, or depend on, the real network.
               ctrl.network_monitor = Arc::new(NetworkMonitor::fixed(true));
               ctrl.work.set_limit(limit);
-              ctrl.catalog = items;
+              ctrl.index.replace_all_items(&items).unwrap();
               ctrl.start_work_event_pump(events, cx);
               ctrl
           });

@@ -22,9 +22,7 @@ fn download(fixture: &Fixture, cx: &mut TestAppContext, id: &str) {
 
 fn file_downloaded(fixture: &Fixture, cx: &mut TestAppContext, id: &str) -> bool {
     fixture.controller.read_with(cx, |ctrl, _| {
-                          ctrl.catalog
-                              .iter()
-                              .find(|item| &*item.id == id)
+                          ctrl.item_by_id(id)
                               .is_some_and(|item| item.files[0].downloaded)
                       })
 }
@@ -56,7 +54,7 @@ fn a_download_marks_the_file_downloaded_and_completes_its_activity(cx: &mut Test
 
     assert!(!is_downloading(&fixture, cx, "a"));
     let status = fixture.controller
-                        .read_with(cx, |ctrl, _| ctrl.catalog[0].status);
+                        .read_with(cx, |ctrl, _| ctrl.item_by_id("a").unwrap().status);
     assert_eq!(status, ItemStatus::Downloaded);
     let items = fixture.activity.read_with(cx, |a, _| a.snapshot().items);
     assert!(matches!(items[0].status, ActivityStatus::Complete));
@@ -96,9 +94,15 @@ fn a_failed_download_leaves_the_file_and_fails_its_activity(cx: &mut TestAppCont
     assert!(!is_downloading(&fixture, cx, "a"));
     let items = fixture.activity.read_with(cx, |a, _| a.snapshot().items);
     assert!(matches!(&items[0].status, ActivityStatus::Error(message) if message.contains("boom")));
-    let cache_written = std::fs::read_dir(&fixture.cache).is_ok_and(|mut dir| dir.next().is_some());
-    assert!(!cache_written,
-            "a failed download does not rewrite the catalog cache");
+    // The library index is opened at construction regardless of download
+    // outcome (it's the controller's only storage, not a write-on-success
+    // cache file), so what matters here is that the failed download didn't
+    // get recorded as downloaded in it.
+    let status = fixture.controller
+                        .read_with(cx, |ctrl, _| ctrl.item_by_id("a").unwrap().status);
+    assert_eq!(status,
+               ItemStatus::Cloud,
+               "a failed download does not mark the item downloaded in the library index");
 }
 
 #[gpui::test]
