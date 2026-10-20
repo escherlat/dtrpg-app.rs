@@ -1,38 +1,18 @@
-//! `LibraryIndex::list_items_filtered`: the sidebar-filter + sort query that
-//! replaces `LibraryController::invalidate_cache()`'s in-memory `Vec` scan.
-//! See `openspec/changes/catalog-reads-from-index` for why.
-
-use std::collections::HashSet;
+//! `list_items_filtered` / `count_items_filtered`: the sidebar-filter + sort
+//! queries that replaced `LibraryController::invalidate_cache()`'s in-memory
+//! `Vec` scan (`catalog-reads-from-index`) and now also carry the search box
+//! and `Tag` dimensions (#353). See the change proposals for why.
 
 use rusqlite::{Connection, params_from_iter};
 
-use super::items::{row_to_item, status_to_text};
-use crate::data::enums::ItemStatus;
+use super::clause::{ItemFilter, build_where};
 use crate::data::index::IndexError;
+use crate::data::index::items::{load_files_for, row_to_item};
 use crate::data::library::LibraryItem;
 use crate::util::sort::{SortDirection, SortMethod};
 
-/// A sidebar-filter dimension to apply, beyond what's always true
-/// (`SidebarFilter::AllTitles`). At most one is ever set by the current UI
-/// (see `catalog-reads-from-index`'s design notes), but each is independent
-/// of the others here rather than folded into one enum, since a future
-/// caller combining them should not need a new query function.
-#[derive(Default)]
-pub struct ItemFilter<'a> {
-    pub status:                Option<ItemStatus>,
-    pub publisher:             Option<&'a str>,
-    /// Member ids to match an item's `order_product_id` or `product_id`
-    /// against, resolved by the caller (the controller's own
-    /// `collection_members`, kept current by optimistic edits) rather than
-    /// joined against the index's own `collection_membership` table — see
-    /// design.md's risk note on why those two can briefly disagree.
-    pub collection_member_ids: Option<&'a HashSet<u64>>,
-    /// `(now_secs, window_days)`, matching
-    /// [`super::items::count_recently_updated`]'s window semantics exactly.
-    pub recently_updated:      Option<(i64, u32)>,
-}
-
-/// Returns every item matching `filter`, sorted by `sort`/`direction`.
+/// Returns every item matching `filter` (including its `search` dimension, if
+/// set), sorted by `sort`/`direction`.
 ///
 /// Mirrors `dtrpg_ui`'s `item_matches_filter` (for the dimensions `filter`
 /// sets) and `sort_items` (for every `SortMethod`, including `Custom`'s
@@ -42,52 +22,10 @@ pub struct ItemFilter<'a> {
 /// # Errors
 ///
 /// Returns [`IndexError::Sqlite`] if the query fails.
-pub(super) fn list_items_filtered(conn: &Connection, filter: &ItemFilter<'_>, sort: SortMethod,
-                                  direction: SortDirection)
-                                  -> Result<Vec<LibraryItem>, IndexError> {
-    let mut clauses: Vec<String> = Vec::new();
-    let mut args: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-
-    if let Some(status) = filter.status {
-        clauses.push(format!("status = ?{}", args.len() + 1));
-        args.push(Box::new(status_to_text(status)));
-    }
-    if let Some(publisher) = filter.publisher {
-        clauses.push(format!("publisher = ?{}", args.len() + 1));
-        args.push(Box::new(publisher.to_owned()));
-    }
-    if let Some((now_secs, window_days)) = filter.recently_updated {
-        let window_secs = i64::from(window_days) * 24 * 60 * 60;
-        clauses.push(format!("COALESCE(date_updated, date_added) >= ?{} - ?{}",
-                             args.len() + 1,
-                             args.len() + 2));
-        args.push(Box::new(now_secs));
-        args.push(Box::new(window_secs));
-    }
-    if let Some(member_ids) = filter.collection_member_ids {
-        let placeholders = member_ids.iter()
-                                     .map(|_| "?".to_string())
-                                     .collect::<Vec<_>>()
-                                     .join(", ");
-        clauses.push(format!(
-            "(order_product_id IN ({placeholders}) OR product_id IN ({placeholders}))"
-        ));
-        // Each `IN` list needs its own copy of the id set, since the same
-        // placeholders string is reused for both columns above.
-        for id in member_ids {
-            args.push(Box::new(*id as i64));
-        }
-        for id in member_ids {
-            args.push(Box::new(*id as i64));
-        }
-    }
-
-    let where_clause = if clauses.is_empty() {
-        String::new()
-    }
-    else {
-        format!("WHERE {}", clauses.join(" AND "))
-    };
+pub(in crate::data::index) fn list_items_filtered(conn: &Connection, filter: &ItemFilter<'_>,
+                                                  sort: SortMethod, direction: SortDirection)
+                                                  -> Result<Vec<LibraryItem>, IndexError> {
+    let (where_clause, args) = build_where(filter);
     let order_by = order_by_clause(sort);
     let sql = format!("SELECT * FROM items {where_clause} ORDER BY {order_by}");
 
@@ -96,12 +34,30 @@ pub(super) fn list_items_filtered(conn: &Connection, filter: &ItemFilter<'_>, so
                                    row_to_item)?
                         .collect::<rusqlite::Result<Vec<_>>>()?;
     for item in &mut items {
-        item.files = super::items::load_files_for(conn, &item.id)?;
+        item.files = load_files_for(conn, &item.id)?;
     }
     if direction == SortDirection::Descending {
         items.reverse();
     }
     Ok(items)
+}
+
+/// Counts the items matching `filter` without materializing any of them —
+/// the "matching the filter alone, search ignored" number the toolbar's
+/// `count_label_for` calls `filter_count`, which the list query can no longer
+/// answer once `search` is one of its dimensions.
+///
+/// # Errors
+///
+/// Returns [`IndexError::Sqlite`] if the query fails.
+pub(in crate::data::index) fn count_items_filtered(conn: &Connection, filter: &ItemFilter<'_>)
+                                                   -> Result<usize, IndexError> {
+    let (where_clause, args) = build_where(filter);
+    let sql = format!("SELECT COUNT(*) FROM items {where_clause}");
+    let count: i64 = conn.query_row(&sql,
+                                    params_from_iter(args.iter().map(AsRef::as_ref)),
+                                    |row| row.get(0))?;
+    Ok(count as usize)
 }
 
 /// Maps `sort` to an `ORDER BY` clause, mirroring `sort_items`'s match
@@ -123,6 +79,7 @@ fn order_by_clause(sort: SortMethod) -> &'static str {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use crate::data::enums::ItemStatus;
     use crate::data::index::LibraryIndex;
 
     // Test fixture builder mirroring `LibraryItem::new`'s own arity.
@@ -330,5 +287,28 @@ mod tests {
         let items = index.list_items_filtered(&filter, SortMethod::Title, SortDirection::Ascending)
                          .unwrap();
         assert_eq!(titles(&items), vec!["Recent Book"]);
+    }
+
+    #[test]
+    fn count_matches_list_length_across_dimensions() {
+        let index = seeded();
+        let book_query = crate::util::search::SearchQuery::parse("book");
+        let cases = [ItemFilter::default(),
+                     ItemFilter { status: Some(ItemStatus::Cloud),
+                                  ..Default::default() },
+                     ItemFilter { publisher: Some("Mid House"),
+                                  ..Default::default() },
+                     ItemFilter { tag_name: Some("nothing"),
+                                  ..Default::default() },
+                     ItemFilter { search: Some(&book_query),
+                                  ..Default::default() }];
+        for filter in cases {
+            let listed =
+                index.list_items_filtered(&filter, SortMethod::Title, SortDirection::Ascending)
+                     .unwrap();
+            assert_eq!(index.count_items_filtered(&filter).unwrap(),
+                       listed.len(),
+                       "count disagreed with list for {filter:?}");
+        }
     }
 }

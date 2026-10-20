@@ -9,6 +9,7 @@
 mod collections;
 mod facets;
 mod filtered_items;
+mod functions;
 mod items;
 mod migrate;
 mod schema;
@@ -84,20 +85,29 @@ impl LibraryIndex {
         let db_path = root.join("library_index.sqlite3");
         let already_existed = db_path.exists();
 
-        let mut conn = Connection::open(&db_path)?;
-        schema::ensure_schema(&conn)?;
+        let mut index = Self::initialized(Connection::open(&db_path)?)?;
 
         if !already_existed {
-            migrate::migrate_json_caches(&mut conn, root)?;
+            migrate::migrate_json_caches(&mut index.conn, root)?;
         }
 
-        Ok(Self { conn })
+        Ok(index)
     }
 
     /// Opens an in-memory index with no migration, for tests.
     #[cfg(test)]
     pub(crate) fn open_in_memory() -> Result<Self, IndexError> {
-        let conn = Connection::open_in_memory()?;
+        Self::initialized(Connection::open_in_memory()?)
+    }
+
+    /// Single initialization sequence every `LibraryIndex` connection goes
+    /// through: custom SQL functions first (so a future schema object that
+    /// references `ulower` can be created), then the schema. One path, not
+    /// two, so no future open site can half-initialize a connection and let
+    /// an `ulower` query fail into `unwrap_or_default()`'s silent empty
+    /// catalog.
+    fn initialized(conn: Connection) -> Result<Self, IndexError> {
+        functions::register_functions(&conn)?;
         schema::ensure_schema(&conn)?;
         Ok(Self { conn })
     }
@@ -217,6 +227,17 @@ impl LibraryIndex {
                                direction: SortDirection)
                                -> Result<Vec<LibraryItem>, IndexError> {
         filtered_items::list_items_filtered(&self.conn, filter, sort, direction)
+    }
+
+    /// Counts the items matching `filter` without materializing them. Pass
+    /// `search: None` for the toolbar's "section size ignoring search"
+    /// number (`openspec/changes/search-box-semantics-sql`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Sqlite`] if the query fails.
+    pub fn count_items_filtered(&self, filter: &ItemFilter<'_>) -> Result<usize, IndexError> {
+        filtered_items::count_items_filtered(&self.conn, filter)
     }
 
     /// Replaces the entire collection list with `entries`. See
