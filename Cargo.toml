@@ -58,7 +58,7 @@ core-foundation-sys = "0.8.6"
 core-video = { version = "0.6.1", features = ["metal"] }
 metal = "0.33"
 md5 = "0.8"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
 rust-i18n = "4"
@@ -74,6 +74,7 @@ flate2 = "1.1.10"
 bzip2 = "0.6.1"
 xz2 = "0.1.7"
 zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+lopdf = { version = "0.45.0", default-features = false }
 tempfile = "3.27.0"
 # File-system tags: extended attributes (macOS and Linux) and the binary
 # property list macOS stores user tags in.

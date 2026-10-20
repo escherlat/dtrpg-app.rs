@@ -93,14 +93,25 @@ pub const ITEM_CHECK_BATCH_TIMER_SECS: u64 = 300;
 /// visible.
 pub const THUMBNAIL_COOLDOWN_SECS: u64 = 300;
 
-/// Reverse-DNS service namespace used for all keyring entries.
+/// Reverse-DNS service namespace used for DriveThruRPG keyring entries.
 pub const KEYRING_SERVICE: &str = MACOS_BUNDLE_ID;
 
 /// Account key for the DriveThruRPG API key credential.
 ///
-/// This is the only credential persisted to the keychain. Access tokens and
-/// refresh tokens are kept in memory and re-acquired at startup.
+/// Access tokens and refresh tokens are kept in memory and re-acquired at
+/// startup, so this and [`KEYRING_ANTHROPIC_API_KEY`] (a distinct service
+/// namespace) are the only credentials persisted to the keychain.
 pub const KEYRING_API_KEY: &str = "api-key";
+
+/// Reverse-DNS service namespace for the user's own Anthropic API key, used
+/// for content-summary generation ([`crate::data::summary_settings`]).
+/// Deliberately separate from [`KEYRING_SERVICE`] -- this is a different
+/// credential for a different, optional feature, not a DriveThruRPG
+/// credential.
+pub const KEYRING_ANTHROPIC_SERVICE: &str = "com.pilgrimagesoftware.dtrpg.anthropic";
+
+/// Account key for the Anthropic API key credential.
+pub const KEYRING_ANTHROPIC_API_KEY: &str = "api-key";
 
 pub const RECENT_CAP: usize = 25;
 pub const EXPIRY_SECS: u64 = 15;

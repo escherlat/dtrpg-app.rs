@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod anthropic_summary;
 pub mod auth_state;
 pub mod avatar;
 pub mod catalog_cache;
@@ -17,6 +18,7 @@ pub mod profile;
 pub mod selection;
 pub mod storage;
 pub mod summary;
+pub mod summary_settings;
 pub mod tag_color;
 pub mod tag_library;
 pub mod token_status;

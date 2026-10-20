@@ -1704,6 +1704,7 @@ dependencies = [
  "flate2",
  "fs4",
  "keyring",
+ "lopdf",
  "md5",
  "plist",
  "reqwest 0.12.28",
