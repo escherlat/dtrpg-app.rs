@@ -611,12 +611,9 @@ results equivalence is the acceptance bar, not a spec change).
 Merged to `develop` via PR #358 (`4003f71`) and archived at
 `openspec/changes/archive/2026-10-20-search-box-semantics-sql`.
 
-`group_by_publisher`/`group_by_tag` SQLization is now unblocked in principle
-(search is a query dimension), but still render-path-cached Rust; revisit
-only with a measured reason. If search latency regresses at large catalog
-sizes, the escape hatch is a second FTS5 trigram table for the text part
-(keep the EXISTS shapes for tags) — `design.md` records why plain `instr`
-was chosen first.
+If search latency regresses at large catalog sizes, the escape hatch is a
+second FTS5 trigram table for the text part (keep the EXISTS shapes for tags)
+— `design.md` records why plain `instr` was chosen first.
 
 # Publisher/tag aggregation from the index: status at 2026-10-20
 
@@ -652,19 +649,23 @@ OpenSpec change: `openspec/changes/publisher-aggregation-sql`
 
 ## Scope correction to #355 (deliberate, not dropped)
 
-`group_by_publisher()`/`group_by_tag()` stay in Rust. They partition the
-*current result set* (post-search, cached in `items_cache`), not the catalog;
-SQLizing them needs #353 (search-box semantics in SQL) first, and querying
-from `grouped_items()` would put SQLite I/O on the render path — where a
-stale cache refetch runs per search keystroke. If #353 lands, revisit.
+`group_by_publisher()`/`group_by_tag()` stayed in Rust for #355 itself.
+SQLizing them needed #353 first and required moving grouping out of the
+render path; that follow-up is issue #361 and PR #362 (merged, see the
+"Group by SQL" section below).
+
+## Status
+
+Merged to `develop` via PR #357 (`942d0e8`) and archived at
+`openspec/changes/archive/2026-10-20-publisher-aggregation-sql`.
 
 ## Not done
 
 - The pure `data::library::section_counts` scan and `publisher_entries()`
   still exist (the first as the identity reference for the SQL composition,
-  the second because `group_by_publisher()` still uses its ordering). They
-  have no production callers other than those; decide on removal alongside
-  #353.
+  the second as the ordering oracle for the now-`SUPERSEDED` Rust
+  partitioners). They have no production callers; remove them in the next
+  cleanup pass now that the SQL grouping path has shipped.
 - `dtrpg-ui` was not rendered in this environment (no display), same caveat
   as the tags work: verified by compiling and controller/pure-function tests.
 
@@ -698,6 +699,11 @@ mechanism swap, no observable behavior change).
   index state, for both sort directions and for a search-filtered subset.
 - Verified: clippy -D warnings clean, 528 core incl. 4 new / 341 ui / 6 mcp
   tests, `make fmt-check`, `make size-check`.
+
+## Status
+
+Merged to `develop` via PR #362 (`845c1bd`) and archived at
+`openspec/changes/archive/2026-10-20-group-by-sql`.
 
 ## Scope correction to #361
 
