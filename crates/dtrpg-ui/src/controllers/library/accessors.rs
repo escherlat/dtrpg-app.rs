@@ -4,10 +4,9 @@
 //! into `Library` itself.
 
 use std::path::PathBuf;
-use std::sync::{Arc, MutexGuard, PoisonError};
+use std::sync::{MutexGuard, PoisonError};
 
 use dtrpg_core::data::index::LibraryIndex;
-use dtrpg_core::services::covers::CoverFetcher;
 use dtrpg_core::work::WorkQueue;
 
 use super::LibraryController;
@@ -39,11 +38,6 @@ impl LibraryController {
     /// Shared reference to the core work queue.
     pub(super) fn work(&self) -> &WorkQueue {
         &self.library.work
-    }
-
-    /// Shared reference to the cover fetcher.
-    pub(super) fn cover_fetcher(&self) -> &Arc<CoverFetcher> {
-        &self.library.cover_fetcher
     }
 
     /// Path to the directory that holds the library index database.
