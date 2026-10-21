@@ -6,5 +6,5 @@
 - [x] Slice 4: Move download/check/thumbnail job orchestration into `Library`.
 - [x] Slice 5: Move catalog mutations into `Library` (item status, disk-presence reconciliation, tag-edit scope, collection-membership edits).
 - [x] Follow-up: move the collections list, the tag-read generation guard, and `verifying_downloads` into `Library`. The `CollectionsService` handle stays on the controller as an adapter (its calls run on gpui's executors).
-- [ ] Update `NOTES.md` ADR 0002 section when slices are merged.
-- [ ] Archive this OpenSpec change after merge.
+- [x] Update `NOTES.md` ADR 0002 section when slices are merged.
+- [x] Archive this OpenSpec change after merge.

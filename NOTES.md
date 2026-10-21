@@ -930,3 +930,9 @@ the controller holds no job-state sets. Still on the controller: the
   gpui spawn glue around the service calls. Everything the controller still
   holds is view state or an adapter.
 
+## ADR 0002 controller decomposition: archived (2026-10-21)
+
+All five slices and the follow-up are merged (#365, #367, #374, #375, #376,
+#377, #378). The OpenSpec change is archived at
+`openspec/changes/archive/2026-10-21-adr-0002-controller-decomposition`.
+
