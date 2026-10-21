@@ -5,12 +5,11 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use dtrpg_core::data::collection::CollectionEntry;
-use dtrpg_core::data::library::{LibraryItem, LibraryItemFile};
-use dtrpg_core::data::storage::{StorageConfig, sanitize_path_component};
-use dtrpg_core::util::matching::member_ids_contain;
-
+use crate::data::collection::CollectionEntry;
+use crate::data::library::{LibraryItem, LibraryItemFile};
+use crate::data::storage::{StorageConfig, sanitize_path_component};
 use crate::util::icloud_status;
+use crate::util::matching::member_ids_contain;
 
 /// Resolves the expected on-disk path for `file` within `item`'s entry,
 /// matching `dispatch_download`'s destination computation so both the
@@ -156,9 +155,8 @@ pub fn verify_item_downloads(item: &mut LibraryItem, storage: &StorageConfig) ->
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use dtrpg_core::data::enums::ItemStatus;
-
     use super::*;
+    use crate::data::enums::ItemStatus;
 
     /// Per-test isolated root under the system tempdir, matching the
     /// `test_dir` convention used by `catalog_cache`/`cover_cache`/

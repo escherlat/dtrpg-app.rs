@@ -15,6 +15,7 @@ use std::{
 use dtrpg_core::{
     data::collection::CollectionEntry,
     services::{
+        LibraryServiceError,
         collections::CollectionsServiceError,
         covers::{CoverFetchError, CoverFetcher, CoverTransport},
         network_monitor::NetworkMonitor,

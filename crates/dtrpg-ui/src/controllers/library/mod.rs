@@ -4,8 +4,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use check_jobs::{CheckJob, CheckJobs};
-use download_jobs::DownloadJobs;
 use dtrpg_core::data::catalog_cache::{load_cache_metadata, save_check_batch_timestamp};
 use dtrpg_core::data::collection::CollectionEntry;
 use dtrpg_core::data::collections_cache::save_collections_cache;
@@ -20,21 +18,16 @@ use dtrpg_core::library::{
     Library, LibraryEvent, LibraryEvents, SyncStage, ViewState, reload_cooldown_active,
 };
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
-use dtrpg_core::services::{
-    DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind,
-};
+use dtrpg_core::services::{DownloadControl, LibraryService, LibraryServiceErrorKind};
 use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
 use dtrpg_core::util::publisher::*;
 use dtrpg_core::util::sort::*;
-use dtrpg_core::work::{
-    JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot,
-};
+use dtrpg_core::work::{JobEvent, JobEvents, JobId, Outcome, Priority};
 use gpui::{AppContext, BorrowAppContext, Bounds, Context, Entity, Pixels, SharedString, Window};
 use gpui_kit::component::input::{InputEvent, InputState};
 use rust_i18n::t;
-use thumbnail_jobs::ThumbnailJobs;
 
 use crate::controllers::activity::ActivityController;
 use crate::data::events::*;
@@ -42,8 +35,8 @@ use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use crate::util::file_presence::{
-    ItemVerification, apply_presence_changes, collection_ids_for_item,
-    find_presence_changes_in_collections, resolved_file_path_in_collections, resolved_item_dir,
+    ItemVerification, collection_ids_for_item, find_presence_changes_in_collections,
+    resolved_file_path_in_collections, resolved_item_dir,
 };
 use crate::view_models::inspector::{InspectorContentsState, InspectorPreviewState, InspectorTab};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
@@ -51,14 +44,12 @@ use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 mod bulk_selection;
 mod catalog;
 mod catalog_sync;
-mod check_jobs;
 mod checks;
 mod collection_links;
 mod collections;
 mod concurrency;
 mod detail;
 mod download_dispatch;
-mod download_jobs;
 mod downloads;
 mod file_tags;
 mod filtering;
@@ -68,7 +59,6 @@ mod preferences;
 mod selection;
 mod tags;
 mod theme_files;
-mod thumbnail_jobs;
 mod thumbnails;
 
 #[cfg(test)]
@@ -239,8 +229,6 @@ pub struct LibraryController {
     /// controller renders — see `dtrpg_core::library::Library`'s own doc
     /// comment.
     pub(super) library:            Arc<Library>,
-    /// Every thumbnail fetch submitted to `work` that has not finished.
-    thumbnail_jobs:                ThumbnailJobs,
     /// Activity id for the aggregated thumbnail loading entry.
     thumbnail_activity_id:         Option<u64>,
     /// Number of thumbnails processed (successes and failures both count) in
@@ -348,29 +336,15 @@ pub struct LibraryController {
     /// whenever a file's `downloaded` flag transitions, since
     /// re-downloading may change the file's content.
     file_info_cache:               HashMap<(Arc<str>, usize), crate::util::file_info::FileInfo>,
-    /// Ids of catalog items with an availability check currently in flight
-    /// (on-demand or queued), mirroring `CoverCache::in_flight`'s role for
-    /// thumbnails. `LibraryChanged` is emitted on insertion and removal so
-    /// catalog card/row rendering can query [`Self::is_checking`] and show a
-    /// spinner/overlay.
-    checking_items:                HashSet<Arc<str>>,
     /// Ids of catalog items whose file-presence verification (see
     /// `verify-downloaded-status-against-disk`) is currently in flight —
     /// either as part of a catalog-wide load-time pass or an on-demand
-    /// single-item check. Distinct from `checking_items` (a network-bound
-    /// availability check) so catalog/popover rendering can show a visually
-    /// distinct "checking download status" indicator via
+    /// single-item check. Distinct from `Library`'s checking-items set (a
+    /// network-bound availability check) so catalog/popover rendering can
+    /// show a visually distinct "checking download status" indicator via
     /// [`Self::is_verifying_downloads`] without conflating the two kinds of
     /// check. `LibraryChanged` is emitted on insertion and removal.
     verifying_downloads:           HashSet<Arc<str>>,
-    /// Every availability check submitted to `work` that has not finished
-    /// (see `catalog-item-level-reconciliation`). Distinct from
-    /// `checking_items`, which holds only those running.
-    check_jobs:                    CheckJobs,
-    /// Every file download submitted to `work` that has not finished. Keyed
-    /// per file (not per entry) so a multi-item entry can have more than one
-    /// of its files queued or active independently.
-    download_jobs:                 DownloadJobs,
     /// Whether files' tags are being compared with the library's right now.
     file_tag_sync_running:         bool,
     /// The storage settings to use instead of the ones on disk. Only tests set

@@ -51,18 +51,7 @@ impl LibraryController {
     /// the entry, leaves everything else about the live entry as it is now,
     /// so a download that completed after the check started is not undone.
     pub(super) fn apply_verifications(&mut self, verifications: &[ItemVerification]) -> bool {
-        let mut changed = false;
-        for verification in verifications {
-            if let Some(mut item) = self.item_by_id(&verification.item_id)
-               && apply_presence_changes(&mut item, &verification.changes)
-            {
-                changed = true;
-                if let Err(e) = self.index_mut().replace_item(&item) {
-                    tracing::error!(error = %e,
-                                    "failed to write item presence change to the library index");
-                }
-            }
-        }
+        let changed = self.library.apply_presence_verifications(verifications);
         if changed {
             self.refresh_section_counts();
             self.invalidate_cache();
@@ -89,7 +78,8 @@ impl LibraryController {
     /// render paths. Items missing from the map are idle.
     #[must_use]
     pub fn item_activity_snapshot(&self) -> HashMap<Arc<str>, ItemActivity> {
-        item_activity_map(&self.verifying_downloads, self.download_jobs.item_ids())
+        let downloading = self.library.downloading_item_ids();
+        item_activity_map(&self.verifying_downloads, downloading.iter())
     }
 
     // ── Item-level availability checks
@@ -99,7 +89,7 @@ impl LibraryController {
     /// catalog item `id` (on-demand or from the periodic queue).
     #[must_use]
     pub fn is_checking(&self, id: &str) -> bool {
-        self.checking_items.contains(id)
+        self.library.is_checking(id)
     }
 
     /// Returns a snapshot of every item id with an availability check
@@ -111,7 +101,7 @@ impl LibraryController {
     /// up front for the same reason.
     #[must_use]
     pub fn checking_items_snapshot(&self) -> HashSet<Arc<str>> {
-        self.checking_items.clone()
+        self.library.checking_items_snapshot()
     }
 
     /// Checks `id`'s availability against the server if it hasn't been
@@ -135,53 +125,21 @@ impl LibraryController {
         self.submit_check(id, Priority::Interactive);
     }
 
-    /// Submits an availability check for `id` to the work queue, bypassing the
+    /// Submits an availability check for `id` via `Library`, bypassing the
     /// per-item cooldown (callers are expected to have already filtered by
-    /// staleness).
-    ///
-    /// No-ops if the item is unknown or its check is already running. A check
-    /// already waiting is left alone, unless this one is interactive, in which
-    /// case it is replaced so the user's request is not stuck behind a
-    /// background one.
+    /// staleness). No-ops if the item is unknown.
     fn submit_check(&mut self, id: Arc<str>, priority: Priority) {
         let Some(numeric_id) = self.item_by_id(&id).map(|item| item.numeric_id)
         else {
             return;
         };
-        if self.check_jobs.is_running(&id) {
-            return;
-        }
-        if self.check_jobs.is_pending(&id) {
-            if priority != Priority::Interactive {
-                return;
-            }
-            if let Some(waiting) = self.check_jobs.remove_pending(&id) {
-                self.work().cancel(waiting);
-            }
-        }
-
         let service = self.vm.service_arc();
-        let result = ResultSlot::new();
-        let job_result = result.clone();
-        let spec = JobSpec { kind: JobKind::Check,
-                             priority,
-                             label: id.to_string() };
-        let job_id = self.work().submit(spec, move |_context| {
-                                    // A failed check is still a result: the
-                                    // caller decides
-                                    // from the error whether the item is gone
-                                    // or the
-                                    // network was merely unavailable.
-                                    job_result.put(service.get_item(numeric_id));
-                                    Ok(())
-                                });
-        self.check_jobs.add(job_id, CheckJob::new(id, result));
+        self.library.submit_check(id, numeric_id, priority, service);
     }
 
     /// Shows an item as being checked once its check starts.
     pub(super) fn check_started(&mut self, id: JobId, cx: &mut Context<Self>) {
-        if let Some(item_id) = self.check_jobs.mark_started(id) {
-            self.checking_items.insert(item_id);
+        if self.library.check_started(id).is_some() {
             cx.emit(LibraryChanged);
         }
     }
@@ -191,12 +149,11 @@ impl LibraryController {
     /// A not-found answer marks the item unavailable. Any other failure is
     /// not evidence of removal, so it leaves the item and its flag unchanged.
     pub(super) fn check_finished(&mut self, id: JobId, outcome: Outcome, cx: &mut Context<Self>) {
-        let Some(job) = self.check_jobs.finish(id)
+        let Some(job) = self.library.check_finished(id)
         else {
             // Cancelled before it started, and already forgotten.
             return;
         };
-        self.checking_items.remove(&job.item_id);
 
         let result = match outcome {
             Outcome::Succeeded => job.result.take(),
@@ -214,21 +171,7 @@ impl LibraryController {
                 tracing::warn!(id = %job.item_id, error = %error,
                                "item availability check failed transiently");
             }
-            if let Some(mut existing) = self.item_by_id(&job.item_id) {
-                let checked_at = std::time::SystemTime::now();
-                apply_check_result(&mut existing, result, checked_at);
-                // `apply_check_result` leaves `availability_last_checked`
-                // unchanged on a transient error (preserving whatever the
-                // overlay in `item_by_id` already set it to) — only record
-                // a new value here when it actually changed.
-                if let Some(checked_at) = existing.availability_last_checked {
-                    self.library
-                        .note_availability_check(&job.item_id, checked_at);
-                }
-                if let Err(e) = self.index_mut().replace_item(&existing) {
-                    tracing::error!(error = %e,
-                                    "failed to write availability check result to the library index");
-                }
+            if self.library.apply_availability_result(&job.item_id, result) {
                 self.refresh_section_counts();
                 self.invalidate_cache();
             }
@@ -239,9 +182,7 @@ impl LibraryController {
     /// Cancels every availability check that has not started. A check already
     /// running is left to finish.
     pub(super) fn cancel_pending_checks(&mut self) {
-        for id in self.check_jobs.remove_all_pending() {
-            self.work().cancel(id);
-        }
+        self.library.cancel_pending_checks();
     }
 
     /// Submits availability checks for `ids` that have none waiting or running.

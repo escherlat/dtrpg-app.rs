@@ -128,23 +128,6 @@ impl LibraryController {
                        cx);
     }
 
-    /// The items an edit will change, so the files that need their tags written
-    /// are known without copying the whole catalog.
-    fn items_affected_by(&self, edit: &TagEdit) -> Vec<LibraryItem> {
-        match edit {
-            TagEdit::Add { item_id, .. } | TagEdit::Remove { item_id, .. } => {
-                self.item_by_id(item_id).into_iter().collect()
-            }
-            TagEdit::SetColor { tag, .. } => {
-                let having = self.library.tags().items_with(tag);
-                self.all_items()
-                    .into_iter()
-                    .filter(|item| having.contains(&item.id))
-                    .collect()
-            }
-        }
-    }
-
     /// Makes an edit in the index in the background and writes the result to
     /// the files it affected. A failure is reported in the activity panel.
     ///
@@ -152,7 +135,7 @@ impl LibraryController {
     /// done, not from the edit, so that edits that overlap show each other's
     /// result: the last read starts after the last edit has finished.
     fn edit_tags(&mut self, edit: TagEdit, cx: &mut Context<Self>) {
-        let affected = self.items_affected_by(&edit);
+        let affected = self.library.items_affected_by_tag_edit(&edit);
         let collections = self.collections.clone();
         let cache_root = self.cache_root().clone();
         cx.spawn(async move |this, async_cx| {

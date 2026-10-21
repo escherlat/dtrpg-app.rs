@@ -43,8 +43,9 @@ fn a_fetched_cover_is_cached_and_its_activity_completes(cx: &mut TestAppContext)
     assert!(all_attempted(&fixture, cx, &["a"]));
     let snapshot = fixture.activity.read_with(cx, |a, _| a.snapshot());
     assert_eq!(snapshot.in_progress_count, 0);
-    fixture.controller
-           .read_with(cx, |ctrl, _| assert!(ctrl.thumbnail_jobs.is_empty()));
+    fixture.controller.read_with(cx, |ctrl, _| {
+                          assert!(ctrl.library.thumbnail_jobs_is_empty())
+                      });
 }
 
 #[gpui::test]
@@ -104,7 +105,7 @@ fn cancelling_waiting_fetches_clears_their_markers_and_leaves_the_running_one(cx
     requested(&fixture, cx, "b");
     requested(&fixture, cx, "c");
     fixture.controller.read_with(cx, |ctrl, _| {
-                          assert_eq!(ctrl.thumbnail_jobs.pending_count(), 2)
+                          assert_eq!(ctrl.library.thumbnail_jobs_pending_count(), 2)
                       });
 
     fixture.controller
@@ -113,7 +114,7 @@ fn cancelling_waiting_fetches_clears_their_markers_and_leaves_the_running_one(cx
     assert!(!in_flight(cx, "b") && !in_flight(cx, "c"));
     assert!(in_flight(cx, "a"), "the running fetch is left alone");
     fixture.controller.read_with(cx, |ctrl, _| {
-                          assert_eq!(ctrl.thumbnail_jobs.pending_count(), 0)
+                          assert_eq!(ctrl.library.thumbnail_jobs_pending_count(), 0)
                       });
     fixture.transport.release(1);
     wait_for(cx, |cx| cached(cx, "a"));
@@ -125,8 +126,9 @@ fn cancelling_waiting_fetches_clears_their_markers_and_leaves_the_running_one(cx
     assert_eq!(fixture.transport.requests(),
                1,
                "cancelled fetches never reached the network");
-    fixture.controller
-           .read_with(cx, |ctrl, _| assert!(ctrl.thumbnail_jobs.is_empty()));
+    fixture.controller.read_with(cx, |ctrl, _| {
+                          assert!(ctrl.library.thumbnail_jobs_is_empty())
+                      });
 }
 
 #[gpui::test]
@@ -166,7 +168,7 @@ fn requesting_a_cover_again_replaces_its_waiting_fetch(cx: &mut TestAppContext) 
     requested(&fixture, cx, "b");
 
     fixture.controller.read_with(cx, |ctrl, _| {
-                          assert_eq!(ctrl.thumbnail_jobs.pending_count(), 1)
+                          assert_eq!(ctrl.library.thumbnail_jobs_pending_count(), 1)
                       });
     fixture.transport.release(2);
     wait_for(cx, |cx| cached(cx, "a") && cached(cx, "b"));

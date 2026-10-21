@@ -4,10 +4,9 @@
 //! into `Library` itself.
 
 use std::path::PathBuf;
-use std::sync::{Arc, MutexGuard, PoisonError};
+use std::sync::{MutexGuard, PoisonError};
 
 use dtrpg_core::data::index::LibraryIndex;
-use dtrpg_core::services::covers::CoverFetcher;
 use dtrpg_core::work::WorkQueue;
 
 use super::LibraryController;
@@ -17,19 +16,9 @@ impl LibraryController {
     ///
     /// The index lives behind a `Mutex` (since ADR 0002 Slice 2: the
     /// catalog-sync run mutates it from a background thread while `Library`
-    /// is shared via `Arc`), not because callers need read/write
-    /// distinction — both `index()` and `index_mut()` take the same lock;
-    /// kept as two methods only so call sites written for the old
-    /// `&LibraryIndex`/`&mut LibraryIndex` split keep compiling unchanged.
+    /// is shared via `Arc`). Reads only: every write goes through a `Library`
+    /// method (ADR 0002 Slice 5).
     pub(super) fn index(&self) -> MutexGuard<'_, LibraryIndex> {
-        self.library
-            .index
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-    }
-
-    /// See [`Self::index`].
-    pub(super) fn index_mut(&self) -> MutexGuard<'_, LibraryIndex> {
         self.library
             .index
             .lock()
@@ -39,11 +28,6 @@ impl LibraryController {
     /// Shared reference to the core work queue.
     pub(super) fn work(&self) -> &WorkQueue {
         &self.library.work
-    }
-
-    /// Shared reference to the cover fetcher.
-    pub(super) fn cover_fetcher(&self) -> &Arc<CoverFetcher> {
-        &self.library.cover_fetcher
     }
 
     /// Path to the directory that holds the library index database.

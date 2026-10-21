@@ -1,5 +1,9 @@
 //! Collection membership and filesystem-link updates.
 
+use dtrpg_core::library::{
+    RemovedMember, add_member, remove_member, restore_removed_member, revert_added_member,
+};
+
 use super::*;
 
 impl LibraryController {
@@ -81,17 +85,11 @@ impl LibraryController {
     /// error notification.
     pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64, product_id: u64,
                                   cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
+        let Some(collection_name) =
+            add_member(&mut self.collections, collection_id, item_id, product_id)
         else {
             return;
         };
-        if member_ids_contain(&collection.member_ids, item_id, product_id) {
-            return;
-        }
-        let collection_name = collection.name.clone();
-        let mut member_ids: Vec<u64> = collection.member_ids.iter().copied().collect();
-        member_ids.push(item_id);
-        collection.member_ids = Arc::from(member_ids.as_slice());
 
         if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
             self.collection_members.insert(item_id);
@@ -131,16 +129,7 @@ impl LibraryController {
                       return;
                   }
                   this.update(async_cx, |ctrl, cx| {
-                          if let Some(collection) =
-                              ctrl.collections.iter_mut().find(|c| c.id == collection_id)
-                          {
-                              let member_ids: Vec<u64> = collection.member_ids
-                                                                   .iter()
-                                                                   .copied()
-                                                                   .filter(|id| *id != item_id)
-                                                                   .collect();
-                              collection.member_ids = Arc::from(member_ids.as_slice());
-                          }
+                          revert_added_member(&mut ctrl.collections, collection_id, item_id);
                           if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
                           {
                               ctrl.collection_members.remove(&item_id);
@@ -181,28 +170,15 @@ impl LibraryController {
     pub fn remove_item_from_collection(&mut self, collection_id: u64, item_id: u64,
                                        product_id: u64, cx: &mut Context<Self>) {
         let collections_before = self.collections.clone();
-        let Some(collection) = self.collections.iter_mut().find(|c| c.id == collection_id)
+        // Whichever id(s) are actually present are removed and remembered, so
+        // that a failed removal restores exactly what was there before rather
+        // than introducing an id that was never actually cached.
+        let Some(RemovedMember { collection_name,
+                                 removed_ids, }) =
+            remove_member(&mut self.collections, collection_id, item_id, product_id)
         else {
             return;
         };
-        if !member_ids_contain(&collection.member_ids, item_id, product_id) {
-            return;
-        }
-        let collection_name = collection.name.clone();
-        // Remove whichever id(s) are actually present, and remember them so a
-        // failed removal restores exactly what was there before rather than
-        // introducing an id that was never actually cached.
-        let removed_ids: Vec<u64> = collection.member_ids
-                                              .iter()
-                                              .copied()
-                                              .filter(|id| *id == item_id || *id == product_id)
-                                              .collect();
-        let member_ids: Vec<u64> = collection.member_ids
-                                             .iter()
-                                             .copied()
-                                             .filter(|id| *id != item_id && *id != product_id)
-                                             .collect();
-        collection.member_ids = Arc::from(member_ids.as_slice());
 
         if matches!(&self.filter, SidebarFilter::Collection(id, _) if *id == collection_id) {
             self.collection_members.remove(&item_id);
@@ -230,16 +206,7 @@ impl LibraryController {
                   }
                   Err(e) => {
                   this.update(async_cx, |ctrl, cx| {
-                          if let Some(collection) =
-                              ctrl.collections.iter_mut().find(|c| c.id == collection_id)
-                          {
-                              let mut member_ids: Vec<u64> = collection.member_ids
-                                                                       .iter()
-                                                                       .copied()
-                                                                       .collect();
-                              member_ids.extend(&removed_ids);
-                              collection.member_ids = Arc::from(member_ids.as_slice());
-                          }
+                          restore_removed_member(&mut ctrl.collections, collection_id, &removed_ids);
                           if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
                           {
                               ctrl.collection_members.extend(&removed_ids);
