@@ -1,11 +1,14 @@
 //! Cover-thumbnail queueing, fetching, caching, and detail-cover refresh.
 //!
-//! Fetches run as jobs on the core work queue. This module submits them and
-//! turns the queue's events back into cache, catalog, and activity updates.
+//! Fetches run as jobs on the core work queue; `Library` owns their
+//! submission and bookkeeping (ADR 0002 Slice 4). This module reacts to the
+//! queue's events with what only the UI can do: writing decoded bytes into
+//! `CoverCache` (holds `gpui::Image`, so it can never move into `Library`)
+//! and driving `ActivityController`.
 
-use dtrpg_core::work::{JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot};
+use dtrpg_core::work::{JobId, Outcome, Priority};
 
-use super::{thumbnail_jobs::ThumbnailJob, *};
+use super::*;
 
 impl LibraryController {
     // ── Thumbnail loading
@@ -45,7 +48,8 @@ impl LibraryController {
         }
     }
 
-    /// Submits one cover fetch to the work queue and marks it in flight.
+    /// Submits one cover fetch via `Library` and marks it in flight in
+    /// `CoverCache`.
     ///
     /// Any fetch for the same cache key that has not started is replaced, so a
     /// key is never queued twice. `force_network` skips the disk cache and
@@ -54,45 +58,17 @@ impl LibraryController {
     /// image; left `false` for automatic background loads.
     fn submit_thumbnail(&mut self, key: Arc<str>, url: Arc<str>, force_network: bool,
                         priority: Priority, cx: &mut Context<Self>) {
-        self.cancel_pending_thumbnail(&key);
         cx.global_mut::<CoverCache>()
           .mark_in_flight(Arc::clone(&key));
-
-        let bytes = ResultSlot::new();
-        let fetcher = Arc::clone(self.cover_fetcher());
-        let job_key = Arc::clone(&key);
-        let job_url = Arc::clone(&url);
-        let job_bytes = bytes.clone();
-        let spec = JobSpec { kind: JobKind::Thumbnail,
-                             priority,
-                             label: key.to_string() };
-        let id = self.work().submit(spec, move |context| {
-                                let fetched = fetcher.fetch(&job_key,
-                                                            &job_url,
-                                                            force_network,
-                                                            context.cancel_flag())
-                                                     .map_err(|error| error.to_string())?;
-                                job_bytes.put(fetched);
-                                Ok(())
-                            });
-        self.thumbnail_jobs
-            .add(id, ThumbnailJob { key, url, bytes });
-    }
-
-    /// Cancels the fetch for `key` if it has not started. A fetch already
-    /// running is left to finish.
-    fn cancel_pending_thumbnail(&mut self, key: &str) {
-        if let Some(id) = self.thumbnail_jobs.remove_pending(key) {
-            self.work().cancel(id);
-        }
+        self.library
+            .submit_thumbnail(key, url, force_network, priority);
     }
 
     /// Cancels every fetch that has not started and clears its in-flight
     /// marker, so the cover can be requested again later. Fetches already
     /// running are left to finish.
     pub(super) fn cancel_pending_thumbnails(&mut self, cx: &mut Context<Self>) {
-        for (key, id) in self.thumbnail_jobs.remove_all_pending() {
-            self.work().cancel(id);
+        for (key, _id) in self.library.cancel_pending_thumbnails() {
             cx.global_mut::<CoverCache>().in_flight.remove(&key);
         }
     }
@@ -100,7 +76,7 @@ impl LibraryController {
     /// Starts the aggregated "loading thumbnails" activity entry when the
     /// first fetch of a batch begins.
     pub(super) fn thumbnail_started(&mut self, id: JobId, cx: &mut Context<Self>) {
-        if !self.thumbnail_jobs.mark_started(id) || self.thumbnail_activity_id.is_some() {
+        if !self.library.thumbnail_started(id) || self.thumbnail_activity_id.is_some() {
             return;
         }
         let label = if self.thumbnail_refresh_active {
@@ -118,7 +94,7 @@ impl LibraryController {
     /// then advances the batch's progress.
     pub(super) fn thumbnail_finished(&mut self, id: JobId, outcome: Outcome,
                                      cx: &mut Context<Self>) {
-        let Some(job) = self.thumbnail_jobs.finish(id)
+        let Some(job) = self.library.thumbnail_finished(id)
         else {
             // Cancelled before it started, and already forgotten.
             return;
@@ -160,7 +136,7 @@ impl LibraryController {
         };
 
         let processed = self.thumbnail_processed;
-        let remaining = self.thumbnail_jobs.outstanding();
+        let remaining = self.library.thumbnail_jobs_outstanding();
         if remaining == 0 {
             self.activity
                 .update(cx, |a, cx| a.complete(activity_id, cx));

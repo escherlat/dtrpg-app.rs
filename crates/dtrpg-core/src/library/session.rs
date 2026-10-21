@@ -1,9 +1,11 @@
 //! The `Library` struct itself: construction and the fields every other file
 //! in this module operates on.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use super::jobs::{CheckJobs, DownloadJobs, ThumbnailJobs};
 use super::queries::{EphemeralOverlay, QueryCache};
 use super::sync::{LibraryEvent, LibraryEvents, SyncState};
 use crate::data::index::{IndexError, LibraryIndex};
@@ -24,28 +26,36 @@ pub struct Library {
     /// (not a plain field) since ADR 0002 Slice 2: the catalog-sync run
     /// mutates it from a background thread while `Library` is shared via
     /// `Arc`, which rules out the `&mut self` a plain field would need.
-    pub index:              Mutex<LibraryIndex>,
+    pub index:                 Mutex<LibraryIndex>,
     /// The shared work queue that runs downloads, checks, and thumbnail
     /// fetches.
-    pub work:               WorkQueue,
+    pub work:                  WorkQueue,
     /// Fetches cover images, reading the disk cache before the network.
-    pub cover_fetcher:      Arc<CoverFetcher>,
+    pub cover_fetcher:         Arc<CoverFetcher>,
     /// Shared connectivity monitor consulted before network requests.
-    pub network_monitor:    Arc<NetworkMonitor>,
+    pub network_monitor:       Arc<NetworkMonitor>,
     /// Directory the library index database lives in.
-    pub cache_root:         PathBuf,
+    pub cache_root:            PathBuf,
     /// Catalog-sync single-flight state: the current generation, whether a
     /// sync is running, and whether a follow-up was requested while busy.
-    pub(super) sync_state:  Mutex<SyncState>,
+    pub(super) sync_state:     Mutex<SyncState>,
     /// Sender for this session's [`LibraryEvent`]s. The controller holds the
     /// matching [`LibraryEvents`] receiver returned by [`Library::open`].
-    pub(super) events:      tokio::sync::mpsc::UnboundedSender<LibraryEvent>,
+    pub(super) events:         tokio::sync::mpsc::UnboundedSender<LibraryEvent>,
     /// The filtered/grouped query cache: ADR 0002 Slice 3.
-    pub(super) query_cache: Mutex<QueryCache>,
+    pub(super) query_cache:    Mutex<QueryCache>,
     /// Session-only per-item timestamps the index never persists.
-    pub(super) ephemeral:   Mutex<EphemeralOverlay>,
+    pub(super) ephemeral:      Mutex<EphemeralOverlay>,
     /// The library's tags, as last set by [`Library::set_tags`].
-    pub(super) tags:        Mutex<Arc<TagLibrary>>,
+    pub(super) tags:           Mutex<Arc<TagLibrary>>,
+    /// Thumbnail-fetch job bookkeeping: ADR 0002 Slice 4.
+    pub(super) thumbnail_jobs: Mutex<ThumbnailJobs>,
+    /// File-download job bookkeeping: ADR 0002 Slice 4.
+    pub(super) download_jobs:  Mutex<DownloadJobs>,
+    /// Availability-check job bookkeeping: ADR 0002 Slice 4.
+    pub(super) check_jobs:     Mutex<CheckJobs>,
+    /// Items with an availability check currently running: ADR 0002 Slice 4.
+    pub(super) checking_items: Mutex<HashSet<Arc<str>>>,
 }
 
 impl Library {
@@ -75,7 +85,11 @@ impl Library {
                    events,
                    query_cache: Mutex::new(QueryCache::default()),
                    ephemeral: Mutex::new(EphemeralOverlay::default()),
-                   tags: Mutex::new(Arc::default()) },
+                   tags: Mutex::new(Arc::default()),
+                   thumbnail_jobs: Mutex::new(ThumbnailJobs::default()),
+                   download_jobs: Mutex::new(DownloadJobs::default()),
+                   check_jobs: Mutex::new(CheckJobs::default()),
+                   checking_items: Mutex::new(HashSet::new()) },
             work_events,
             sync_events))
     }

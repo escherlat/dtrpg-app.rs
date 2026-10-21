@@ -125,7 +125,7 @@ impl LibraryController {
         else {
             return;
         };
-        if self.download_jobs.has_file(id, index) {
+        if self.library.is_file_queued_or_active(id, index) {
             return;
         }
         self.submit_download(item, index, title.into());
@@ -312,11 +312,10 @@ impl LibraryController {
     /// No-op if `(id, index)` is not queued or in flight.
     pub fn cancel_download(&mut self, id: &str, index: u32, cx: &mut Context<Self>) {
         let key = (Arc::<str>::from(id), index);
-        let Some((job_id, activity_id)) = self.download_jobs.cancel(&key)
+        let Some((_job_id, activity_id)) = self.library.cancel_download(&key)
         else {
             return;
         };
-        self.work().cancel(job_id);
         if let Some(activity_id) = activity_id {
             self.activity
                 .update(cx, |a, cx| a.remove_in_progress(activity_id, cx));
@@ -328,7 +327,7 @@ impl LibraryController {
     /// actively downloading.
     #[must_use]
     pub fn is_downloading(&self, id: &str) -> bool {
-        self.download_jobs.has_item(id)
+        self.library.is_downloading(id)
     }
 
     /// Returns `true` if the file at `(id, index)` is currently queued or
@@ -338,7 +337,7 @@ impl LibraryController {
     /// indicator on a row instead of its download/downloaded affordance.
     #[must_use]
     pub fn is_file_queued_or_active(&self, id: &str, index: u32) -> bool {
-        self.download_jobs.has_file(id, index)
+        self.library.is_file_queued_or_active(id, index)
     }
 }
 
