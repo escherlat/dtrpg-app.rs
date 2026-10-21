@@ -5,6 +5,6 @@
 - [x] Slice 3: Move filtered/grouped queries and caches into `Library`.
 - [x] Slice 4: Move download/check/thumbnail job orchestration into `Library`.
 - [x] Slice 5: Move catalog mutations into `Library` (item status, disk-presence reconciliation, tag-edit scope, collection-membership edits).
-- [ ] Follow-up: move the collections list and `CollectionsService` into `Library`; move the tag-load loop and `verifying_downloads`; then `LibraryController` is a pure view-model.
+- [ ] Follow-up: move the collections list and `CollectionsService` into `Library`; move the tag-load loop; (`verifying_downloads` is done); then `LibraryController` is a pure view-model.
 - [ ] Update `NOTES.md` ADR 0002 section when slices are merged.
 - [ ] Archive this OpenSpec change after merge.

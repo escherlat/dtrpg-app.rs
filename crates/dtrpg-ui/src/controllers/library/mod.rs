@@ -336,15 +336,6 @@ pub struct LibraryController {
     /// whenever a file's `downloaded` flag transitions, since
     /// re-downloading may change the file's content.
     file_info_cache:               HashMap<(Arc<str>, usize), crate::util::file_info::FileInfo>,
-    /// Ids of catalog items whose file-presence verification (see
-    /// `verify-downloaded-status-against-disk`) is currently in flight —
-    /// either as part of a catalog-wide load-time pass or an on-demand
-    /// single-item check. Distinct from `Library`'s checking-items set (a
-    /// network-bound availability check) so catalog/popover rendering can
-    /// show a visually distinct "checking download status" indicator via
-    /// [`Self::is_verifying_downloads`] without conflating the two kinds of
-    /// check. `LibraryChanged` is emitted on insertion and removal.
-    verifying_downloads:           HashSet<Arc<str>>,
     /// Whether files' tags are being compared with the library's right now.
     file_tag_sync_running:         bool,
     /// The storage settings to use instead of the ones on disk. Only tests set
