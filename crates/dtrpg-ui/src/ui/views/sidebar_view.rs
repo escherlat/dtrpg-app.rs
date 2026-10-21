@@ -12,6 +12,7 @@ use dtrpg_core::data::library::SectionCounts;
 use dtrpg_core::data::tag_library::TagEntry;
 use dtrpg_core::util::filter::SidebarFilter;
 use dtrpg_core::util::matching::name_matches_query;
+use dtrpg_core::util::publisher::PublisherEntry;
 use dtrpg_core::util::sort::{CollectionSortMethod, SortDirection};
 use gpui::prelude::*;
 use gpui::{
@@ -35,7 +36,6 @@ use crate::controllers::library::{LibraryController, SidebarOpen, SidebarSection
 use crate::controllers::tabs::{TabTarget, TabsController};
 use crate::ui::library::drag::DraggedLibraryItem;
 use crate::ui::views::sidebar_tags::tags_menu;
-use crate::util::publisher::PublisherEntry;
 
 /// Inline search bar state for a collapsible sidebar section (Publishers or
 /// Collections).

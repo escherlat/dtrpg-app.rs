@@ -115,8 +115,6 @@ impl LibraryController {
         if let Err(e) = self.index_mut().replace_all_items(&[]) {
             tracing::error!(error = %e, "failed to clear the library index");
         }
-        self.section_counts = SectionCounts::default();
-        self.publishers.clear();
         self.collections.clear();
         self.collections_loaded = false;
         self.collection_members.clear();

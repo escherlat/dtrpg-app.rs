@@ -222,8 +222,8 @@ impl LibraryController {
                 // overlay in `item_by_id` already set it to) — only record
                 // a new value here when it actually changed.
                 if let Some(checked_at) = existing.availability_last_checked {
-                    self.availability_checks
-                        .insert(Arc::clone(&job.item_id), checked_at);
+                    self.library
+                        .note_availability_check(&job.item_id, checked_at);
                 }
                 if let Err(e) = self.index_mut().replace_item(&existing) {
                     tracing::error!(error = %e,

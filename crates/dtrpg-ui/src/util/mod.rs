@@ -6,7 +6,6 @@ pub mod icloud_status;
 pub mod init;
 pub mod item_opener;
 pub mod pluralize;
-pub mod publisher;
 pub mod reveal;
 pub mod size;
 pub mod symlink;

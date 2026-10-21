@@ -15,9 +15,9 @@ use dtrpg_core::data::library::*;
 use dtrpg_core::data::paths::{cache_dir, covers_dir};
 use dtrpg_core::data::selection::Selection;
 use dtrpg_core::data::storage::{StorageConfig, available_space_mb_at};
-use dtrpg_core::data::tag_library::{TagEntry, TagLibrary};
+use dtrpg_core::data::tag_library::TagEntry;
 use dtrpg_core::library::{
-    Library, LibraryEvent, LibraryEvents, SyncStage, reload_cooldown_active,
+    Library, LibraryEvent, LibraryEvents, SyncStage, ViewState, reload_cooldown_active,
 };
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
 use dtrpg_core::services::{
@@ -26,7 +26,7 @@ use dtrpg_core::services::{
 use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
-use dtrpg_core::util::search::SearchQuery;
+use dtrpg_core::util::publisher::*;
 use dtrpg_core::util::sort::*;
 use dtrpg_core::work::{
     JobEvent, JobEvents, JobId, JobKind, JobSpec, Outcome, Priority, ResultSlot,
@@ -45,7 +45,6 @@ use crate::util::file_presence::{
     ItemVerification, apply_presence_changes, collection_ids_for_item,
     find_presence_changes_in_collections, resolved_file_path_in_collections, resolved_item_dir,
 };
-use crate::util::publisher::*;
 use crate::view_models::inspector::{InspectorContentsState, InspectorPreviewState, InspectorTab};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};
 
@@ -197,13 +196,6 @@ pub struct LibraryController {
     /// controller.
     #[allow(dead_code)]
     activity:                      Entity<ActivityController>,
-    /// When a thumbnail fetch for an item was last attempted — not persisted
-    /// catalog data, so it lives here rather than on the index-backed
-    /// `LibraryItem`, keyed by item id.
-    thumbnail_attempts:            HashMap<Arc<str>, std::time::SystemTime>,
-    /// When an item's availability was last checked against the live API —
-    /// same rationale as `thumbnail_attempts`.
-    availability_checks:           HashMap<Arc<str>, std::time::SystemTime>,
     /// Active sidebar filter.
     pub filter:                    SidebarFilter,
     /// Text search query.
@@ -227,10 +219,6 @@ pub struct LibraryController {
     pub presentation:              CatalogPresentation,
     /// The currently selected item id (for the detail panel).
     pub selection:                 Selection,
-    /// Smart section counts derived from the full catalog.
-    pub section_counts:            SectionCounts,
-    /// Publisher list derived from the full catalog (count desc, name asc).
-    pub publishers:                Vec<PublisherEntry>,
     /// Collection list loaded from the API product-list endpoint.
     pub collections:               Vec<CollectionEntry>,
     /// True once the first `apply_collections` call has completed for the
@@ -293,21 +281,6 @@ pub struct LibraryController {
     /// for seeding the activity item's progress bar. Cleared when the run
     /// finishes.
     catalog_progress_total:        Option<usize>,
-    /// Cached filtered/sorted result of the current catalog, filter, search
-    /// query, and sort settings. `None` means stale; recomputed lazily by
-    /// [`cached_visible_items`](Self::cached_visible_items).
-    /// The filtered, sorted result set. Shared, so handing it to a render pass
-    /// costs a reference count rather than a copy of every item.
-    items_cache:                   Option<Arc<Vec<LibraryItem>>>,
-    /// Grouped view of `items_cache`, rebuilt whenever grouping is active and
-    /// the filter/search/sort/group dimension changes. Render paths read this
-    /// cache instead of computing groups themselves.
-    grouped_items_cache:           Option<Arc<Vec<ItemGroup>>>,
-    /// How many catalog items the sidebar filter alone matches, kept with
-    /// `items_cache`.
-    filter_count_cache:            usize,
-    /// Every product id in the catalog, kept with `items_cache`.
-    catalog_ids_cache:             Arc<HashSet<u64>>,
     /// Whether the publishers section's inline search bar is expanded.
     /// Session-only; never persisted.
     publisher_search_open:         bool,
@@ -403,9 +376,6 @@ pub struct LibraryController {
     /// The storage settings to use instead of the ones on disk. Only tests set
     /// it, so that they do not read or depend on the developer's own settings.
     storage_override:              Option<Arc<StorageConfig>>,
-    /// The library's tags, read from the index in the background, which the
-    /// views read instead of reading the index themselves.
-    tags:                          Arc<TagLibrary>,
     /// Counts the reads and edits of tags that have been started, so a result
     /// that arrives after a newer one is dropped.
     tag_generation:                u64,

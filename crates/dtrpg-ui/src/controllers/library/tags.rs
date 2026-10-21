@@ -23,21 +23,21 @@ impl LibraryController {
     /// sidebar.
     #[must_use]
     pub fn tag_entries(&self) -> Vec<TagEntry> {
-        self.tags.entries().to_vec()
+        self.library.tags().entries().to_vec()
     }
 
     /// The tags of the item `item_id`, for the detail panel.
     #[must_use]
     pub fn tags_of(&self, item_id: &str) -> Vec<TagEntry> {
-        self.tags.tags_of(item_id)
+        self.library.tags().tags_of(item_id)
     }
 
     /// The tags to offer when tagging `item_id`: every tag it does not have.
     #[must_use]
     pub fn tags_to_offer(&self, item_id: &str) -> Vec<TagEntry> {
-        let has = self.tags.tags_of(item_id);
-        self.tags
-            .entries()
+        let tags = self.library.tags();
+        let has = tags.tags_of(item_id);
+        tags.entries()
             .iter()
             .filter(|entry| !has.iter().any(|tag| tag.name == entry.name))
             .cloned()
@@ -46,7 +46,7 @@ impl LibraryController {
 
     /// The library's tags as they are now, for grouping the catalog by them.
     pub fn tag_library(&self) -> Arc<TagLibrary> {
-        Arc::clone(&self.tags)
+        self.library.tags()
     }
 
     /// Reads the tags from the library index in the background and shows them.
@@ -76,7 +76,7 @@ impl LibraryController {
         if generation < self.tag_generation {
             return;
         }
-        self.tags = Arc::new(library);
+        self.library.set_tags(library);
         self.refresh_tag_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -89,19 +89,21 @@ impl LibraryController {
         else {
             return;
         };
-        self.filter = match self.tags.entry(name) {
-            Some(entry) => tag_filter(&entry.name, &self.tags),
+        let tags = self.library.tags();
+        self.filter = match tags.entry(name) {
+            Some(entry) => tag_filter(&entry.name, &tags),
             None => SidebarFilter::AllTitles,
         };
     }
 
     /// Shows only the items that have the tag called `name`.
     pub fn filter_by_tag(&mut self, name: &str, cx: &mut Context<Self>) {
-        let Some(entry) = self.tags.entry(name)
+        let tags = self.library.tags();
+        let Some(entry) = tags.entry(name)
         else {
             return;
         };
-        let filter = tag_filter(&entry.name, &self.tags);
+        let filter = tag_filter(&entry.name, &tags);
         self.set_filter(filter, cx);
     }
 
@@ -134,7 +136,7 @@ impl LibraryController {
                 self.item_by_id(item_id).into_iter().collect()
             }
             TagEdit::SetColor { tag, .. } => {
-                let having = self.tags.items_with(tag);
+                let having = self.library.tags().items_with(tag);
                 self.all_items()
                     .into_iter()
                     .filter(|item| having.contains(&item.id))
