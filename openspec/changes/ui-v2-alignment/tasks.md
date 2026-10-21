@@ -1,0 +1,15 @@
+- [x] Review all 22 v2 mockups against the current views and core types.
+- [x] Write the gap matrix and the proposed slices (`design.md`).
+- [ ] Decide the open questions in `design.md`.
+- [ ] Recapture `upgrade-a-collection.png` in `dtrpg-design` (it duplicates the smart-collection sheet).
+- [ ] Slice 1: Domain foundations (availability states, per-file location, System/Type, facet queries).
+- [ ] Slice 2: Query language (shared parser).
+- [ ] Slice 3: Library chrome (Filters button and facet column, token chips, sidebar, status bar).
+- [ ] Slice 4: Inspector parity.
+- [ ] Slice 5: Download sheet.
+- [ ] Slice 6: Smart collections.
+- [ ] Slice 7: Insights.
+- [ ] Slice 8: Settings parity (Agent & MCP, Storage, Native, Appearance check).
+- [ ] Slice 9: MCP completion (tools, scopes, audit log).
+- [ ] Slice 10: Windows and Linux chrome.
+- [ ] Slice 11: Empty and loading states.
