@@ -56,6 +56,8 @@ pub struct Library {
     pub(super) check_jobs:     Mutex<CheckJobs>,
     /// Items with an availability check currently running: ADR 0002 Slice 4.
     pub(super) checking_items: Mutex<HashSet<Arc<str>>>,
+    /// Items whose files are being checked against disk: ADR 0002 Slice 5.
+    pub(super) verifying:      Mutex<HashSet<Arc<str>>>,
 }
 
 impl Library {
@@ -89,7 +91,8 @@ impl Library {
                    thumbnail_jobs: Mutex::new(ThumbnailJobs::default()),
                    download_jobs: Mutex::new(DownloadJobs::default()),
                    check_jobs: Mutex::new(CheckJobs::default()),
-                   checking_items: Mutex::new(HashSet::new()) },
+                   checking_items: Mutex::new(HashSet::new()),
+                   verifying: Mutex::new(HashSet::new()) },
             work_events,
             sync_events))
     }

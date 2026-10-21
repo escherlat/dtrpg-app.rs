@@ -909,3 +909,10 @@ make fmt-check
 make size-check
 ```
 
+## Follow-up: `verifying_downloads` moved (2026-10-21)
+
+The set of entries being checked against disk now lives in `Library`
+(`begin_verifying`, `end_verifying`, `is_verifying`, `verifying_snapshot`), so
+the controller holds no job-state sets. Still on the controller: the
+`collections` list and `CollectionsService`, and the `load_tags` loop.
+

@@ -18,7 +18,7 @@ impl LibraryController {
             return;
         };
         let collection_ids = collection_ids_for_item(&item, &self.collections);
-        self.verifying_downloads.insert(Arc::clone(&id));
+        self.library.begin_verifying([Arc::clone(&id)]);
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
@@ -31,7 +31,7 @@ impl LibraryController {
                                          .await;
 
               this.update(async_cx, |ctrl, cx| {
-                      ctrl.verifying_downloads.remove(&id);
+                      ctrl.library.end_verifying([&id]);
                       if let Some(verification) = verification {
                           ctrl.apply_verifications(&[verification]);
                       }
@@ -64,7 +64,7 @@ impl LibraryController {
     /// check), per `verify-downloaded-status-against-disk`.
     #[must_use]
     pub fn is_verifying_downloads(&self, id: &str) -> bool {
-        self.verifying_downloads.contains(id)
+        self.library.is_verifying(id)
     }
 
     /// Returns what the app is busy doing with catalog item `id` right now.
@@ -79,7 +79,7 @@ impl LibraryController {
     #[must_use]
     pub fn item_activity_snapshot(&self) -> HashMap<Arc<str>, ItemActivity> {
         let downloading = self.library.downloading_item_ids();
-        item_activity_map(&self.verifying_downloads, downloading.iter())
+        item_activity_map(&self.library.verifying_snapshot(), downloading.iter())
     }
 
     // ── Item-level availability checks

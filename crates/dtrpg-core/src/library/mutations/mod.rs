@@ -10,6 +10,7 @@
 mod check_result;
 mod collection_members;
 mod items;
+mod verifying;
 
 pub use check_result::apply_check_result;
 pub use collection_members::{

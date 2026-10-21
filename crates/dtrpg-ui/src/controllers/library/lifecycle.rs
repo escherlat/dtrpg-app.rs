@@ -108,7 +108,6 @@ impl LibraryController {
                           other_details_open: HashMap::new(),
                           file_other_details_open: HashMap::new(),
                           file_info_cache: HashMap::new(),
-                          verifying_downloads: HashSet::new(),
                           tag_generation: 0,
                           file_tag_sync_running: false,
                           storage_override: None,
@@ -260,7 +259,7 @@ impl LibraryController {
         let catalog = self.index().list_items().unwrap_or_default();
         let collections = self.collections.clone();
         let ids: HashSet<Arc<str>> = catalog.iter().map(|i| Arc::clone(&i.id)).collect();
-        self.verifying_downloads.extend(ids.iter().cloned());
+        self.library.begin_verifying(ids.iter().cloned());
         cx.emit(LibraryChanged);
 
         cx.spawn(async move |this, async_cx| {
@@ -278,9 +277,7 @@ impl LibraryController {
                                           .await;
 
               this.update(async_cx, |ctrl, cx| {
-                      for id in &ids {
-                          ctrl.verifying_downloads.remove(id);
-                      }
+                      ctrl.library.end_verifying(&ids);
                       ctrl.apply_verifications(&verifications);
                       cx.emit(LibraryChanged);
                   })
