@@ -13,6 +13,7 @@ use crate::data::library::LibraryItem;
 use crate::data::storage::StorageConfig;
 use crate::library::Library;
 use crate::services::collections::{CollectionsService, CollectionsServiceError};
+use crate::services::network_monitor::NetworkMonitor;
 use crate::services::{LibraryService, LibraryServiceError};
 
 fn item(id: &str, product_id: u64) -> LibraryItem {
@@ -94,8 +95,11 @@ fn test_storage_config() -> StorageConfig {
 
 fn open_library() -> (Arc<Library>, super::LibraryEvents) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let (library, _work_events, sync_events) =
+    let (mut library, _work_events, sync_events) =
         Library::open(dir.keep(), &test_storage_config()).expect("open library");
+    // The real monitor probes the DriveThruRPG host, which would make these
+    // tests depend on the machine's internet access.
+    library.network_monitor = Arc::new(NetworkMonitor::fixed(true));
     (Arc::new(library), sync_events)
 }
 
