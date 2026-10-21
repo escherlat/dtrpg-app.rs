@@ -54,11 +54,7 @@ impl LibraryController {
     /// filters, `collection_members` is cleared.
     pub fn set_filter(&mut self, filter: SidebarFilter, cx: &mut Context<Self>) {
         if let SidebarFilter::Collection(id, _) = &filter {
-            self.collection_members = self.collections
-                                          .iter()
-                                          .find(|c| c.id == *id)
-                                          .map(|c| c.member_ids.iter().copied().collect())
-                                          .unwrap_or_default();
+            self.collection_members = self.library.collection_member_ids(*id);
         }
         else {
             self.collection_members.clear();
@@ -146,14 +142,12 @@ impl LibraryController {
     }
 
     /// Sets the sidebar Collections sort method, persists it, and re-sorts
-    /// `self.collections` in place.
+    /// the collections in place.
     pub fn set_collection_sort(&mut self, method: CollectionSortMethod, cx: &mut Context<Self>) {
         self.collection_sort = method;
         let catalog_ids = self.catalog_ids();
-        sort_collections(&mut self.collections,
-                         method,
-                         self.collection_sort_direction,
-                         &catalog_ids);
+        self.library
+            .sort_collections(method, self.collection_sort_direction, &catalog_ids);
         dtrpg_core::data::ui_preferences::UiPreferences::load()
             .save_collection_sort(method, self.collection_sort_direction);
         cx.emit(LibraryChanged);
@@ -165,10 +159,8 @@ impl LibraryController {
                                          cx: &mut Context<Self>) {
         self.collection_sort_direction = direction;
         let catalog_ids = self.catalog_ids();
-        sort_collections(&mut self.collections,
-                         self.collection_sort,
-                         direction,
-                         &catalog_ids);
+        self.library
+            .sort_collections(self.collection_sort, direction, &catalog_ids);
         dtrpg_core::data::ui_preferences::UiPreferences::load()
             .save_collection_sort(self.collection_sort, direction);
         cx.emit(LibraryChanged);

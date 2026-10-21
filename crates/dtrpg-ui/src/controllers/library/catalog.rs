@@ -150,7 +150,7 @@ impl LibraryController {
     /// no longer be visible.
     pub fn clear_and_reload(&mut self, cx: &mut Context<Self>) {
         self.library.clear_catalog();
-        self.collections.clear();
+        self.library.clear_collections();
         self.collection_members.clear();
         self.invalidate_cache();
         // Queued availability checks reference items that no longer exist in
@@ -213,9 +213,9 @@ impl LibraryController {
         LibrarySnapshot { filter: self.filter.clone(),
                           counts,
                           publishers: self.library.publishers(),
-                          collections: self.collections.clone(),
+                          collections: self.library.collections().to_vec(),
                           tags: self.tag_entries(),
-                          collections_loaded: self.collections_loaded,
+                          collections_loaded: self.library.collections_loaded(),
                           catalog_ids: self.library.cached_catalog_ids(),
                           total_count: counts.all,
                           total_mb: self.total_size_mb(),

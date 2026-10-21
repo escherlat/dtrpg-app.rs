@@ -222,7 +222,9 @@ fn filtering_by_a_tag_nothing_has_does_nothing(cx: &mut TestAppContext) {
 fn tags_that_arrive_after_newer_ones_are_ignored(cx: &mut TestAppContext) {
     let fixture = fixture_with_index(cx);
     fixture.controller.update(cx, |ctrl, cx| {
-                          ctrl.tag_generation = 5;
+                          for _ in 0..5 {
+                              ctrl.library.begin_tag_read();
+                          }
                           let stale =
                               TagLibrary::new([("a".to_owned(), vec!["old".to_owned()])].into(),
                                               Default::default());

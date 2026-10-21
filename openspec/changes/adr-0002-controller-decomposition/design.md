@@ -83,8 +83,9 @@ As built, `Library` owns every write to a catalog entry outside a sync run
 scope of a tag edit (`items_affected_by_tag_edit`), and the pure
 optimistic-membership rules (`add_member`, `remove_member` and their
 rollbacks). The controller no longer writes to the index. The collections
-list itself, its service, the tag-load loop, and the `verifying_downloads`
-set stay on the controller and are tracked as a follow-up.
+list, the tag-read generation guard, and the `verifying_downloads` set also
+live in `Library`. The `CollectionsService` handle stays on the controller:
+its calls run on gpui's executors, so it is an adapter, not state.
 
 ## Render-path invariant
 

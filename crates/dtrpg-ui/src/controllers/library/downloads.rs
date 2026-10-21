@@ -53,7 +53,8 @@ impl LibraryController {
     /// items. Already-downloaded, already-queued, and already-active
     /// items/files are left untouched — see [`Self::enqueue_download`].
     pub fn download_all_for_collection(&mut self, collection_id: u64, cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        let collections = self.library.collections();
+        let Some(collection) = collections.iter().find(|c| c.id == collection_id)
         else {
             return;
         };
@@ -179,7 +180,8 @@ impl LibraryController {
     /// item's missing files, not per item — see [`Self::request_download`].
     pub fn request_download_all_for_collection(&mut self, collection_id: u64,
                                                cx: &mut Context<Self>) {
-        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        let collections = self.library.collections();
+        let Some(collection) = collections.iter().find(|c| c.id == collection_id)
         else {
             return;
         };
@@ -252,7 +254,7 @@ impl LibraryController {
     pub(super) fn warn_if_insufficient_space_for_item(&self, item: &LibraryItem, needed_mb: f64)
                                                       -> Option<f64> {
         let storage = StorageConfig::load();
-        let collection_ids = collection_ids_for_item(item, &self.collections);
+        let collection_ids = collection_ids_for_item(item, &self.library.collections());
         let root = storage.resolve_root_for(&item.publisher, &collection_ids, item.size_mb);
         let free_mb = available_space_mb_at(&root.path)?;
         (needed_mb > free_mb).then_some(free_mb)

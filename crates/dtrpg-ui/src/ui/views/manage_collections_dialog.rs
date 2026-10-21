@@ -115,7 +115,7 @@ fn render_content(content: DialogContent, _window: &mut Window, cx: &mut App,
                   member_id: u64, product_id: u64)
                   -> DialogContent {
     let colors = cx.global::<LibriTheme>().colors.clone();
-    let collections = controller.read(cx).collections.clone();
+    let collections = controller.read(cx).collections().to_vec();
     let error = state.borrow().error.clone();
 
     let mut rows = v_flex().gap_2();

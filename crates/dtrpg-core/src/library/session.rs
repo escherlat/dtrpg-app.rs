@@ -3,9 +3,11 @@
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
 use super::jobs::{CheckJobs, DownloadJobs, ThumbnailJobs};
+use super::mutations::CollectionsState;
 use super::queries::{EphemeralOverlay, QueryCache};
 use super::sync::{LibraryEvent, LibraryEvents, SyncState};
 use crate::data::index::{IndexError, LibraryIndex};
@@ -48,6 +50,9 @@ pub struct Library {
     pub(super) ephemeral:      Mutex<EphemeralOverlay>,
     /// The library's tags, as last set by [`Library::set_tags`].
     pub(super) tags:           Mutex<Arc<TagLibrary>>,
+    /// Counts the reads and edits of tags that have been started, so a result
+    /// that arrives after a newer one is dropped: ADR 0002 Slice 5.
+    pub(super) tag_generation: AtomicU64,
     /// Thumbnail-fetch job bookkeeping: ADR 0002 Slice 4.
     pub(super) thumbnail_jobs: Mutex<ThumbnailJobs>,
     /// File-download job bookkeeping: ADR 0002 Slice 4.
@@ -58,6 +63,8 @@ pub struct Library {
     pub(super) checking_items: Mutex<HashSet<Arc<str>>>,
     /// Items whose files are being checked against disk: ADR 0002 Slice 5.
     pub(super) verifying:      Mutex<HashSet<Arc<str>>>,
+    /// The collections list and whether it has been fetched: ADR 0002 Slice 5.
+    pub(super) collections:    Mutex<CollectionsState>,
 }
 
 impl Library {
@@ -88,11 +95,13 @@ impl Library {
                    query_cache: Mutex::new(QueryCache::default()),
                    ephemeral: Mutex::new(EphemeralOverlay::default()),
                    tags: Mutex::new(Arc::default()),
+                   tag_generation: AtomicU64::new(0),
                    thumbnail_jobs: Mutex::new(ThumbnailJobs::default()),
                    download_jobs: Mutex::new(DownloadJobs::default()),
                    check_jobs: Mutex::new(CheckJobs::default()),
                    checking_items: Mutex::new(HashSet::new()),
-                   verifying: Mutex::new(HashSet::new()) },
+                   verifying: Mutex::new(HashSet::new()),
+                   collections: Mutex::new(CollectionsState::default()) },
             work_events,
             sync_events))
     }

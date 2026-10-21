@@ -17,7 +17,7 @@ impl LibraryController {
         else {
             return;
         };
-        let collection_ids = collection_ids_for_item(&item, &self.collections);
+        let collection_ids = collection_ids_for_item(&item, &self.library.collections());
         self.library.begin_verifying([Arc::clone(&id)]);
         cx.emit(LibraryChanged);
 

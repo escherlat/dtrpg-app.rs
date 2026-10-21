@@ -73,20 +73,21 @@ impl LibraryController {
                          self.collection_sort,
                          self.collection_sort_direction,
                          &catalog_ids);
-        self.collections = collections;
-        self.collections_loaded = true;
+        self.library.set_collections(collections);
         // Refresh collection_members if the current filter is a Collection
         // filter, in case the filter was set before the collections
         // loaded.
         if let SidebarFilter::Collection(id, _) = &self.filter {
-            let id = *id;
-            self.collection_members = self.collections
-                                          .iter()
-                                          .find(|c| c.id == id)
-                                          .map(|c| c.member_ids.iter().copied().collect())
-                                          .unwrap_or_default();
+            self.collection_members = self.library.collection_member_ids(*id);
         }
         cx.emit(LibraryChanged);
+    }
+
+    /// The collections as they are now, for the views and for work started
+    /// from them. A cheap `Arc` clone; edits go through `Library`.
+    #[must_use]
+    pub fn collections(&self) -> Arc<Vec<CollectionEntry>> {
+        self.library.collections()
     }
 
     /// Returns the current pane state from the service layer.
@@ -113,8 +114,7 @@ impl LibraryController {
         self.collections_service = Arc::from(collections_service);
         self.catalog_loading = true;
         self.library.clear_catalog();
-        self.collections.clear();
-        self.collections_loaded = false;
+        self.library.clear_collections();
         self.collection_members.clear();
         self.selection = Selection::default();
         self.invalidate_cache();
@@ -145,7 +145,7 @@ impl LibraryController {
               match result {
                   Ok(entry) => {
                       this.update(async_cx, |ctrl, cx| {
-                              ctrl.collections.push(entry);
+                              ctrl.library.push_collection(entry);
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);
@@ -193,7 +193,7 @@ impl LibraryController {
                   Ok(entry) => {
                       let collection_id = entry.id;
                       this.update(async_cx, |ctrl, cx| {
-                              ctrl.collections.push(entry);
+                              ctrl.library.push_collection(entry);
                               ctrl.activity
                                   .update(cx, |a, cx| a.complete(activity_id, cx));
                               cx.emit(LibraryChanged);
@@ -231,7 +231,7 @@ impl LibraryController {
               match result {
                   Ok(()) => {
                       this.update(async_cx, |ctrl, cx| {
-                              ctrl.collections.retain(|c| c.id != id);
+                              ctrl.library.remove_collection(id);
                               if let SidebarFilter::Collection(cid, _) = &ctrl.filter
                                  && *cid == id
                               {
