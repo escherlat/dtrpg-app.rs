@@ -7,7 +7,7 @@ impl LibraryController {
     /// Returns the filtered, sorted result set for the current state.
     #[must_use]
     pub fn visible_items(&self) -> Vec<LibraryItem> {
-        self.items_cache.as_deref().cloned().unwrap_or_default()
+        (*self.library.visible_items()).clone()
     }
 
     /// Returns the filtered, sorted result set without copying it.
@@ -16,7 +16,7 @@ impl LibraryController {
     /// only read, as every render pass does.
     #[must_use]
     pub fn visible_items_shared(&self) -> Arc<Vec<LibraryItem>> {
-        self.items_cache.clone().unwrap_or_default()
+        self.library.visible_items()
     }
 
     /// Returns the number of items in the filtered, sorted result set.
@@ -25,7 +25,7 @@ impl LibraryController {
     /// times a frame.
     #[must_use]
     pub fn visible_items_count(&self) -> usize {
-        self.items_cache.as_deref().map_or(0, Vec::len)
+        self.library.visible_items_count()
     }
 
     /// Returns a slice of the filtered, sorted result set.
@@ -35,87 +35,13 @@ impl LibraryController {
     /// it draws, so it copies only the items in `range`.
     #[must_use]
     pub fn visible_items_slice(&self, range: std::ops::Range<usize>) -> Vec<LibraryItem> {
-        self.items_cache
-            .as_deref()
-            .and_then(|items| items.get(range))
-            .map(<[LibraryItem]>::to_vec)
-            .unwrap_or_default()
+        self.library.visible_items_slice(range)
     }
 
     /// Returns the grouped result set for the current state.
     #[must_use]
     pub fn visible_items_grouped(&self) -> Arc<Vec<ItemGroup>> {
-        self.grouped_items_cache.clone().unwrap_or_default()
-    }
-
-    /// Builds an `ItemFilter` representing the current sidebar filter, before
-    /// the search query is applied.
-    pub(in crate::controllers::library) fn current_item_filter(
-        &self)
-        -> dtrpg_core::data::index::ItemFilter<'_> {
-        let now_secs = now_secs();
-        let window_days = self.recently_updated_window_days;
-        match &self.filter {
-            SidebarFilter::AllTitles => dtrpg_core::data::index::ItemFilter::default(),
-            SidebarFilter::Tag { name, .. } => {
-                dtrpg_core::data::index::ItemFilter { tag_name: Some(name),
-                                                      ..Default::default() }
-            }
-            SidebarFilter::OnDevice => {
-                dtrpg_core::data::index::ItemFilter { status: Some(ItemStatus::Downloaded),
-                                                      ..Default::default() }
-            }
-            SidebarFilter::InCloud => {
-                dtrpg_core::data::index::ItemFilter { status: Some(ItemStatus::Cloud),
-                                                      ..Default::default() }
-            }
-            SidebarFilter::RecentlyUpdated => {
-                dtrpg_core::data::index::ItemFilter { recently_updated: Some((now_secs,
-                                                                              window_days)),
-                                                      ..Default::default() }
-            }
-            SidebarFilter::Publisher(name) => {
-                dtrpg_core::data::index::ItemFilter { publisher: Some(name),
-                                                      ..Default::default() }
-            }
-            SidebarFilter::Collection(..) => {
-                dtrpg_core::data::index::ItemFilter { collection_member_ids:
-                                                          Some(&self.collection_members),
-                                                      ..Default::default() }
-            }
-        }
-    }
-
-    /// Builds the grouped-items cache for the current `group_by`, or `None`
-    /// when grouping is disabled. Queries the index so grouping shares the
-    /// same source-of-truth as filtering and search.
-    pub(in crate::controllers::library) fn build_grouped_cache(&self)
-                                                               -> Option<Arc<Vec<ItemGroup>>> {
-        let mut filter = self.current_item_filter();
-        let query = SearchQuery::parse(&self.search_query);
-        filter.search = Some(&query);
-
-        match self.group_by {
-            GroupBy::None => None,
-            GroupBy::Publisher => {
-                let items =
-                    self.index()
-                        .list_items_for_grouping_by_publisher(&filter,
-                                                              self.sort,
-                                                              self.sort_direction)
-                        .inspect_err(|error| tracing::warn!(%error, "could not group by publisher"))
-                        .ok()?;
-                Some(Arc::new(split_by_publisher(items)))
-            }
-            GroupBy::Tag => {
-                let rows =
-                    self.index()
-                        .list_items_for_grouping_by_tag(&filter, self.sort, self.sort_direction)
-                        .inspect_err(|error| tracing::warn!(%error, "could not group by tag"))
-                        .ok()?;
-                Some(Arc::new(split_by_tag(rows, &t!("catalog.untagged"))))
-            }
-        }
+        self.library.visible_items_grouped()
     }
 
     // ── Sidebar filter mutations

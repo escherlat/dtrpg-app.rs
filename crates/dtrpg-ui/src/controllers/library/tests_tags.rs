@@ -9,6 +9,7 @@ use dtrpg_core::data::activity::ActivityStatus;
 use dtrpg_core::data::catalog_cache::save_catalog_cache;
 use dtrpg_core::data::index::LibraryIndex;
 use dtrpg_core::data::tag_color::TagColor;
+use dtrpg_core::data::tag_library::TagLibrary;
 use dtrpg_core::services::network_monitor::NetworkMonitor;
 use gpui::TestAppContext;
 

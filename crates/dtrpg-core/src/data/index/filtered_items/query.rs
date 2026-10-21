@@ -65,7 +65,7 @@ pub(in crate::data::index) fn count_items_filtered(conn: &Connection, filter: &I
 ///
 /// Group order is ascending by Unicode-lowercase publisher; item order within
 /// each group follows `sort`/`direction`. This matches
-/// `dtrpg_ui::util::publisher::group_by_publisher`'s behavior.
+/// `crate::util::publisher::group_by_publisher`'s behavior.
 ///
 /// # Errors
 ///
@@ -94,7 +94,7 @@ pub(in crate::data::index) fn list_items_for_grouping_by_publisher(
 ///
 /// Group order is ascending by Unicode-lowercase tag; item order within each
 /// group follows `sort`/`direction`. This matches
-/// `dtrpg_ui::util::publisher::group_by_tag`'s behavior.
+/// `crate::util::publisher::group_by_tag`'s behavior.
 ///
 /// # Errors
 ///

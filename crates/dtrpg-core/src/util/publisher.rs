@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dtrpg_core::data::library::LibraryItem;
-use dtrpg_core::data::tag_library::TagLibrary;
+use crate::data::library::LibraryItem;
+use crate::data::tag_library::TagLibrary;
 
 // ── Publisher aggregation
 // ─────────────────────────────────────────────────────
@@ -172,9 +172,8 @@ pub fn format_total_size(items: &[LibraryItem]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use dtrpg_core::data::library::LibraryItem;
-
     use super::*;
+    use crate::data::library::LibraryItem;
 
     fn item(publisher: &str) -> LibraryItem {
         LibraryItem::new("id",
@@ -187,7 +186,7 @@ mod tests {
                          0.0,
                          2020,
                          0,
-                         dtrpg_core::data::enums::ItemStatus::Cloud,
+                         crate::data::enums::ItemStatus::Cloud,
                          "#000000",
                          "",
                          None)

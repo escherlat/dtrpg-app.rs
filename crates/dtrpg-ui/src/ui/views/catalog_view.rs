@@ -10,6 +10,7 @@ use dtrpg_core::data::enums::{CatalogPresentation, GroupBy};
 use dtrpg_core::data::library::{LibraryItem, thumbnail_cooldown_elapsed};
 use dtrpg_core::platform::{Platform, PlatformIntegration, PlatformKind};
 use dtrpg_core::util::matching::collection_member_id;
+use dtrpg_core::util::publisher::ItemGroup;
 use dtrpg_core::util::sort::{SortDirection, SortMethod};
 use gpui::prelude::*;
 use gpui::{
@@ -44,7 +45,6 @@ use crate::ui::views::list_columns::{
     ListColumnSet, column_chooser_menu, column_sorted_by, sort_method_for,
 };
 use crate::ui::views::manage_collections_dialog::open_manage_collections_dialog;
-use crate::util::publisher::ItemGroup;
 use crate::util::reveal::reveal_in_file_manager;
 
 #[derive(Clone, Copy)]

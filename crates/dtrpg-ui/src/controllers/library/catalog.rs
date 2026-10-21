@@ -1,42 +1,16 @@
 //! Catalog apply/reload logic, publisher-filter validation, and the render
 //! snapshot.
 //!
-//! The library index (`self.index()`) is the catalog's only storage — there is
-//! no in-memory `Vec<LibraryItem>` mirror of it. Every method here that used
-//! to scan or mutate one now reads from or writes to `self.index()` directly.
-//! `thumbnail_last_attempted`/`availability_last_checked` are the two
-//! exceptions: they're session-only state the index never persists, kept in
-//! `self.thumbnail_attempts`/`self.availability_checks` and overlaid onto an
-//! item right after it's fetched from the index (see
-//! [`Self::overlay_ephemeral_state`]), so the UI-facing `LibraryItem` API is
-//! unchanged.
+//! The library index is the catalog's only storage, and
+//! `dtrpg_core::library::Library` is where the catalog-sync state machine
+//! (Slice 2) and the filtered/grouped query cache (Slice 3) both live. This
+//! controller reads through `self.library`'s accessor methods and owns only
+//! view state (the active filter/search/sort/group settings themselves,
+//! not their computed results).
 
 use super::*;
 
 impl LibraryController {
-    /// Sets `item.thumbnail_last_attempted`/`availability_last_checked` from
-    /// the controller's session-only tracking maps, since the index never
-    /// persists either (see this module's doc comment).
-    pub(super) fn overlay_ephemeral_state(&self, item: &mut LibraryItem) {
-        item.thumbnail_last_attempted = self.thumbnail_attempts.get(&item.id).copied();
-        item.availability_last_checked = self.availability_checks.get(&item.id).copied();
-    }
-
-    fn overlaid_items(&self, mut items: Vec<LibraryItem>) -> Vec<LibraryItem> {
-        for item in &mut items {
-            self.overlay_ephemeral_state(item);
-        }
-        items
-    }
-
-    /// Returns every item in the catalog, with ephemeral state overlaid.
-    ///
-    /// The one place every other catalog-reading method in this controller
-    /// should go through, so none of them forget the overlay.
-    pub(super) fn all_items(&self) -> Vec<LibraryItem> {
-        self.overlaid_items(self.index().list_items().unwrap_or_default())
-    }
-
     /// Looks up a catalog item by id, independent of the current popover
     /// selection, with ephemeral state overlaid.
     ///
@@ -44,55 +18,12 @@ impl LibraryController {
     /// tracks only the item id, not a full `LibraryItem` snapshot.
     #[must_use]
     pub fn item_by_id(&self, id: &str) -> Option<LibraryItem> {
-        let mut item = self.index()
-                           .get_item(id)
-                           .map_err(|e| tracing::warn!(error = %e, "library index query failed"))
-                           .ok()
-                           .flatten()?;
-        self.overlay_ephemeral_state(&mut item);
-        Some(item)
+        self.library.item_by_id(id)
     }
 
-    /// Recomputes the sidebar's section counts from the index facet query,
-    /// replacing the whole-catalog `all_items()` scan (issue #355).
-    ///
-    /// On query failure the previous counts are kept: a failed count leaves
-    /// stale-but-plausible numbers in the sidebar rather than zeroes in the
-    /// middle of a load that otherwise succeeds. Status changes never move
-    /// an item between publishers, so callers reacting to one item's status
-    /// only need this — see [`Self::refresh_sidebar_facets`] for the full
-    /// load-completion refresh.
-    pub(super) fn refresh_section_counts(&mut self) {
-        let now = now_secs();
-        let result = self.index()
-                         .section_counts(now, self.recently_updated_window_days);
-        match result {
-            Ok(counts) => self.section_counts = counts,
-            Err(error) => tracing::warn!(%error, "could not count the catalog sections"),
-        }
-    }
-
-    /// Refreshes both sidebar facet lists (section counts and publishers)
-    /// after a whole-catalog load, and returns whether the publisher list
-    /// was refreshed successfully. Callers that revalidate a `Publisher`
-    /// filter against the new list should skip it when this returns `false`:
-    /// revalidating stale numbers could drop a filter the catalog still
-    /// satisfies.
-    pub(super) fn refresh_sidebar_facets(&mut self) -> bool {
-        self.refresh_section_counts();
-        let result = self.index().publisher_counts();
-        match result {
-            Ok(counts) => {
-                self.publishers = counts.into_iter()
-                                        .map(|(name, count)| PublisherEntry { name, count })
-                                        .collect();
-                true
-            }
-            Err(error) => {
-                tracing::warn!(%error, "could not count the catalog publishers");
-                false
-            }
-        }
+    /// Returns every item in the catalog, with ephemeral state overlaid.
+    pub(super) fn all_items(&self) -> Vec<LibraryItem> {
+        self.library.all_items()
     }
 
     /// Reacts to new items a catalog-sync run (`dtrpg_core::library::Library`)
@@ -127,9 +58,28 @@ impl LibraryController {
     pub(super) fn react_to_prepopulated_items(&mut self, items: &[LibraryItem],
                                               cx: &mut Context<Self>) {
         self.enqueue_thumbnails(items, cx);
-        self.refresh_sidebar_facets();
+        let _ = self.refresh_sidebar_facets();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
+    }
+
+    /// Refreshes both sidebar facet lists (section counts and publishers)
+    /// in `Library`, and returns whether the publisher list was refreshed
+    /// successfully. Callers that revalidate a `Publisher` filter against
+    /// the new list should skip it when this returns `false`: revalidating
+    /// stale numbers could drop a filter the catalog still satisfies.
+    pub(super) fn refresh_sidebar_facets(&mut self) -> bool {
+        self.library
+            .refresh_sidebar_facets(now_secs(), self.recently_updated_window_days)
+    }
+
+    /// Refreshes only the sidebar's section counts in `Library`, cheaper
+    /// than [`Self::refresh_sidebar_facets`] for callers reacting to one
+    /// item's status change — status changes never move an item between
+    /// publishers, so there's no need to also refresh the publisher list.
+    pub(super) fn refresh_section_counts(&mut self) {
+        self.library
+            .refresh_section_counts(now_secs(), self.recently_updated_window_days);
     }
 
     /// Resets `self.filter` to [`SidebarFilter::AllTitles`] if it is a
@@ -150,13 +100,14 @@ impl LibraryController {
     }
 
     /// Convenience wrapper around [`Self::validate_publisher_filter`] using
-    /// the just-recomputed `self.publishers` as the known set.
+    /// `Library`'s just-recomputed publisher list as the known set.
     ///
-    /// Every catalog-load completion path that (re)computes `self.publishers`
+    /// Every catalog-load completion path that refreshes the publisher list
     /// must call this — see [`Self::react_to_new_catalog_items`], which every
     /// load-completing `LibraryEvent` handler goes through.
     pub(super) fn revalidate_publisher_filter(&mut self) {
-        let known_publishers: Vec<Arc<str>> = self.publishers
+        let known_publishers: Vec<Arc<str>> = self.library
+                                                  .publishers()
                                                   .iter()
                                                   .map(|p| Arc::clone(&p.name))
                                                   .collect();
@@ -203,8 +154,6 @@ impl LibraryController {
         }
         self.collections.clear();
         self.collection_members.clear();
-        self.section_counts = SectionCounts::default();
-        self.publishers.clear();
         self.invalidate_cache();
         // Queued availability checks reference items that no longer exist in
         // the now-cleared catalog; an in-flight check (if any) still
@@ -262,16 +211,17 @@ impl LibraryController {
         let items = self.visible_items_shared();
         let matched_count = items.len();
         let selected_item = self.selected_item();
+        let counts = self.library.section_counts();
         LibrarySnapshot { filter: self.filter.clone(),
-                          counts: self.section_counts,
-                          publishers: self.publishers.clone(),
+                          counts,
+                          publishers: self.library.publishers(),
                           collections: self.collections.clone(),
                           tags: self.tag_entries(),
                           collections_loaded: self.collections_loaded,
-                          catalog_ids: Arc::clone(&self.catalog_ids_cache),
-                          total_count: self.section_counts.all,
+                          catalog_ids: self.library.cached_catalog_ids(),
+                          total_count: counts.all,
                           total_mb: self.total_size_mb(),
-                          filter_count: self.filter_count_cache,
+                          filter_count: self.library.filter_count(),
                           matched_count,
                           search_query: self.search_query.clone(),
                           sort: self.sort,
@@ -302,99 +252,34 @@ impl LibraryController {
     }
 
     /// Builds the set of all product IDs that can match a collection's
-    /// `member_ids`.
-    ///
-    /// Includes both `order_product_id` and `product_id` since the product
-    /// list items API returns `productId` (not `orderProductId`) in its
-    /// response.
+    /// `member_ids`, by a full catalog scan.
     pub(super) fn catalog_ids(&self) -> HashSet<u64> {
-        let all = self.all_items();
-        let mut ids = HashSet::with_capacity(all.len() * 2);
-        for item in &all {
-            if item.order_product_id > 0 {
-                ids.insert(item.order_product_id);
-            }
-            if item.product_id > 0 {
-                ids.insert(item.product_id);
-            }
-        }
-        ids
+        self.library.catalog_ids()
     }
 
-    /// Records that a thumbnail fetch for item `id` was attempted at `at`, in
-    /// the session-only tracking map and in the cached result set.
-    ///
-    /// Does not recompute the result set, as [`invalidate_cache`] would: the
-    /// time is in neither the filter nor the sort, and a cover arrives for
-    /// every item scrolled into view.
-    ///
-    /// [`invalidate_cache`]: Self::invalidate_cache
+    /// Records that a thumbnail fetch for item `id` was attempted at `at`.
     pub(super) fn note_thumbnail_attempt(&mut self, id: &Arc<str>, at: std::time::SystemTime) {
-        self.thumbnail_attempts.insert(Arc::clone(id), at);
-        let Some(cached) = self.items_cache.as_mut()
-        else {
-            return;
-        };
-        if let Some(item) = Arc::make_mut(cached).iter_mut().find(|item| item.id == *id) {
-            item.thumbnail_last_attempted = Some(at);
-        }
+        self.library.note_thumbnail_attempt(id, at);
     }
 
     // ── Filtered result set
     // ───────────────────────────────────────────────────
 
-    /// Recomputes the filtered, sorted item cache from the catalog's current
-    /// filter, search query, and sort settings.
+    /// Recomputes `Library`'s filtered, sorted item cache from the
+    /// controller's current filter, search query, sort, and group-by
+    /// settings.
     ///
-    /// Called eagerly at every mutation site that changes any of those inputs
-    /// so render-path accessors never re-scan the catalog.
+    /// Called eagerly at every mutation site that changes any of those
+    /// inputs so render-path accessors never re-scan the catalog.
     pub(super) fn invalidate_cache(&mut self) {
-        // The toolbar's `filter_count` means "section size with search
-        // ignored" (`count_label_for`), so the count runs before `search`
-        // joins the WHERE. A failed count keeps the previous number, the same
-        // keep-stale-on-failure policy as the facet refreshes (issue #355).
-        let count = {
-            let item_filter = self.current_item_filter();
-            match self.index().count_items_filtered(&item_filter) {
-                Ok(count) => Some(count),
-                Err(error) => {
-                    tracing::warn!(%error, "could not count the filtered catalog");
-                    None
-                }
-            }
-        };
-        if let Some(count) = count {
-            self.filter_count_cache = count;
-        }
-
-        let matched = {
-            let query = SearchQuery::parse(&self.search_query);
-            let mut item_filter = self.current_item_filter();
-            item_filter.search = Some(&query);
-            match self.index()
-                      .list_items_filtered(&item_filter, self.sort, self.sort_direction)
-            {
-                Ok(items) => Some(items),
-                Err(error) => {
-                    // Both toolbar numbers describe the (empty) table that
-                    // follows; a stale count over an empty
-                    // result would contradict it.
-                    tracing::warn!(%error, "could not query the filtered catalog");
-                    None
-                }
-            }
-        };
-        let matched = match matched {
-            Some(items) => items,
-            None => {
-                self.filter_count_cache = 0;
-                Vec::new()
-            }
-        };
-        let items = self.overlaid_items(matched);
-
-        self.items_cache = Some(Arc::new(items));
-        self.grouped_items_cache = self.build_grouped_cache();
-        self.catalog_ids_cache = Arc::new(self.catalog_ids());
+        let view = ViewState { filter:                       self.filter.clone(),
+                               collection_members:           self.collection_members.clone(),
+                               search_query:                 self.search_query.clone(),
+                               sort:                         self.sort,
+                               sort_direction:               self.sort_direction,
+                               group_by:                     self.group_by,
+                               recently_updated_window_days: self.recently_updated_window_days, };
+        self.library
+            .invalidate_cache(&view, now_secs(), &t!("catalog.untagged"));
     }
 }
