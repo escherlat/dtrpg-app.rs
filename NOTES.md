@@ -849,3 +849,63 @@ make size-check
 ```
 
 All five are clean as of PR #367.
+
+---
+
+# Controller decomposition / ADR 0002 Slice 5: status at 2026-10-21
+
+Branch: `claude/vigilant-feynman-dv7fx2`, off `develop`. Issue #364.
+OpenSpec change: `openspec/changes/adr-0002-controller-decomposition`.
+
+## Slice 4 was not on `develop`
+
+PR #375 (Slice 4) was stacked on the Slice 3 branch and merged into it
+*after* #374 had already merged into `develop`, so the Slice 4 commit never
+reached `develop`. This branch merges that line in first, so this PR carries
+Slice 4 as well as Slice 5.
+
+## What exists now
+
+- `dtrpg_core::library` gained a `mutations` module. `Library` now owns every
+  write to a catalog entry outside a sync run, and the controller no longer
+  touches the index for writes (`LibraryController::index_mut` is gone):
+  - `apply_presence_verifications` (disk-presence reconciliation),
+  - `apply_availability_result` (a finished availability check),
+  - `record_download_result` (a finished download),
+  - `clear_item_downloads` ("Remove Download"),
+  - `clear_catalog` (sign-in and "clear and reload"),
+  - `items_affected_by_tag_edit` (which files a tag edit rewrites).
+- The optimistic collection-membership rules moved out of the controller as
+  pure functions (`add_member`, `remove_member`, `revert_added_member`,
+  `restore_removed_member`) with core-level unit tests and doctests.
+- `file_presence` and `icloud_status` moved from `dtrpg-ui` to
+  `dtrpg_core::util`; `dtrpg_ui::util` re-exports them so existing paths work.
+  `apply_check_result` and its tests moved to core with them.
+- After each write the controller still refreshes its section counts and view
+  caches with its own view state and emits `LibraryChanged`.
+
+## Not done
+
+- The `collections` list and `CollectionsService` are still on the controller,
+  so the membership edits are only half-moved: the rules are in core, the
+  state they edit is not.
+- The tag-load loop (`load_tags`) and `verifying_downloads` stay on the
+  controller.
+- `LibraryController` is therefore thinner but not yet a pure view-model.
+
+## Known test failure
+
+`library::sync::tests::full_fetch_writes_the_index_and_emits_fully_loaded`
+fails in the cloud sandbox used for this slice, with and without these
+changes. It was not investigated.
+
+## Verify before continuing
+
+```sh
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+make fmt-check
+make size-check
+```
+

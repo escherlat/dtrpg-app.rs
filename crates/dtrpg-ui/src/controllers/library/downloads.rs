@@ -16,17 +16,7 @@ impl LibraryController {
     /// `LibraryItem::recompute_status`): every file's `downloaded` flag is
     /// cleared first, then the entry status is re-derived.
     pub fn remove_download(&mut self, id: &str, cx: &mut Context<Self>) {
-        if let Some(mut item) = self.item_by_id(id)
-           && item.status == ItemStatus::Downloaded
-        {
-            for file in &mut item.files {
-                file.downloaded = false;
-                file.offloaded = false;
-            }
-            item.recompute_status();
-            if let Err(e) = self.index_mut().replace_item(&item) {
-                tracing::error!(error = %e, "failed to write item status to the library index");
-            }
+        if self.library.clear_item_downloads(id) {
             self.refresh_section_counts();
             self.invalidate_cache();
             self.file_info_cache

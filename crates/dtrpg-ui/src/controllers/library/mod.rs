@@ -18,9 +18,7 @@ use dtrpg_core::library::{
     Library, LibraryEvent, LibraryEvents, SyncStage, ViewState, reload_cooldown_active,
 };
 use dtrpg_core::services::collections::{CollectionsService, CollectionsServiceErrorKind};
-use dtrpg_core::services::{
-    DownloadControl, LibraryService, LibraryServiceError, LibraryServiceErrorKind,
-};
+use dtrpg_core::services::{DownloadControl, LibraryService, LibraryServiceErrorKind};
 use dtrpg_core::util::datetime::now_secs;
 use dtrpg_core::util::filter::*;
 use dtrpg_core::util::matching::*;
@@ -37,8 +35,8 @@ use crate::data::theme::LibriTheme;
 use crate::data::theme::*;
 use crate::ui::library::cover::{CoverCache, detail_cache_key};
 use crate::util::file_presence::{
-    ItemVerification, apply_presence_changes, collection_ids_for_item,
-    find_presence_changes_in_collections, resolved_file_path_in_collections, resolved_item_dir,
+    ItemVerification, collection_ids_for_item, find_presence_changes_in_collections,
+    resolved_file_path_in_collections, resolved_item_dir,
 };
 use crate::view_models::inspector::{InspectorContentsState, InspectorPreviewState, InspectorTab};
 use crate::view_models::library::{LibraryPaneState, LibraryViewModel};

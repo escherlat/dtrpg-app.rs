@@ -170,67 +170,6 @@ pub(crate) fn item_check_due(last_checked: Option<std::time::SystemTime>) -> boo
     }
 }
 
-/// Applies the result of a single-item availability check to `item`, per
-/// `catalog-availability-flag`'s single-item check requirement.
-///
-/// - `Ok`: replaces `item`'s fields with the fresh data, sets `is_available =
-///   true`, and records `checked_at`.
-/// - `Err` with kind `NotFound`: leaves other fields as-is, sets `is_available
-///   = false`, and records `checked_at`.
-/// - Any other `Err` (network, session, or otherwise): leaves `item` and its
-///   flag entirely unchanged — a transient failure is not evidence of removal.
-pub(crate) fn apply_check_result(item: &mut LibraryItem,
-                                 result: Result<LibraryItem, LibraryServiceError>,
-                                 checked_at: std::time::SystemTime) {
-    match result {
-        Ok(fresh) => {
-            // Preserve identity/collection-membership fields from the existing
-            // item rather than trusting the single-item response
-            // for them: a per-item availability re-check should
-            // only refresh display data, and blindly overwriting
-            // `order_product_id`/`product_id` here has been observed to
-            // silently corrupt `collection_member_id` lookups for the checked
-            // item (its collection membership stops resolving) when
-            // the single-item endpoint's response doesn't carry the
-            // exact same id values the list fetch populated.
-            let id = Arc::clone(&item.id);
-            let numeric_id = item.numeric_id;
-            let order_product_id = item.order_product_id;
-            let product_id = item.product_id;
-            // `downloaded` is a local-only fact the server response knows
-            // nothing about - the single-item endpoint always
-            // reports it `false`. Preserve each file's existing
-            // flag by id so a re-check (or the disk-presence
-            // verification racing it, see
-            // `verify-downloaded-status-against-disk`) doesn't get its
-            // correction wiped the moment this slower network check resolves.
-            let downloaded_by_id: HashMap<Arc<str>, bool> =
-                item.files
-                    .iter()
-                    .map(|f| (Arc::clone(&f.id), f.downloaded))
-                    .collect();
-            *item = fresh;
-            item.id = id;
-            item.numeric_id = numeric_id;
-            item.order_product_id = order_product_id;
-            item.product_id = product_id;
-            for file in &mut item.files {
-                if let Some(&downloaded) = downloaded_by_id.get(&file.id) {
-                    file.downloaded = downloaded;
-                }
-            }
-            item.recompute_status();
-            item.is_available = true;
-            item.availability_last_checked = Some(checked_at);
-        }
-        Err(e) if e.kind == LibraryServiceErrorKind::NotFound => {
-            item.is_available = false;
-            item.availability_last_checked = Some(checked_at);
-        }
-        Err(_) => {}
-    }
-}
-
 /// Returns `true` if a check-batch request (manual or automatic) should be
 /// suppressed because a batch was already enqueued too recently, per
 /// `ITEM_CHECK_BATCH_COOLDOWN_SECS`. `None` (no prior batch recorded) never

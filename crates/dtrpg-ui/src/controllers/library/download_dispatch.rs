@@ -131,28 +131,21 @@ impl LibraryController {
         let (item_id, index) = job.key.clone();
         let dest = job.dest.take();
         let succeeded = outcome == Outcome::Succeeded;
-        if let Some(mut item) = self.item_by_id(&item_id) {
-            if succeeded {
-                if let Some(file) = item.files.get_mut(index as usize) {
-                    file.downloaded = true;
-                    file.offloaded = false;
-                }
-                self.file_info_cache
-                    .remove(&(Arc::clone(&item_id), index as usize));
-                if let Some(dest) = &dest {
-                    create_collections_symlinks(dest,
-                                                item.order_product_id,
-                                                item.product_id,
-                                                &self.collections);
-                }
-            }
-            item.recompute_status();
-            // Persist the download to the library index immediately —
-            // otherwise a restart before the next catalog reload shows
-            // `Cloud` status regardless of what `reconcile_catalog` does
-            // (see `catalog-live-data-swap`).
-            if let Err(e) = self.index_mut().replace_item(&item) {
-                tracing::error!(error = %e, "failed to write download status to the library index");
+        // `Library` persists the download to the index immediately —
+        // otherwise a restart before the next catalog reload shows `Cloud`
+        // status regardless of what `reconcile_catalog` does (see
+        // `catalog-live-data-swap`).
+        if let Some(item) = self.library
+                                .record_download_result(&item_id, index, succeeded)
+           && succeeded
+        {
+            self.file_info_cache
+                .remove(&(Arc::clone(&item_id), index as usize));
+            if let Some(dest) = &dest {
+                create_collections_symlinks(dest,
+                                            item.order_product_id,
+                                            item.product_id,
+                                            &self.collections);
             }
         }
         self.refresh_section_counts();

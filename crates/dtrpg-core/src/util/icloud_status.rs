@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use dtrpg_core::platform::{FileState, Platform, PlatformIntegration};
+use crate::platform::{FileState, Platform, PlatformIntegration};
 
 /// Returns whether `path` is present as a cloud-only/offloaded placeholder.
 ///

@@ -51,18 +51,7 @@ impl LibraryController {
     /// the entry, leaves everything else about the live entry as it is now,
     /// so a download that completed after the check started is not undone.
     pub(super) fn apply_verifications(&mut self, verifications: &[ItemVerification]) -> bool {
-        let mut changed = false;
-        for verification in verifications {
-            if let Some(mut item) = self.item_by_id(&verification.item_id)
-               && apply_presence_changes(&mut item, &verification.changes)
-            {
-                changed = true;
-                if let Err(e) = self.index_mut().replace_item(&item) {
-                    tracing::error!(error = %e,
-                                    "failed to write item presence change to the library index");
-                }
-            }
-        }
+        let changed = self.library.apply_presence_verifications(verifications);
         if changed {
             self.refresh_section_counts();
             self.invalidate_cache();
@@ -182,21 +171,7 @@ impl LibraryController {
                 tracing::warn!(id = %job.item_id, error = %error,
                                "item availability check failed transiently");
             }
-            if let Some(mut existing) = self.item_by_id(&job.item_id) {
-                let checked_at = std::time::SystemTime::now();
-                apply_check_result(&mut existing, result, checked_at);
-                // `apply_check_result` leaves `availability_last_checked`
-                // unchanged on a transient error (preserving whatever the
-                // overlay in `item_by_id` already set it to) — only record
-                // a new value here when it actually changed.
-                if let Some(checked_at) = existing.availability_last_checked {
-                    self.library
-                        .note_availability_check(&job.item_id, checked_at);
-                }
-                if let Err(e) = self.index_mut().replace_item(&existing) {
-                    tracing::error!(error = %e,
-                                    "failed to write availability check result to the library index");
-                }
+            if self.library.apply_availability_result(&job.item_id, result) {
                 self.refresh_section_counts();
                 self.invalidate_cache();
             }

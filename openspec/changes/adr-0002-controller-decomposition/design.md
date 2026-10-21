@@ -77,6 +77,15 @@ Move per-item status changes, tag edits, collection membership edits, and
 disk-presence reconciliation into `Library`. `LibraryController` becomes a
 pure view-model.
 
+As built, `Library` owns every write to a catalog entry outside a sync run
+(`apply_presence_verifications`, `apply_availability_result`,
+`record_download_result`, `clear_item_downloads`, `clear_catalog`), the
+scope of a tag edit (`items_affected_by_tag_edit`), and the pure
+optimistic-membership rules (`add_member`, `remove_member` and their
+rollbacks). The controller no longer writes to the index. The collections
+list itself, its service, the tag-load loop, and the `verifying_downloads`
+set stay on the controller and are tracked as a follow-up.
+
 ## Render-path invariant
 
 No slice may add SQLite I/O or whole-catalog copies to the render path. The

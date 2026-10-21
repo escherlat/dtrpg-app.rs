@@ -149,9 +149,7 @@ impl LibraryController {
     /// which is harmless since it only caches an image for a URL that may
     /// no longer be visible.
     pub fn clear_and_reload(&mut self, cx: &mut Context<Self>) {
-        if let Err(e) = self.index_mut().replace_all_items(&[]) {
-            tracing::error!(error = %e, "failed to clear the library index");
-        }
+        self.library.clear_catalog();
         self.collections.clear();
         self.collection_members.clear();
         self.invalidate_cache();

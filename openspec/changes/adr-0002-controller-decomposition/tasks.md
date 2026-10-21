@@ -2,8 +2,9 @@
 - [x] Write OpenSpec proposal/design.
 - [x] Slice 1: Extract core `Library` skeleton (move index, queue, network monitor, cover fetcher).
 - [x] Slice 2: Move catalog load/refresh state machine into `Library`.
-- [ ] Slice 3: Move filtered/grouped queries and caches into `Library`.
-- [ ] Slice 4: Move download/check/thumbnail job orchestration into `Library`.
-- [ ] Slice 5: Move catalog mutations into `Library`; thin `LibraryController` to view-model.
+- [x] Slice 3: Move filtered/grouped queries and caches into `Library`.
+- [x] Slice 4: Move download/check/thumbnail job orchestration into `Library`.
+- [x] Slice 5: Move catalog mutations into `Library` (item status, disk-presence reconciliation, tag-edit scope, collection-membership edits).
+- [ ] Follow-up: move the collections list and `CollectionsService` into `Library`; move the tag-load loop and `verifying_downloads`; then `LibraryController` is a pure view-model.
 - [ ] Update `NOTES.md` ADR 0002 section when slices are merged.
 - [ ] Archive this OpenSpec change after merge.
