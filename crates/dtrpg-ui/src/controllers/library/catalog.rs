@@ -163,7 +163,7 @@ impl LibraryController {
         // If nothing is currently in flight, no fetch completion will ever
         // complete the aggregated activity item — without this, it would be
         // left showing "in progress" indefinitely.
-        if self.thumbnail_jobs.is_empty()
+        if self.library.thumbnail_jobs_is_empty()
            && let Some(id) = self.thumbnail_activity_id.take()
         {
             self.thumbnail_processed = 0;

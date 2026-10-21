@@ -59,7 +59,7 @@ fn a_download_marks_the_file_downloaded_and_completes_its_activity(cx: &mut Test
     let items = fixture.activity.read_with(cx, |a, _| a.snapshot().items);
     assert!(matches!(items[0].status, ActivityStatus::Complete));
     fixture.controller.read_with(cx, |ctrl, _| {
-                          assert!(ctrl.download_jobs.item_ids().next().is_none())
+                          assert!(ctrl.library.downloading_item_ids().is_empty())
                       });
 }
 
@@ -181,7 +181,7 @@ fn a_cancelled_download_changes_nothing_when_it_finishes(cx: &mut TestAppContext
     wait_for(cx, |_| fixture.library.cancelled() == [A]);
     wait_for(cx, |cx| {
         fixture.controller
-               .read_with(cx, |ctrl, _| ctrl.download_jobs.is_idle())
+               .read_with(cx, |ctrl, _| ctrl.library.download_jobs_is_idle())
     });
 
     assert_eq!(changes.load(Ordering::SeqCst),
