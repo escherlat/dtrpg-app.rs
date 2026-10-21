@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use dtrpg_core::data::index::{IndexError, LibraryIndex};
+use dtrpg_core::data::index::IndexError;
 use dtrpg_core::data::native_preferences::NativePreferences;
 use dtrpg_core::data::tag_color::TagColor;
 use dtrpg_core::data::tag_library::{TagEntry, TagLibrary};
@@ -51,12 +51,11 @@ impl LibraryController {
 
     /// Reads the tags from the library index in the background and shows them.
     pub(super) fn load_tags(&mut self, cx: &mut Context<Self>) {
-        self.tag_generation += 1;
-        let generation = self.tag_generation;
+        let generation = self.library.begin_tag_read();
         let cache_root = self.cache_root().clone();
         cx.spawn(async move |this, async_cx| {
               let loaded = async_cx.background_executor()
-                                   .spawn(async move { read_tag_library(&cache_root) })
+                                   .spawn(async move { Library::read_tags(&cache_root) })
                                    .await;
               this.update(async_cx, |ctrl, cx| match loaded {
                       Ok(library) => ctrl.show_tags(library, generation, cx),
@@ -73,10 +72,9 @@ impl LibraryController {
     /// `generation`, and keeps a tag filter on what it now holds.
     pub(super) fn show_tags(&mut self, library: TagLibrary, generation: u64,
                             cx: &mut Context<Self>) {
-        if generation < self.tag_generation {
+        if !self.library.set_tags_if_current(library, generation) {
             return;
         }
-        self.library.set_tags(library);
         self.refresh_tag_filter();
         self.invalidate_cache();
         cx.emit(LibraryChanged);
@@ -136,7 +134,7 @@ impl LibraryController {
     /// result: the last read starts after the last edit has finished.
     fn edit_tags(&mut self, edit: TagEdit, cx: &mut Context<Self>) {
         let affected = self.library.items_affected_by_tag_edit(&edit);
-        let collections = self.collections.clone();
+        let collections = self.library.collections();
         let cache_root = self.cache_root().clone();
         cx.spawn(async move |this, async_cx| {
               let outcome =
@@ -193,9 +191,4 @@ impl LibraryController {
 fn tag_filter(name: &Arc<str>, library: &TagLibrary) -> SidebarFilter {
     SidebarFilter::Tag { name:  Arc::clone(name),
                          items: Arc::new(library.items_with(name)), }
-}
-
-/// Reads the library's tags from the index under `index_root`.
-fn read_tag_library(index_root: &Path) -> Result<TagLibrary, IndexError> {
-    TagLibrary::load(&LibraryIndex::open_and_migrate(index_root)?)
 }

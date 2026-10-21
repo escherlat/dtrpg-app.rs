@@ -26,7 +26,7 @@ impl LibraryController {
         else {
             return;
         };
-        let collection_ids = collection_ids_for_item(&item, &self.collections);
+        let collection_ids = collection_ids_for_item(&item, &self.library.collections());
         let service = self.vm.service_arc();
         let order_product_id = item.order_product_id;
         let key = (Arc::clone(&item.id), index);
@@ -145,7 +145,7 @@ impl LibraryController {
                 create_collections_symlinks(dest,
                                             item.order_product_id,
                                             item.product_id,
-                                            &self.collections);
+                                            &self.library.collections());
             }
         }
         self.refresh_section_counts();

@@ -916,3 +916,17 @@ The set of entries being checked against disk now lives in `Library`
 the controller holds no job-state sets. Still on the controller: the
 `collections` list and `CollectionsService`, and the `load_tags` loop.
 
+## Follow-up: collections and tag reads moved (2026-10-21)
+
+- `Library` now owns the collections list and its loaded flag
+  (`collections`, `collections_loaded`, `set_collections`, `push_collection`,
+  `remove_collection`, `sort_collections`, `collection_member_ids`, and the
+  optimistic membership edits with their rollbacks). Readers take an `Arc`
+  clone; an edit while a reader holds one copies the list.
+- `LibraryController::collections()` replaces the public `collections` field.
+- The tag-read generation guard moved too (`begin_tag_read`,
+  `set_tags_if_current`, `read_tags`).
+- Left on the controller by design: the `CollectionsService` handle and the
+  gpui spawn glue around the service calls. Everything the controller still
+  holds is view state or an adapter.
+

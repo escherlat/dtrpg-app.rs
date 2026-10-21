@@ -100,11 +100,11 @@ fn setup(cx: &mut TestAppContext, create: bool, answer: Answer) -> Setup {
     fixture.controller.update(cx, move |ctrl, _| {
                           ctrl.collections_service = for_controller;
                           ctrl.storage_override = Some(shared);
-                          ctrl.collections
-                              .push(CollectionEntry { id:         COLLECTION_ID,
-                                                      name:       COLLECTION_NAME.into(),
-                                                      member_ids: Arc::from([]),
-                                                      created_at: 0, });
+                          ctrl.library
+                              .push_collection(CollectionEntry { id:         COLLECTION_ID,
+                                                                 name:       COLLECTION_NAME.into(),
+                                                                 member_ids: Arc::from([]),
+                                                                 created_at: 0, });
                       });
     Setup { fixture,
             service,
@@ -271,7 +271,9 @@ fn the_link_stays_when_the_server_refuses_the_removal(cx: &mut TestAppContext) {
     let dest = put_on_disk(&setup.storage, &setup.item, 0);
     link_into_collection(&dest, &setup.storage.root_path(), COLLECTION_NAME);
     setup.fixture.controller.update(cx, |ctrl, _| {
-                                ctrl.collections[0].member_ids = Arc::from([1]);
+                                let mut collections = ctrl.library.collections().to_vec();
+                                collections[0].member_ids = Arc::from([1]);
+                                ctrl.library.set_collections(collections);
                             });
 
     setup.remove_item(cx);

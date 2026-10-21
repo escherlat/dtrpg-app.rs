@@ -75,8 +75,6 @@ impl LibraryController {
                           list_columns: view_prefs.to_list_columns(),
                           presentation: view_prefs.to_presentation(),
                           selection: Selection::default(),
-                          collections: Vec::new(),
-                          collections_loaded: false,
                           collections_service: Arc::from(collections_service),
                           collection_members: HashSet::new(),
                           library,
@@ -108,7 +106,6 @@ impl LibraryController {
                           other_details_open: HashMap::new(),
                           file_other_details_open: HashMap::new(),
                           file_info_cache: HashMap::new(),
-                          tag_generation: 0,
                           file_tag_sync_running: false,
                           storage_override: None,
                           file_tags_reconciled: false,
@@ -257,7 +254,7 @@ impl LibraryController {
     /// running must not be reverted to `Cloud` by a snapshot that predates it.
     pub(super) fn verify_catalog_downloads(&mut self, cx: &mut Context<Self>) {
         let catalog = self.index().list_items().unwrap_or_default();
-        let collections = self.collections.clone();
+        let collections = self.library.collections();
         let ids: HashSet<Arc<str>> = catalog.iter().map(|i| Arc::clone(&i.id)).collect();
         self.library.begin_verifying(ids.iter().cloned());
         cx.emit(LibraryChanged);

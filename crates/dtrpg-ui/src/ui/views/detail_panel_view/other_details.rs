@@ -134,7 +134,7 @@ pub(super) fn render_collections_section(item: &LibraryItem, entity: Entity<Libr
     let product_id = item.product_id;
     let member_names: Vec<Arc<str>> =
         entity.read(cx)
-              .collections
+              .collections()
               .iter()
               .filter(|c| member_ids_contain(&c.member_ids, member_id, product_id))
               .map(|c| Arc::clone(&c.name))

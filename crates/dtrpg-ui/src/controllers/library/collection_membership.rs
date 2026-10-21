@@ -1,8 +1,6 @@
 //! Collection membership and filesystem-link updates.
 
-use dtrpg_core::library::{
-    RemovedMember, add_member, remove_member, restore_removed_member, revert_added_member,
-};
+use dtrpg_core::library::RemovedMember;
 
 use super::*;
 
@@ -25,7 +23,7 @@ impl LibraryController {
     /// catalog or not downloaded.
     fn unlink_item_from_removed_collection(&self, item_id: u64, product_id: u64,
                                            collection_name: Arc<str>,
-                                           collections_before: Vec<CollectionEntry>,
+                                           collections_before: Arc<Vec<CollectionEntry>>,
                                            cx: &mut Context<Self>) {
         let Some(item) = self.catalog_item_for_member(item_id, product_id)
         else {
@@ -51,12 +49,12 @@ impl LibraryController {
         else {
             return;
         };
-        let Some(collection) = self.collections.iter().find(|c| c.id == collection_id)
+        let collections = self.library.collections();
+        let Some(collection) = collections.iter().find(|c| c.id == collection_id)
         else {
             return;
         };
         let collection_name = Arc::clone(&collection.name);
-        let collections = self.collections.clone();
         let storage = self.storage_override.clone();
         cx.background_executor()
           .spawn(async move {
@@ -85,8 +83,8 @@ impl LibraryController {
     /// error notification.
     pub fn add_item_to_collection(&mut self, collection_id: u64, item_id: u64, product_id: u64,
                                   cx: &mut Context<Self>) {
-        let Some(collection_name) =
-            add_member(&mut self.collections, collection_id, item_id, product_id)
+        let Some(collection_name) = self.library
+                                        .add_collection_member(collection_id, item_id, product_id)
         else {
             return;
         };
@@ -129,7 +127,7 @@ impl LibraryController {
                       return;
                   }
                   this.update(async_cx, |ctrl, cx| {
-                          revert_added_member(&mut ctrl.collections, collection_id, item_id);
+                          ctrl.library.revert_added_collection_member(collection_id, item_id);
                           if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
                           {
                               ctrl.collection_members.remove(&item_id);
@@ -169,13 +167,14 @@ impl LibraryController {
     /// error notification.
     pub fn remove_item_from_collection(&mut self, collection_id: u64, item_id: u64,
                                        product_id: u64, cx: &mut Context<Self>) {
-        let collections_before = self.collections.clone();
+        let collections_before = self.library.collections();
         // Whichever id(s) are actually present are removed and remembered, so
         // that a failed removal restores exactly what was there before rather
         // than introducing an id that was never actually cached.
         let Some(RemovedMember { collection_name,
                                  removed_ids, }) =
-            remove_member(&mut self.collections, collection_id, item_id, product_id)
+            self.library
+                .remove_collection_member(collection_id, item_id, product_id)
         else {
             return;
         };
@@ -206,7 +205,7 @@ impl LibraryController {
                   }
                   Err(e) => {
                   this.update(async_cx, |ctrl, cx| {
-                          restore_removed_member(&mut ctrl.collections, collection_id, &removed_ids);
+                          ctrl.library.restore_removed_collection_member(collection_id, &removed_ids);
                           if matches!(&ctrl.filter, SidebarFilter::Collection(id, _) if *id == collection_id)
                           {
                               ctrl.collection_members.extend(&removed_ids);

@@ -9,6 +9,7 @@
 
 mod check_result;
 mod collection_members;
+mod collections;
 mod items;
 mod verifying;
 
@@ -16,3 +17,4 @@ pub use check_result::apply_check_result;
 pub use collection_members::{
     RemovedMember, add_member, remove_member, restore_removed_member, revert_added_member,
 };
+pub(super) use collections::CollectionsState;

@@ -209,13 +209,6 @@ pub struct LibraryController {
     pub presentation:              CatalogPresentation,
     /// The currently selected item id (for the detail panel).
     pub selection:                 Selection,
-    /// Collection list loaded from the API product-list endpoint.
-    pub collections:               Vec<CollectionEntry>,
-    /// True once the first `apply_collections` call has completed for the
-    /// current session. Used by the sidebar to show a "?" placeholder for
-    /// the collection count instead of a misleading `0` while the initial
-    /// fetch is still in flight.
-    collections_loaded:            bool,
     /// Backing service for collections; stored so it can be replaced on
     /// sign-in.
     collections_service:           Arc<dyn CollectionsService>,
@@ -341,9 +334,6 @@ pub struct LibraryController {
     /// The storage settings to use instead of the ones on disk. Only tests set
     /// it, so that they do not read or depend on the developer's own settings.
     storage_override:              Option<Arc<StorageConfig>>,
-    /// Counts the reads and edits of tags that have been started, so a result
-    /// that arrives after a newer one is dropped.
-    tag_generation:                u64,
     /// Whether the files' tags have been compared with the library's in this
     /// launch. A reload compares them again.
     file_tags_reconciled:          bool,
